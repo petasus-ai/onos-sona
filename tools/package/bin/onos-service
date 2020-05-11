@@ -26,7 +26,7 @@ set -u  # exit on undefined variable
 
 KARAF_ARGS=server
 SYS_APPS=drivers
-ONOS_APPS=${ONOS_APPS:-gui2}  # Activate GUI2 unless specific apps were named
+ONOS_APPS=${ONOS_APPS:-gui}  # Activate legacy GUI unless specific apps were named
 
 cd $ONOS_HOME
 
