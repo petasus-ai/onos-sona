@@ -243,7 +243,7 @@
     "io_netty_netty_codec-http2": "mvn:io.netty:netty-codec-http2:4.1.35.Final",
     "io_netty_netty_codec-http": "mvn:io.netty:netty-codec-http:4.1.35.Final",
     "io_netty_netty_codec-socks": "mvn:io.netty:netty-codec-socks:4.1.35.Final",
-    "io_netty_netty_tcnative_boringssl": "mvn:io.netty:netty-tcnative-boringssl-static:2.0.25.Final",
+    "io_netty_netty_tcnative_boringssl": "mvn:io.netty:netty-tcnative-boringssl-static:2.0.36.Final",
     "objenesis": "mvn:org.objenesis:objenesis:2.6",
     "openflowj": "mvn:org.onosproject:openflowj:3.2.1.onos",
     "org.osgi.util.function": "mvn:org.osgi:org.osgi.util.function:1.1.0",
@@ -361,6 +361,6 @@
     "stax2-api": "mvn:org.codehaus.woodstox:stax2-api:4.0.0",
     "concurrent-hashmap": "mvn:com.googlecode.concurrentlinkedhashmap:concurrentlinkedhashmap-lru:1.0",
     "gnu-idn": "mvn:org.gnu.inet:libidn:1.15",
-    "sigar":"mvn:org.knowhowlab.osgi:sigar:1.6.5_01"
+    "sigar":"mvn:io.kamon:sigar-loader:1.6.6-rev002"
   }
 }
