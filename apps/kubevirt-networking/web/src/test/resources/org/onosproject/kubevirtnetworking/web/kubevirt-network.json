@@ -3,6 +3,7 @@
   "name": "network",
   "type": "FLAT",
   "mtu": 1500,
+  "physnetName": "physnet",
   "cidr": "10.10.10.0/24",
   "gatewayIp": "10.10.10.1",
   "defaultRoute": true,

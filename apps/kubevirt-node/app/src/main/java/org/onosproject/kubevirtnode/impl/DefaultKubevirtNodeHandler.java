@@ -121,6 +121,9 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
     private final Logger log = getLogger(getClass());
 
     private static final String DEFAULT_OF_PROTO = "tcp";
+
+    private static final String OF_PREFIX = "of:";
+
     private static final int DEFAULT_OFPORT = 6653;
     private static final int DPID_BEGIN = 3;
     private static final int NETWORK_BEGIN = 3;
@@ -219,6 +222,14 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
 
         if (!deviceService.isAvailable(node.tunBridge())) {
             createBridge(node, TUNNEL_BRIDGE, node.tunBridge());
+        }
+
+        for (KubevirtPhyInterface kpi : node.phyIntfs()) {
+            if (!deviceService.isAvailable(kpi.physBridge())) {
+                createPhysicalBridge(node, kpi);
+                createPhysicalPatchPorts(node, kpi);
+                attachPhysicalPort(node, kpi);
+            }
         }
     }
 
@@ -600,7 +611,7 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                     return false;
                 }
             } else {
-                //In case node type is GATEWAY, we create physical bridges connected to the contoller.
+                //In case node type is GATEWAY, we create physical bridges connected to the controller.
                 //By doing so, ONOS immediately recognizes the status of physical interface and performs RM procedures.
                 Port phyIntfPort = deviceService.getPorts(phyIntf.physBridge()).stream()
                         .filter(port -> port.annotations().value(PORT_NAME).equals(phyIntf.intf()))
@@ -782,12 +793,36 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
     private void createPhysicalBridge(KubevirtNode osNode,
                                       KubevirtPhyInterface phyInterface) {
         Device device = deviceService.getDevice(osNode.ovsdb());
-
         String bridgeName = BRIDGE_PREFIX + phyInterface.network();
+
+        IpAddress controllerIp = apiConfigService.apiConfig().controllerIp();
+        String serviceFqdn = apiConfigService.apiConfig().serviceFqdn();
+        IpAddress serviceIp = null;
+
+        if (controllerIp == null) {
+            if (serviceFqdn != null) {
+                serviceIp = resolveHostname(serviceFqdn);
+            }
+
+            if (serviceIp != null) {
+                controllerIp = serviceIp;
+            } else {
+                controllerIp = apiConfigService.apiConfig().ipAddress();
+            }
+        }
+
+        ControllerInfo controlInfo = new ControllerInfo(controllerIp, DEFAULT_OFPORT, DEFAULT_OF_PROTO);
+        List<ControllerInfo> controllers = Lists.newArrayList(controlInfo);
+
+        String dpid = phyInterface.physBridge().toString().substring(DPID_BEGIN);
 
         BridgeDescription.Builder builder = DefaultBridgeDescription.builder()
                 .name(bridgeName)
-                .mcastSnoopingEnable();
+                .failMode(BridgeDescription.FailMode.SECURE)
+                .datapathId(dpid)
+                .mcastSnoopingEnable()
+                .disableInBand()
+                .controllers(controllers);
 
         BridgeConfig bridgeConfig = device.as(BridgeConfig.class);
         bridgeConfig.addBridge(builder.build());

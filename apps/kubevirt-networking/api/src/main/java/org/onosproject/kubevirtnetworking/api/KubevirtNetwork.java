@@ -98,6 +98,13 @@ public interface KubevirtNetwork {
     String segmentId();
 
     /**
+     * Returns the physical network name.
+     *
+     * @return physical network name
+     */
+    String physnetName();
+
+    /**
      * Returns gateway IP address.
      *
      * @return gateway IP address
@@ -138,6 +145,14 @@ public interface KubevirtNetwork {
      * @return a set of DNS
      */
     Set<IpAddress> dnses();
+
+    /**
+     * Returns the flat physnet bridge's device identifier.
+     *
+     * @param hostname kubevirt node hostname
+     * @return device identifier
+     */
+    DeviceId flatDeviceId(String hostname);
 
     /**
      * Returns the tenant integration bridge name in case the bridge type
@@ -222,6 +237,14 @@ public interface KubevirtNetwork {
          * @return network builder
          */
         Builder segmentId(String segmentId);
+
+        /**
+         * Returns network builder with supplied physnet name.
+         *
+         * @param physnetName physical network name
+         * @return network builder
+         */
+        Builder physnetName(String physnetName);
 
         /**
          * Returns network builder with supplied gateway IP address.

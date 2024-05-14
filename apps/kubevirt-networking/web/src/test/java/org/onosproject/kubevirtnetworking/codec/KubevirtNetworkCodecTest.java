@@ -95,6 +95,7 @@ public final class KubevirtNetworkCodecTest {
                 .networkId("net-1")
                 .name("net-1")
                 .type(KubevirtNetwork.Type.FLAT)
+                .physnetName("physnet")
                 .gatewayIp(IpAddress.valueOf("10.10.10.1"))
                 .defaultRoute(true)
                 .mtu(1500)
@@ -120,6 +121,7 @@ public final class KubevirtNetworkCodecTest {
         assertThat(network.networkId(), is("network-1"));
         assertThat(network.name(), is("network-1"));
         assertThat(network.type().name(), is("FLAT"));
+        assertThat(network.physnetName(), is("physnet"));
         assertThat(network.cidr(), is("10.10.0.0/24"));
         assertThat(network.gatewayIp().toString(), is("10.10.0.1"));
         assertThat(network.defaultRoute(), is(true));

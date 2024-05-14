@@ -34,6 +34,7 @@ public final class KubevirtNetworkJsonMatcher extends TypeSafeDiagnosingMatcher<
     private static final String NAME = "name";
     private static final String MTU = "mtu";
     private static final String SEGMENT_ID = "segmentId";
+    private static final String PHYSNET_NAME = "physnetName";
     private static final String GATEWAY_IP = "gatewayIp";
     private static final String DEFAULT_ROUTE = "defaultRoute";
     private static final String CIDR = "cidr";
@@ -109,6 +110,16 @@ public final class KubevirtNetworkJsonMatcher extends TypeSafeDiagnosingMatcher<
             String segmentId = network.segmentId();
             if (!jsonSegmentId.asText().equals(segmentId)) {
                 description.appendText("segment ID was " + jsonSegmentId.asText());
+                return false;
+            }
+        }
+
+        // check physnet name
+        JsonNode jsonPhysnetName = jsonNode.get(PHYSNET_NAME);
+        if (jsonPhysnetName != null) {
+            String physnetName = network.physnetName();
+            if (!jsonPhysnetName.asText().equals(physnetName)) {
+                description.appendText("physnet Name was " + jsonPhysnetName.asText());
                 return false;
             }
         }

@@ -41,6 +41,10 @@ public class DefaultKubevirtNetworkTest {
     private static final Integer MTU_2 = 1400;
     private static final String SEGMENT_ID_1 = null;
     private static final String SEGMENT_ID_2 = "2";
+
+    private static final String PHYSNET_NAME_1 = "physnet";
+
+    private static final String PHYSNET_NAME_2 = null;
     private static final IpAddress GATEWAY_IP_1 = IpAddress.valueOf("10.10.10.1");
     private static final IpAddress GATEWAY_IP_2 = IpAddress.valueOf("20.20.20.1");
     private static final boolean DEFAULT_ROUTE_1 = true;
@@ -77,6 +81,7 @@ public class DefaultKubevirtNetworkTest {
                 .type(TYPE_1)
                 .mtu(MTU_1)
                 .segmentId(SEGMENT_ID_1)
+                .physnetName(PHYSNET_NAME_1)
                 .gatewayIp(GATEWAY_IP_1)
                 .defaultRoute(DEFAULT_ROUTE_1)
                 .cidr(CIDR_1)
@@ -91,6 +96,7 @@ public class DefaultKubevirtNetworkTest {
                 .type(TYPE_1)
                 .mtu(MTU_1)
                 .segmentId(SEGMENT_ID_1)
+                .physnetName(PHYSNET_NAME_1)
                 .gatewayIp(GATEWAY_IP_1)
                 .defaultRoute(DEFAULT_ROUTE_1)
                 .cidr(CIDR_1)
@@ -105,6 +111,7 @@ public class DefaultKubevirtNetworkTest {
                 .type(TYPE_2)
                 .mtu(MTU_2)
                 .segmentId(SEGMENT_ID_2)
+                .physnetName(PHYSNET_NAME_2)
                 .gatewayIp(GATEWAY_IP_2)
                 .defaultRoute(DEFAULT_ROUTE_2)
                 .cidr(CIDR_2)

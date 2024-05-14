@@ -1317,9 +1317,6 @@ public class KubevirtNetworkHandler {
                         case GRE:
                         case GENEVE:
                         case STT:
-                            if (network.segmentId() == null) {
-                                continue;
-                            }
                             createBridge(node, network);
                             createPatchTenantInterface(node, network);
                             setDefaultRulesForTenantNetwork(node, network);

@@ -47,6 +47,7 @@ public final class KubevirtNetworkCodec extends JsonCodec<KubevirtNetwork> {
     private static final String NAME = "name";
     private static final String MTU = "mtu";
     private static final String SEGMENT_ID = "segmentId";
+    private static final String PHYSNET_NAME = "physnetName";
     private static final String GATEWAY_IP = "gatewayIp";
     private static final String DEFAULT_ROUTE = "defaultRoute";
     private static final String CIDR = "cidr";
@@ -71,6 +72,10 @@ public final class KubevirtNetworkCodec extends JsonCodec<KubevirtNetwork> {
 
         if (network.segmentId() != null) {
             result.put(SEGMENT_ID, network.segmentId());
+        }
+
+        if (network.physnetName() != null) {
+            result.put(PHYSNET_NAME, network.physnetName());
         }
 
         if (network.hostRoutes() != null && !network.hostRoutes().isEmpty()) {
@@ -133,6 +138,11 @@ public final class KubevirtNetworkCodec extends JsonCodec<KubevirtNetwork> {
             JsonNode segmentIdJson = json.get(SEGMENT_ID);
             if (segmentIdJson != null) {
                 networkBuilder.segmentId(segmentIdJson.asText());
+            }
+        } else {
+            JsonNode physnetNameJson = json.get(PHYSNET_NAME);
+            if (physnetNameJson != null) {
+                networkBuilder.physnetName(physnetNameJson.asText());
             }
         }
 

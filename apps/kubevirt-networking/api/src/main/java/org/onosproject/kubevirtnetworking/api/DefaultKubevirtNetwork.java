@@ -53,6 +53,7 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
     private final String name;
     private final Integer mtu;
     private final String segmentId;
+    private final String physnetName;
     private final IpAddress gatewayIp;
     private final boolean defaultRoute;
     private final String cidr;
@@ -68,6 +69,7 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
      * @param name              network name
      * @param mtu               network MTU
      * @param segmentId         segment identifier
+     * @param physnetName       physnet name
      * @param gatewayIp         gateway IP address
      * @param defaultRoute      default route
      * @param cidr              CIDR of network
@@ -76,8 +78,8 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
      * @param dnses             a set of DNSes
      */
     public DefaultKubevirtNetwork(String networkId, Type type, String name,
-                                  Integer mtu, String segmentId, IpAddress gatewayIp,
-                                  boolean defaultRoute, String cidr,
+                                  Integer mtu, String segmentId, String physnetName,
+                                  IpAddress gatewayIp, boolean defaultRoute, String cidr,
                                   Set<KubevirtHostRoute> hostRoutes,
                                   KubevirtIpPool ipPool, Set<IpAddress> dnses) {
         this.networkId = networkId;
@@ -85,6 +87,7 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
         this.name = name;
         this.mtu = mtu;
         this.segmentId = segmentId;
+        this.physnetName = physnetName;
         this.gatewayIp = gatewayIp;
         this.defaultRoute = defaultRoute;
         this.cidr = cidr;
@@ -116,6 +119,11 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
     @Override
     public String segmentId() {
         return segmentId;
+    }
+
+    @Override
+    public String physnetName() {
+        return physnetName;
     }
 
     @Override
@@ -154,6 +162,15 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
         } else {
             return ImmutableSet.copyOf(dnses);
         }
+    }
+
+    @Override
+    public DeviceId flatDeviceId(String hostname) {
+        if (type == FLAT) {
+            String dpid = genDpidFromName(physnetName() + "-" + hostname);
+            return DeviceId.deviceId(dpid);
+        }
+        return null;
     }
 
     @Override
@@ -214,8 +231,8 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
 
     @Override
     public int hashCode() {
-        return Objects.hash(networkId, type, name, mtu, segmentId, gatewayIp,
-                defaultRoute, cidr, hostRoutes, ipPool, dnses);
+        return Objects.hash(networkId, type, name, mtu, segmentId, physnetName,
+                gatewayIp, defaultRoute, cidr, hostRoutes, ipPool, dnses);
     }
 
     @Override
@@ -226,6 +243,7 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
                 .add("name", name)
                 .add("mtu", mtu)
                 .add("segmentId", segmentId)
+                .add("physnetName", physnetName)
                 .add("gatewayIp", gatewayIp)
                 .add("defaultRoute", defaultRoute)
                 .add("cidr", cidr)
@@ -273,6 +291,7 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
         private String name;
         private Integer mtu;
         private String segmentId;
+        private String physnetName;
         private IpAddress gatewayIp;
         private boolean defaultRoute;
         private String cidr;
@@ -293,12 +312,16 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
                 checkArgument(segmentId != null, NOT_NULL_MSG, "segmentId");
             }
 
+            if (type == FLAT) {
+                checkArgument(physnetName != null, NOT_NULL_MSG, "physnetName");
+            }
+
             if (dnses == null) {
                 dnses = new HashSet<>();
             }
 
             return new DefaultKubevirtNetwork(networkId, type, name, mtu, segmentId,
-                    gatewayIp, defaultRoute, cidr, hostRouts, ipPool, dnses);
+                    physnetName, gatewayIp, defaultRoute, cidr, hostRouts, ipPool, dnses);
         }
 
         @Override
@@ -328,6 +351,12 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
         @Override
         public Builder segmentId(String segmentId) {
             this.segmentId = segmentId;
+            return this;
+        }
+
+        @Override
+        public Builder physnetName(String physnetName) {
+            this.physnetName = physnetName;
             return this;
         }
 

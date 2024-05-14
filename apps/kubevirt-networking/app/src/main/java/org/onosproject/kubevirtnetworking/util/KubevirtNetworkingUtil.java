@@ -121,6 +121,7 @@ public final class KubevirtNetworkingUtil {
     private static final String TYPE = "type";
     private static final String MTU = "mtu";
     private static final String SEGMENT_ID = "segmentId";
+    private static final String PHYSNET_NAME = "physnetName";
     private static final String GATEWAY_IP = "gatewayIp";
     private static final String DEFAULT_ROUTE = "defaultRoute";
     private static final String CIDR = "cidr";
@@ -1026,6 +1027,8 @@ public final class KubevirtNetworkingUtil {
 
             if (!type.equalsIgnoreCase(FLAT.name())) {
                 builder.segmentId(configJson.getString(SEGMENT_ID, ""));
+            } else {
+                builder.physnetName(configJson.getString(PHYSNET_NAME, ""));
             }
 
             String cidr = configJson.getString(CIDR, "");

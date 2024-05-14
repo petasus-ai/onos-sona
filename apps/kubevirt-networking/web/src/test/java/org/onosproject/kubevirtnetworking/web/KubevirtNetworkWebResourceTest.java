@@ -85,6 +85,7 @@ public class KubevirtNetworkWebResourceTest extends ResourceTest {
                 .networkId("network")
                 .name("network")
                 .type(KubevirtNetwork.Type.FLAT)
+                .physnetName("physnet")
                 .cidr("10.10.10.0/24")
                 .mtu(1500)
                 .gatewayIp(IpAddress.valueOf("10.10.10.1"))

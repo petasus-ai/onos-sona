@@ -84,6 +84,7 @@ public class KubevirtSwitchingPhysicalHandler {
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected KubevirtNodeService kubevirtNodeService;
 
+
     private final ExecutorService eventExecutor = newSingleThreadExecutor(
             groupedThreads(this.getClass().getSimpleName(), "event-handler"));
     private final InternalDeviceListener internalDeviceListener = new InternalDeviceListener();
