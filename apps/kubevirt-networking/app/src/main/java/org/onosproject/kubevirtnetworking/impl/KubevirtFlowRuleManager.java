@@ -270,11 +270,6 @@ public class KubevirtFlowRuleManager implements KubevirtFlowRuleService {
 
         // for setting up default Forwarding table behavior which is NORMAL
         setupNormalTable(deviceId, FORWARDING_TABLE);
-
-        kubevirtNode.phyIntfs().stream().filter(intf -> intf.physBridge() != null)
-                .forEach(phyIntf -> {
-                    setupNormalTable(phyIntf.physBridge(), STAT_INBOUND_TABLE);
-                });
     }
 
     private void setupArpTable(DeviceId deviceId) {

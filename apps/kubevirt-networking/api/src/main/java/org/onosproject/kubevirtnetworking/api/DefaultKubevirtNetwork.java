@@ -165,15 +165,6 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
     }
 
     @Override
-    public DeviceId flatDeviceId(String hostname) {
-        if (type == FLAT) {
-            String dpid = genDpidFromName(physnetName() + "-" + hostname);
-            return DeviceId.deviceId(dpid);
-        }
-        return null;
-    }
-
-    @Override
     public String tenantBridgeName() {
         if (type == VXLAN || type == GRE || type == GENEVE || type == STT) {
             return TENANT_BRIDGE_PREFIX + segmentIdHex(segmentId);

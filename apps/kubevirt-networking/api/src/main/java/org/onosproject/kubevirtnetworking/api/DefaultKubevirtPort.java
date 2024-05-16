@@ -22,6 +22,7 @@ import org.onlab.packet.IpAddress;
 import org.onlab.packet.MacAddress;
 import org.onosproject.kubevirtnode.api.KubevirtNode;
 import org.onosproject.kubevirtnode.api.KubevirtNodeService;
+import org.onosproject.kubevirtnode.api.KubevirtPhyInterface;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
 
@@ -109,6 +110,30 @@ public final class DefaultKubevirtPort implements KubevirtPort {
     }
 
     @Override
+    public DeviceId physnetDeviceId() {
+        KubevirtNetworkService networkService =
+                DefaultServiceDirectory.getService(KubevirtNetworkService.class);
+        KubevirtNodeService nodeService =
+                DefaultServiceDirectory.getService(KubevirtNodeService.class);
+        KubevirtNetwork network = networkService.network(networkId);
+        KubevirtNode node = nodeService.node(deviceId);
+
+        if (network == null || node == null) {
+            return null;
+        } else {
+            KubevirtPhyInterface kpi =
+                    node.phyIntfs().stream()
+                            .filter(pi -> pi.network().equals(network.physnetName()))
+                            .findAny().orElse(null);
+            if (kpi == null) {
+                return null;
+            } else {
+                return kpi.physBridge();
+            }
+        }
+    }
+
+    @Override
     public boolean isTenant() {
         KubevirtNetworkService networkService =
                 DefaultServiceDirectory.getService(KubevirtNetworkService.class);
@@ -120,6 +145,18 @@ public final class DefaultKubevirtPort implements KubevirtPort {
                     network.type() == KubevirtNetwork.Type.GRE ||
                     network.type() == KubevirtNetwork.Type.GENEVE ||
                     network.type() == KubevirtNetwork.Type.STT;
+        }
+    }
+
+    @Override
+    public boolean isFlat() {
+        KubevirtNetworkService networkService =
+                DefaultServiceDirectory.getService(KubevirtNetworkService.class);
+        KubevirtNetwork network = networkService.network(networkId);
+        if (network == null) {
+            return false;
+        } else {
+            return network.type() == KubevirtNetwork.Type.FLAT;
         }
     }
 

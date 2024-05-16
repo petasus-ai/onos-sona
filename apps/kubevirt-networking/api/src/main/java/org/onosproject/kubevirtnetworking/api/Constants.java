@@ -39,6 +39,8 @@ public final class Constants {
 
     public static final String INSTANCE_PORT_PREFIX = "veth";
 
+    public static final String STATE_ENABLED = "enabled";
+
     // provider and VLAN integration bridge flow table index
     public static final int STAT_INBOUND_TABLE = 0;
     public static final int VTAP_INBOUND_TABLE = 1;
@@ -56,15 +58,15 @@ public final class Constants {
     public static final int ERROR_TABLE = 100;
 
     // tenant (VXLAN/GRE/GENEVE) integration bridge flow table index
-    public static final int TENANT_INBOUND_TABLE = 0;
-    public static final int TENANT_DHCP_TABLE = 5;
-    public static final int TENANT_ARP_TABLE = 30;
-    public static final int TENANT_ICMP_TABLE = 35;
-    public static final int TENANT_ACL_EGRESS_TABLE = 40;
-    public static final int TENANT_ACL_RECIRC_TABLE = 43;
-    public static final int TENANT_ACL_INGRESS_TABLE = 44;
-    public static final int TENANT_ACL_CT_TABLE = 45;
-    public static final int TENANT_FORWARDING_TABLE = 80;
+    public static final int COMMON_INBOUND_TABLE = 0;
+    public static final int COMMON_DHCP_TABLE = 5;
+    public static final int COMMON_ARP_TABLE = 30;
+    public static final int COMMON_ICMP_TABLE = 35;
+    public static final int COMMON_ACL_EGRESS_TABLE = 40;
+    public static final int COMMON_ACL_RECIRC_TABLE = 43;
+    public static final int COMMON_ACL_INGRESS_TABLE = 44;
+    public static final int COMMON_ACL_CT_TABLE = 45;
+    public static final int COMMON_FORWARDING_TABLE = 80;
 
     // tunnel bridge flow table index
     public static final int TUNNEL_DEFAULT_TABLE = 0;

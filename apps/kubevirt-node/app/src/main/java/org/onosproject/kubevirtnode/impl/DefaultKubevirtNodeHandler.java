@@ -227,8 +227,11 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
         for (KubevirtPhyInterface kpi : node.phyIntfs()) {
             if (!deviceService.isAvailable(kpi.physBridge())) {
                 createPhysicalBridge(node, kpi);
-                createPhysicalPatchPorts(node, kpi);
                 attachPhysicalPort(node, kpi);
+
+                if (node.type() == GATEWAY) {
+                    createPhysicalPatchPorts(node, kpi);
+                }
             }
         }
     }
@@ -603,10 +606,8 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
             if (node.type() == WORKER) {
                 String bridgeName = BRIDGE_PREFIX + phyIntf.network();
                 if (!(hasPhyBridge(node, bridgeName) &&
-                        hasPhyPatchPort(node, patchPortName) &&
                         hasPhyIntf(node, phyIntf.intf()))) {
                     log.warn("PhyBridge {}", hasPhyBridge(node, bridgeName));
-                    log.warn("hasPhyPatchPort {}", hasPhyPatchPort(node, patchPortName));
                     log.warn("hasPhyIntf {}", hasPhyIntf(node, phyIntf.intf()));
                     return false;
                 }
@@ -674,34 +675,36 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                     structurePortName(INTEGRATION_TO_PHYSICAL_PREFIX + pi.network());
             if (node.type() == WORKER && !hasPhyBridge(node, bridgeName)) {
                 createPhysicalBridge(node, pi);
-                createPhysicalPatchPorts(node, pi);
                 attachPhysicalPort(node, pi);
 
                 log.info("Creating physnet bridge {} for worker node {}", bridgeName, node.hostname());
-                log.info("Creating patch ports for physnet {} for worker node {}", bridgeName, node.hostname());
-
             } else if (node.type() == GATEWAY && (!deviceService.isAvailable(pi.physBridge()))) {
-                createPhysicalBridgeWithConnectedMode(node, pi);
+                createPhysicalBridge(node, pi);
                 createPhysicalPatchPorts(node, pi);
                 attachPhysicalPort(node, pi);
 
                 log.info("Creating physnet bridge {} for gateway node {}", bridgeName, node.hostname());
                 log.info("Creating patch ports for physnet {} for gateway node {}", bridgeName, node.hostname());
             } else {
-                // in case physical bridge exists, but patch port is missing,
-                // we will add patch port to connect br-physnet with physical bridge
-                if (!hasPhyPatchPort(node, patchPortName)) {
-                    createPhysicalPatchPorts(node, pi);
-
-                    log.info("Creating patch ports for physnet {}", bridgeName);
-                }
-
                 // in case physical bridge exists, but physnet interface is missing,
                 // we will add the physnet interface to connect br-physnet to the external
                 if (!hasPhyIntf(node, pi.intf())) {
                     attachPhysicalPort(node, pi);
 
                     log.info("Attaching external ports for physnet {}", bridgeName);
+                }
+
+                // we do not create any patch ports for worker nodes
+                if (node.type() == WORKER) {
+                    return;
+                }
+
+                // in case physical bridge exists, but patch port is missing,
+                // we will add patch port to connect br-physnet with physical bridge
+                if (!hasPhyPatchPort(node, patchPortName)) {
+                    createPhysicalPatchPorts(node, pi);
+
+                    log.info("Creating patch ports for physnet {}", bridgeName);
                 }
             }
         });
@@ -815,44 +818,6 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
         List<ControllerInfo> controllers = Lists.newArrayList(controlInfo);
 
         String dpid = phyInterface.physBridge().toString().substring(DPID_BEGIN);
-
-        BridgeDescription.Builder builder = DefaultBridgeDescription.builder()
-                .name(bridgeName)
-                .failMode(BridgeDescription.FailMode.SECURE)
-                .datapathId(dpid)
-                .mcastSnoopingEnable()
-                .disableInBand()
-                .controllers(controllers);
-
-        BridgeConfig bridgeConfig = device.as(BridgeConfig.class);
-        bridgeConfig.addBridge(builder.build());
-    }
-
-    private void createPhysicalBridgeWithConnectedMode(KubevirtNode osNode,
-                                                       KubevirtPhyInterface phyInterface) {
-        Device device = deviceService.getDevice(osNode.ovsdb());
-        IpAddress controllerIp = apiConfigService.apiConfig().controllerIp();
-        String serviceFqdn = apiConfigService.apiConfig().serviceFqdn();
-        IpAddress serviceIp = null;
-
-        if (controllerIp == null) {
-            if (serviceFqdn != null) {
-                serviceIp = resolveHostname(serviceFqdn);
-            }
-
-            if (serviceIp != null) {
-                controllerIp = serviceIp;
-            } else {
-                controllerIp = apiConfigService.apiConfig().ipAddress();
-            }
-        }
-
-        ControllerInfo controlInfo = new ControllerInfo(controllerIp, DEFAULT_OFPORT, DEFAULT_OF_PROTO);
-        List<ControllerInfo> controllers = Lists.newArrayList(controlInfo);
-
-        String dpid = phyInterface.physBridge().toString().substring(DPID_BEGIN);
-
-        String bridgeName = BRIDGE_PREFIX + phyInterface.network();
 
         BridgeDescription.Builder builder = DefaultBridgeDescription.builder()
                 .name(bridgeName)

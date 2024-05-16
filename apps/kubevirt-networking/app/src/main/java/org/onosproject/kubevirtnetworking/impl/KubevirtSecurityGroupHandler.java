@@ -87,19 +87,21 @@ import static org.onosproject.kubevirtnetworking.api.Constants.ACL_CT_TABLE;
 import static org.onosproject.kubevirtnetworking.api.Constants.ACL_EGRESS_TABLE;
 import static org.onosproject.kubevirtnetworking.api.Constants.ACL_INGRESS_TABLE;
 import static org.onosproject.kubevirtnetworking.api.Constants.ACL_RECIRC_TABLE;
+import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_ACL_CT_TABLE;
+import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_ACL_EGRESS_TABLE;
+import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_ACL_INGRESS_TABLE;
+import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_ACL_RECIRC_TABLE;
+import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_FORWARDING_TABLE;
 import static org.onosproject.kubevirtnetworking.api.Constants.ERROR_TABLE;
 import static org.onosproject.kubevirtnetworking.api.Constants.FORWARDING_TABLE;
+import static org.onosproject.kubevirtnetworking.api.Constants.INSTANCE_PORT_PREFIX;
 import static org.onosproject.kubevirtnetworking.api.Constants.KUBEVIRT_NETWORKING_APP_ID;
 import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_ACL_INGRESS_RULE;
 import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_ACL_RULE;
 import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_CT_DROP_RULE;
 import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_CT_HOOK_RULE;
 import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_CT_RULE;
-import static org.onosproject.kubevirtnetworking.api.Constants.TENANT_ACL_CT_TABLE;
-import static org.onosproject.kubevirtnetworking.api.Constants.TENANT_ACL_EGRESS_TABLE;
-import static org.onosproject.kubevirtnetworking.api.Constants.TENANT_ACL_INGRESS_TABLE;
-import static org.onosproject.kubevirtnetworking.api.Constants.TENANT_ACL_RECIRC_TABLE;
-import static org.onosproject.kubevirtnetworking.api.Constants.TENANT_FORWARDING_TABLE;
+import static org.onosproject.kubevirtnetworking.api.Constants.STATE_ENABLED;
 import static org.onosproject.kubevirtnetworking.api.Constants.TENANT_TO_TUNNEL_PREFIX;
 import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.FLAT;
 import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.VLAN;
@@ -112,6 +114,7 @@ import static org.onosproject.kubevirtnetworking.util.RulePopulatorUtil.computeC
 import static org.onosproject.kubevirtnetworking.util.RulePopulatorUtil.computeCtStateFlag;
 import static org.onosproject.kubevirtnetworking.util.RulePopulatorUtil.niciraConnTrackTreatmentBuilder;
 import static org.onosproject.kubevirtnode.api.KubevirtNode.Type.WORKER;
+import static org.onosproject.net.AnnotationKeys.ADMIN_STATE;
 import static org.onosproject.net.AnnotationKeys.PORT_NAME;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -270,8 +273,8 @@ public class KubevirtSecurityGroupHandler {
         initializeConnTrackTable(deviceId, ACL_CT_TABLE, FORWARDING_TABLE, install);
     }
 
-    private void initializeTenantConnTrackTable(DeviceId deviceId, boolean install) {
-        initializeConnTrackTable(deviceId, TENANT_ACL_CT_TABLE, TENANT_FORWARDING_TABLE, install);
+    private void initializeCommonConnTrackTable(DeviceId deviceId, boolean install) {
+        initializeConnTrackTable(deviceId, COMMON_ACL_CT_TABLE, COMMON_FORWARDING_TABLE, install);
     }
 
     private void initializeConnTrackTable(DeviceId deviceId, int ctTable,
@@ -300,8 +303,8 @@ public class KubevirtSecurityGroupHandler {
         initializeAclTable(deviceId, ACL_RECIRC_TABLE, PortNumber.NORMAL, install);
     }
 
-    private void initializeTenantAclTable(DeviceId deviceId, PortNumber portNumber, boolean install) {
-        initializeAclTable(deviceId, TENANT_ACL_RECIRC_TABLE, portNumber, install);
+    private void initializeCommonAclTable(DeviceId deviceId, PortNumber portNumber, boolean install) {
+        initializeAclTable(deviceId, COMMON_ACL_RECIRC_TABLE, portNumber, install);
     }
 
     private void initializeAclTable(DeviceId deviceId, int recircTable,
@@ -332,14 +335,14 @@ public class KubevirtSecurityGroupHandler {
         initializeEgressTable(deviceId, ACL_EGRESS_TABLE, FORWARDING_TABLE, install);
     }
 
-    private void initializeTenantEgressTable(DeviceId deviceId, boolean install) {
-        initializeEgressTable(deviceId, TENANT_ACL_EGRESS_TABLE, TENANT_FORWARDING_TABLE, install);
+    private void initializeCommonEgressTable(DeviceId deviceId, boolean install) {
+        initializeEgressTable(deviceId, COMMON_ACL_EGRESS_TABLE, COMMON_FORWARDING_TABLE, install);
     }
 
     private void initializeEgressTable(DeviceId deviceId, int egressTable,
                                        int forwardTable, boolean install) {
         if (install) {
-            flowRuleService.setUpTableMissEntry(deviceId, TENANT_ACL_EGRESS_TABLE);
+            flowRuleService.setUpTableMissEntry(deviceId, COMMON_ACL_EGRESS_TABLE);
         } else {
             flowRuleService.connectTables(deviceId, egressTable, forwardTable);
         }
@@ -349,8 +352,8 @@ public class KubevirtSecurityGroupHandler {
         initializeIngressTable(deviceId, ACL_INGRESS_TABLE, FORWARDING_TABLE, install);
     }
 
-    private void initializeTenantIngressTable(DeviceId deviceId, boolean install) {
-        initializeIngressTable(deviceId, TENANT_ACL_INGRESS_TABLE, TENANT_FORWARDING_TABLE, install);
+    private void initializeCommonIngressTable(DeviceId deviceId, boolean install) {
+        initializeIngressTable(deviceId, COMMON_ACL_INGRESS_TABLE, COMMON_FORWARDING_TABLE, install);
     }
 
     private void initializeIngressTable(DeviceId deviceId, int ingressTable,
@@ -369,12 +372,12 @@ public class KubevirtSecurityGroupHandler {
         initializeProviderAclTable(node.intgBridge(), install);
     }
 
-    private void initializeTenantPipeline(DeviceId deviceId,
+    private void initializeCommonPipeline(DeviceId deviceId,
                                           PortNumber portNumber, boolean install) {
-        initializeTenantIngressTable(deviceId, install);
-        initializeTenantEgressTable(deviceId, install);
-        initializeTenantConnTrackTable(deviceId, install);
-        initializeTenantAclTable(deviceId, portNumber, install);
+        initializeCommonIngressTable(deviceId, install);
+        initializeCommonEgressTable(deviceId, install);
+        initializeCommonConnTrackTable(deviceId, install);
+        initializeCommonAclTable(deviceId, portNumber, install);
     }
 
     private void updateSecurityGroupRule(KubevirtPort port,
@@ -439,7 +442,15 @@ public class KubevirtSecurityGroupHandler {
             return;
         }
 
-        DeviceId deviceId = port.isTenant() ? port.tenantDeviceId() : port.deviceId();
+        DeviceId deviceId;
+
+        if (port.isTenant()) {
+            deviceId = port.tenantDeviceId();
+        } else if (port.isFlat()) {
+            deviceId = port.physnetDeviceId();
+        } else {
+            deviceId = port.deviceId();
+        }
 
         Set<TrafficSelector> ctSelectors = buildSelectors(
                 sgRule,
@@ -472,20 +483,20 @@ public class KubevirtSecurityGroupHandler {
             if (net.type() == FLAT || net.type() == VLAN) {
                 aclTable = ACL_EGRESS_TABLE;
             } else {
-                aclTable = TENANT_ACL_EGRESS_TABLE;
+                aclTable = COMMON_ACL_EGRESS_TABLE;
             }
 
-            tBuilder.transition(TENANT_ACL_RECIRC_TABLE);
+            tBuilder.transition(COMMON_ACL_RECIRC_TABLE);
         } else {
 
             if (net.type() == FLAT || net.type() == VLAN) {
                 aclTable = ACL_INGRESS_TABLE;
             } else {
-                aclTable = TENANT_ACL_INGRESS_TABLE;
+                aclTable = COMMON_ACL_INGRESS_TABLE;
             }
 
             tBuilder.extension(ctTreatment, deviceId)
-                    .transition(TENANT_FORWARDING_TABLE);
+                    .transition(COMMON_FORWARDING_TABLE);
         }
 
         int finalAclTable = aclTable;
@@ -504,7 +515,7 @@ public class KubevirtSecurityGroupHandler {
                 .matchIPDst(IpPrefix.valueOf(port.ipAddress(), 32))
                 .build();
         TrafficTreatment tTreatment = DefaultTrafficTreatment.builder()
-                .transition(TENANT_ACL_INGRESS_TABLE)
+                .transition(COMMON_ACL_INGRESS_TABLE)
                 .build();
 
         flowRuleService.setRule(appId,
@@ -512,7 +523,7 @@ public class KubevirtSecurityGroupHandler {
                 tSelector,
                 tTreatment,
                 PRIORITY_ACL_RULE,
-                TENANT_ACL_RECIRC_TABLE,
+                COMMON_ACL_RECIRC_TABLE,
                 install);
     }
 
@@ -567,9 +578,9 @@ public class KubevirtSecurityGroupHandler {
 
         int tableType = ERROR_TABLE;
         if (priority == PRIORITY_CT_RULE || priority == PRIORITY_CT_DROP_RULE) {
-            tableType = TENANT_ACL_CT_TABLE;
+            tableType = COMMON_ACL_CT_TABLE;
         } else if (priority == PRIORITY_CT_HOOK_RULE) {
-            tableType = TENANT_ACL_INGRESS_TABLE;
+            tableType = COMMON_ACL_INGRESS_TABLE;
         } else {
             log.error("Cannot an appropriate table for the conn track rule.");
         }
@@ -807,11 +818,26 @@ public class KubevirtSecurityGroupHandler {
             nodeService.completeNodes(WORKER).forEach(node -> {
                 initializeProviderPipeline(node, true);
 
+                // pipeline for tenant bridge
                 for (Device device : deviceService.getDevices()) {
                     for (Port port : deviceService.getPorts(device.id())) {
                         String portName = port.annotations().value(PORT_NAME);
                         if (StringUtils.startsWithIgnoreCase(portName, TENANT_TO_TUNNEL_PREFIX)) {
-                            initializeTenantPipeline(device.id(), port.number(), true);
+                            initializeCommonPipeline(device.id(), port.number(), true);
+                        }
+                    }
+                }
+
+                // pipeline for physnet bridge
+                for (Device device : deviceService.getDevices()) {
+                    for (Port port : deviceService.getPorts(device.id())) {
+                        String portName = port.annotations().value(PORT_NAME);
+                        String adminState = port.annotations().value(ADMIN_STATE);
+                        // FIXME: since the physical port number can be changed on reboot,
+                        // we need to add another intermediate bridge to handle this
+                        if (!StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX) &&
+                                StringUtils.equals(adminState, STATE_ENABLED)) {
+                            initializeCommonPipeline(device.id(), port.number(), true);
                         }
                     }
                 }
@@ -823,11 +849,26 @@ public class KubevirtSecurityGroupHandler {
             nodeService.completeNodes(WORKER).forEach(node -> {
                 initializeProviderPipeline(node, false);
 
+                // pipeline for tenant bridge
                 for (Device device : deviceService.getDevices()) {
                     for (Port port : deviceService.getPorts(device.id())) {
                         String portName = port.annotations().value(PORT_NAME);
                         if (StringUtils.startsWithIgnoreCase(portName, TENANT_TO_TUNNEL_PREFIX)) {
-                            initializeTenantPipeline(device.id(), port.number(), false);
+                            initializeCommonPipeline(device.id(), port.number(), false);
+                        }
+                    }
+                }
+
+                // pipeline for physnet bridge
+                for (Device device : deviceService.getDevices()) {
+                    for (Port port : deviceService.getPorts(device.id())) {
+                        String portName = port.annotations().value(PORT_NAME);
+                        String adminState = port.annotations().value(ADMIN_STATE);
+                        // FIXME: since the physical port number can be changed on reboot,
+                        // we need to add another intermediate bridge to handle this
+                        if (!StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX) &&
+                                StringUtils.equals(adminState, STATE_ENABLED)) {
+                            initializeCommonPipeline(device.id(), port.number(), false);
                         }
                     }
                 }
@@ -1017,6 +1058,7 @@ public class KubevirtSecurityGroupHandler {
                             return;
                         }
                         initializeTenantTable(device, port);
+                        initializeFlatTable(device, port);
                     });
                     break;
                 case PORT_REMOVED:
@@ -1030,7 +1072,18 @@ public class KubevirtSecurityGroupHandler {
         private void initializeTenantTable(Device device, Port port) {
             String portName = port.annotations().value(PORT_NAME);
             if (StringUtils.startsWithIgnoreCase(portName, TENANT_TO_TUNNEL_PREFIX)) {
-                initializeTenantPipeline(device.id(), port.number(), true);
+                initializeCommonPipeline(device.id(), port.number(), true);
+            }
+        }
+
+        private void initializeFlatTable(Device device, Port port) {
+            String portName = port.annotations().value(PORT_NAME);
+            String adminState = port.annotations().value(ADMIN_STATE);
+            // FIXME: since the physical port number can be changed on reboot,
+            // we need to add another intermediate bridge to handle this
+            if (!StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX) &&
+                    StringUtils.equals(adminState, STATE_ENABLED)) {
+                initializeCommonPipeline(device.id(), port.number(), true);
             }
         }
     }
@@ -1120,11 +1173,26 @@ public class KubevirtSecurityGroupHandler {
         if (getUseSecurityGroupFlag()) {
             initializeProviderPipeline(node, true);
 
+            // pipeline for tenant bridge
             for (Device device : deviceService.getDevices()) {
                 for (Port port : deviceService.getPorts(device.id())) {
                     String portName = port.annotations().value(PORT_NAME);
                     if (StringUtils.startsWithIgnoreCase(portName, TENANT_TO_TUNNEL_PREFIX)) {
-                        initializeTenantPipeline(device.id(), port.number(), true);
+                        initializeCommonPipeline(device.id(), port.number(), true);
+                    }
+                }
+            }
+
+            // pipeline for physnet bridge
+            for (Device device : deviceService.getDevices()) {
+                for (Port port : deviceService.getPorts(device.id())) {
+                    String portName = port.annotations().value(PORT_NAME);
+                    String adminState = port.annotations().value(ADMIN_STATE);
+                    // FIXME: since the physical port number can be changed on reboot,
+                    // we need to add another intermediate bridge to handle this
+                    if (!StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX) &&
+                            StringUtils.equals(adminState, STATE_ENABLED)) {
+                        initializeCommonPipeline(device.id(), port.number(), true);
                     }
                 }
             }
@@ -1135,11 +1203,26 @@ public class KubevirtSecurityGroupHandler {
         } else {
             initializeProviderPipeline(node, false);
 
+            // pipeline for tenant bridge
             for (Device device : deviceService.getDevices()) {
                 for (Port port : deviceService.getPorts(device.id())) {
                     String portName = port.annotations().value(PORT_NAME);
                     if (StringUtils.startsWithIgnoreCase(portName, TENANT_TO_TUNNEL_PREFIX)) {
-                        initializeTenantPipeline(device.id(), port.number(), false);
+                        initializeCommonPipeline(device.id(), port.number(), false);
+                    }
+                }
+            }
+
+            // pipeline for physnet bridge
+            for (Device device : deviceService.getDevices()) {
+                for (Port port : deviceService.getPorts(device.id())) {
+                    String portName = port.annotations().value(PORT_NAME);
+                    String adminState = port.annotations().value(ADMIN_STATE);
+                    // FIXME: since the physical port number can be changed on reboot,
+                    // we need to add another intermediate bridge to handle this
+                    if (!StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX) &&
+                            StringUtils.equals(adminState, STATE_ENABLED)) {
+                        initializeCommonPipeline(device.id(), port.number(), false);
                     }
                 }
             }

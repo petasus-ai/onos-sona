@@ -57,6 +57,7 @@ import static org.onosproject.kubevirtnetworking.api.Constants.KUBEVIRT_NETWORKI
 import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_FORWARDING_RULE;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.structurePortName;
 import static org.onosproject.kubevirtnode.api.Constants.INTEGRATION_TO_PHYSICAL_PREFIX;
+import static org.onosproject.kubevirtnode.api.KubevirtNode.Type.GATEWAY;
 import static org.onosproject.net.AnnotationKeys.PORT_NAME;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -178,15 +179,23 @@ public class KubevirtSwitchingPhysicalHandler {
             if (!isRelevantHelper(event)) {
                 return;
             }
-            setIngressRuleForPatchPort(event.subject().id(),
-                    event.port().number(), true);
+
+            KubevirtNode node = kubevirtNodeService.node(event.subject().id());
+            if (node != null && node.type() == GATEWAY) {
+                setIngressRuleForPatchPort(event.subject().id(),
+                        event.port().number(), true);
+            }
         }
         private void processPortRemoval(DeviceEvent event) {
             if (!isRelevantHelper(event)) {
                 return;
             }
-            setIngressRuleForPatchPort(event.subject().id(),
-                    event.port().number(), false);
+
+            KubevirtNode node = kubevirtNodeService.node(event.subject().id());
+            if (node != null && node.type() == GATEWAY) {
+                setIngressRuleForPatchPort(event.subject().id(),
+                        event.port().number(), false);
+            }
         }
     }
 
@@ -214,7 +223,7 @@ public class KubevirtSwitchingPhysicalHandler {
             }
 
             deviceService.getPorts(node.intgBridge()).forEach(p -> {
-                if (containsPhyPatchPort(node, p)) {
+                if (containsPhyPatchPort(node, p) && node.type() == GATEWAY) {
                     setIngressRuleForPatchPort(node.intgBridge(), p.number(), true);
                 }
             });

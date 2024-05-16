@@ -147,14 +147,6 @@ public interface KubevirtNetwork {
     Set<IpAddress> dnses();
 
     /**
-     * Returns the flat physnet bridge's device identifier.
-     *
-     * @param hostname kubevirt node hostname
-     * @return device identifier
-     */
-    DeviceId flatDeviceId(String hostname);
-
-    /**
      * Returns the tenant integration bridge name in case the bridge type
      * is VXLAN/GRE/GENEVE.
      *

@@ -53,6 +53,7 @@ import org.onosproject.kubevirtnode.api.KubevirtNode;
 import org.onosproject.kubevirtnode.api.KubevirtNodeEvent;
 import org.onosproject.kubevirtnode.api.KubevirtNodeListener;
 import org.onosproject.kubevirtnode.api.KubevirtNodeService;
+import org.onosproject.kubevirtnode.api.KubevirtPhyInterface;
 import org.onosproject.net.Device;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.Port;
@@ -91,8 +92,16 @@ import static org.onlab.packet.ICMP.CODE_ECHO_REQEUST;
 import static org.onlab.packet.ICMP.TYPE_ECHO_REPLY;
 import static org.onlab.packet.ICMP.TYPE_ECHO_REQUEST;
 import static org.onlab.util.Tools.groupedThreads;
+import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_ACL_EGRESS_TABLE;
+import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_ACL_INGRESS_TABLE;
+import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_ARP_TABLE;
+import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_DHCP_TABLE;
+import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_FORWARDING_TABLE;
+import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_ICMP_TABLE;
+import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_INBOUND_TABLE;
 import static org.onosproject.kubevirtnetworking.api.Constants.FORWARDING_TABLE;
 import static org.onosproject.kubevirtnetworking.api.Constants.GW_ENTRY_TABLE;
+import static org.onosproject.kubevirtnetworking.api.Constants.INSTANCE_PORT_PREFIX;
 import static org.onosproject.kubevirtnetworking.api.Constants.KUBEVIRT_NETWORKING_APP_ID;
 import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_ARP_DEFAULT_RULE;
 import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_ARP_GATEWAY_RULE;
@@ -103,13 +112,7 @@ import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_INTERNAL
 import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_IP_EGRESS_RULE;
 import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_IP_INGRESS_RULE;
 import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_TUNNEL_RULE;
-import static org.onosproject.kubevirtnetworking.api.Constants.TENANT_ACL_EGRESS_TABLE;
-import static org.onosproject.kubevirtnetworking.api.Constants.TENANT_ACL_INGRESS_TABLE;
-import static org.onosproject.kubevirtnetworking.api.Constants.TENANT_ARP_TABLE;
-import static org.onosproject.kubevirtnetworking.api.Constants.TENANT_DHCP_TABLE;
-import static org.onosproject.kubevirtnetworking.api.Constants.TENANT_FORWARDING_TABLE;
-import static org.onosproject.kubevirtnetworking.api.Constants.TENANT_ICMP_TABLE;
-import static org.onosproject.kubevirtnetworking.api.Constants.TENANT_INBOUND_TABLE;
+import static org.onosproject.kubevirtnetworking.api.Constants.STATE_ENABLED;
 import static org.onosproject.kubevirtnetworking.api.Constants.TENANT_TO_TUNNEL_PREFIX;
 import static org.onosproject.kubevirtnetworking.api.Constants.TUNNEL_DEFAULT_TABLE;
 import static org.onosproject.kubevirtnetworking.api.Constants.TUNNEL_TO_TENANT_PREFIX;
@@ -140,6 +143,7 @@ import static org.onosproject.kubevirtnode.api.Constants.TUNNEL_BRIDGE;
 import static org.onosproject.kubevirtnode.api.Constants.TUNNEL_TO_INTEGRATION;
 import static org.onosproject.kubevirtnode.api.KubevirtNode.Type.GATEWAY;
 import static org.onosproject.kubevirtnode.api.KubevirtNode.Type.WORKER;
+import static org.onosproject.net.AnnotationKeys.ADMIN_STATE;
 import static org.onosproject.net.AnnotationKeys.PORT_NAME;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -375,7 +379,7 @@ public class KubevirtNetworkHandler {
             return;
         }
 
-        setGatewayArpRuleForTenantInternalNetwork(router, network, TENANT_ARP_TABLE,
+        setGatewayArpRuleForTenantInternalNetwork(router, network, COMMON_ARP_TABLE,
                 electedGw.intgBridge(), network.tenantDeviceId(node.hostname()), true);
     }
 
@@ -391,7 +395,7 @@ public class KubevirtNetworkHandler {
             return;
         }
 
-        setGatewayIcmpRuleForTenantInternalNetwork(router, network, TENANT_ICMP_TABLE,
+        setGatewayIcmpRuleForTenantInternalNetwork(router, network, COMMON_ICMP_TABLE,
                 electedGw.intgBridge(), network.tenantDeviceId(node.hostname()), true);
     }
 
@@ -411,6 +415,37 @@ public class KubevirtNetworkHandler {
                 electedGw.intgBridge(), node, true);
     }
 
+    private void setDefaultRulesForFlatNetwork(KubevirtNode node) {
+        for (KubevirtPhyInterface kpi : node.phyIntfs()) {
+            DeviceId deviceId = kpi.physBridge();
+            if (!deviceService.isAvailable(deviceId)) {
+                log.warn("Device {} is not ready for installing rules", deviceId);
+                continue;
+            }
+
+            flowService.connectTables(deviceId, COMMON_INBOUND_TABLE, COMMON_DHCP_TABLE);
+            flowService.connectTables(deviceId, COMMON_DHCP_TABLE, COMMON_ARP_TABLE);
+            flowService.connectTables(deviceId, COMMON_ARP_TABLE, COMMON_ICMP_TABLE);
+            flowService.connectTables(deviceId, COMMON_ICMP_TABLE, COMMON_FORWARDING_TABLE);
+
+            setArpRule(deviceId, true);
+            setDhcpRule(deviceId, true);
+            setForwardingRule(deviceId, true);
+            setEgressTransitionRule(deviceId, true);
+
+            for (Port port : deviceService.getPorts(deviceId)) {
+                String portName = port.annotations().value(PORT_NAME);
+                String adminState = port.annotations().value(ADMIN_STATE);
+                // FIXME: since the physical port number can be changed on reboot,
+                // we need to add another intermediate bridge to handle this
+                if (!StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX) &&
+                        StringUtils.equals(adminState, STATE_ENABLED)) {
+                    setIngressTransitionRule(deviceId, port, true);
+                }
+            }
+        }
+    }
+
     private void setDefaultRulesForTenantNetwork(KubevirtNode node,
                                                  KubevirtNetwork network) {
         DeviceId deviceId = network.tenantDeviceId(node.hostname());
@@ -420,17 +455,17 @@ public class KubevirtNetworkHandler {
             waitFor(3);
         }
 
-        flowService.connectTables(deviceId, TENANT_INBOUND_TABLE, TENANT_DHCP_TABLE);
-        flowService.connectTables(deviceId, TENANT_DHCP_TABLE, TENANT_ARP_TABLE);
-        flowService.connectTables(deviceId, TENANT_ARP_TABLE, TENANT_ICMP_TABLE);
-        flowService.connectTables(deviceId, TENANT_ICMP_TABLE, TENANT_FORWARDING_TABLE);
+        flowService.connectTables(deviceId, COMMON_INBOUND_TABLE, COMMON_DHCP_TABLE);
+        flowService.connectTables(deviceId, COMMON_DHCP_TABLE, COMMON_ARP_TABLE);
+        flowService.connectTables(deviceId, COMMON_ARP_TABLE, COMMON_ICMP_TABLE);
+        flowService.connectTables(deviceId, COMMON_ICMP_TABLE, COMMON_FORWARDING_TABLE);
 
-        setArpRuleForTenantNetwork(deviceId, true);
-        setDhcpRuleForTenantNetwork(deviceId, true);
+        setArpRule(deviceId, true);
+        setDhcpRule(deviceId, true);
         setForwardingRule(deviceId, true);
 
         // security group related rules
-        setTenantEgressTransitionRule(network.tenantDeviceId(node.hostname()), true);
+        setEgressTransitionRule(deviceId, true);
 
         // if patch port is available, we install ingress transition rule;
         // otherwise the patch port event will trigger the rule installation
@@ -438,7 +473,7 @@ public class KubevirtNetworkHandler {
         for (Port port : deviceService.getPorts(deviceId)) {
             String portName = port.annotations().value(PORT_NAME);
             if (StringUtils.startsWithIgnoreCase(portName, TENANT_TO_TUNNEL_PREFIX)) {
-                setTenantIngressTransitionRule(deviceId, port, true);
+                setIngressTransitionRule(deviceId, port, true);
                 installed = true;
             }
         }
@@ -449,7 +484,7 @@ public class KubevirtNetworkHandler {
         log.info("Install default flow rules for tenant bridge {}", network.tenantBridgeName());
     }
 
-    private void setDhcpRuleForTenantNetwork(DeviceId deviceId, boolean install) {
+    private void setDhcpRule(DeviceId deviceId, boolean install) {
         TrafficSelector selector = DefaultTrafficSelector.builder()
                 .matchEthType(Ethernet.TYPE_IPV4)
                 .matchIPProtocol(IPv4.PROTOCOL_UDP)
@@ -467,7 +502,7 @@ public class KubevirtNetworkHandler {
                 selector,
                 treatment,
                 PRIORITY_DHCP_RULE,
-                TENANT_DHCP_TABLE,
+                COMMON_DHCP_TABLE,
                 install);
     }
 
@@ -483,7 +518,7 @@ public class KubevirtNetworkHandler {
                 selector,
                 treatment,
                 PRIORITY_FORWARDING_RULE,
-                TENANT_FORWARDING_TABLE,
+                COMMON_FORWARDING_TABLE,
                 install);
     }
 
@@ -500,10 +535,10 @@ public class KubevirtNetworkHandler {
                         electedGateway.intgBridge(), install);
                 kubevirtNodeService.completeNodes(WORKER).forEach(node -> {
                     setGatewayArpRuleForTenantInternalNetwork(router, network,
-                            TENANT_ARP_TABLE, electedGateway.intgBridge(),
+                            COMMON_ARP_TABLE, electedGateway.intgBridge(),
                             network.tenantDeviceId(node.hostname()), install);
                     setGatewayIcmpRuleForTenantInternalNetwork(router, network,
-                            TENANT_ICMP_TABLE, electedGateway.intgBridge(),
+                            COMMON_ICMP_TABLE, electedGateway.intgBridge(),
                             network.tenantDeviceId(node.hostname()), install);
                     setDefaultGatewayRuleToWorkerNodeTunBridge(router, network,
                             electedGateway.intgBridge(), node, install);
@@ -580,19 +615,19 @@ public class KubevirtNetworkHandler {
                 install);
     }
 
-    private void setTenantEgressTransitionRule(DeviceId deviceId, boolean install) {
+    private void setEgressTransitionRule(DeviceId deviceId, boolean install) {
         TrafficSelector.Builder sBuilder = DefaultTrafficSelector.builder();
         sBuilder.matchEthType(EthType.EtherType.IPV4.ethType().toShort());
 
         TrafficTreatment.Builder tBuilder = DefaultTrafficTreatment.builder();
-        tBuilder.transition(TENANT_ACL_EGRESS_TABLE);
+        tBuilder.transition(COMMON_ACL_EGRESS_TABLE);
 
         flowService.setRule(appId,
                 deviceId,
                 sBuilder.build(),
                 tBuilder.build(),
                 PRIORITY_IP_EGRESS_RULE,
-                TENANT_ICMP_TABLE,
+                COMMON_ICMP_TABLE,
                 install
         );
     }
@@ -687,13 +722,13 @@ public class KubevirtNetworkHandler {
                 install);
     }
 
-    private void setArpRuleForTenantNetwork(DeviceId tenantDeviceId,
-                                            boolean install) {
+    private void setArpRule(DeviceId tenantDeviceId,
+                            boolean install) {
         TrafficSelector.Builder sBuilder = DefaultTrafficSelector.builder()
                 .matchEthType(EthType.EtherType.ARP.ethType().toShort());
 
         TrafficTreatment.Builder tBuilder = DefaultTrafficTreatment.builder()
-                .transition(TENANT_FORWARDING_TABLE);
+                .transition(COMMON_FORWARDING_TABLE);
 
         flowService.setRule(
                 appId,
@@ -701,7 +736,7 @@ public class KubevirtNetworkHandler {
                 sBuilder.build(),
                 tBuilder.build(),
                 PRIORITY_ARP_DEFAULT_RULE,
-                TENANT_ARP_TABLE,
+                COMMON_ARP_TABLE,
                 install
         );
     }
@@ -1311,6 +1346,11 @@ public class KubevirtNetworkHandler {
             }
 
             if (node.type().equals(WORKER)) {
+
+                // physnet is not directly associated with any network,
+                // we init. the FLAT network pipeline without referring to any network
+                setDefaultRulesForFlatNetwork(node);
+
                 for (KubevirtNetwork network : networkService.networks()) {
                     switch (network.type()) {
                         case VXLAN:
@@ -1418,26 +1458,20 @@ public class KubevirtNetworkHandler {
         }
     }
 
-    private void setTenantIngressTransitionRule(DeviceId deviceId, Port port, boolean install) {
-
-        String portName = port.annotations().value(PORT_NAME);
-        if (!StringUtils.startsWithIgnoreCase(portName, TENANT_TO_TUNNEL_PREFIX)) {
-            return;
-        }
-
+    private void setIngressTransitionRule(DeviceId deviceId, Port port, boolean install) {
         TrafficSelector.Builder sBuilder = DefaultTrafficSelector.builder();
         sBuilder.matchEthType(EthType.EtherType.IPV4.ethType().toShort())
                 .matchInPort(port.number());
 
         TrafficTreatment.Builder tBuilder = DefaultTrafficTreatment.builder();
-        tBuilder.transition(TENANT_ACL_INGRESS_TABLE);
+        tBuilder.transition(COMMON_ACL_INGRESS_TABLE);
 
         flowService.setRule(appId,
                 deviceId,
                 sBuilder.build(),
                 tBuilder.build(),
                 PRIORITY_IP_INGRESS_RULE,
-                TENANT_ICMP_TABLE,
+                COMMON_ICMP_TABLE,
                 install
         );
     }
@@ -1464,13 +1498,29 @@ public class KubevirtNetworkHandler {
                         if (!isRelevantHelper()) {
                             return;
                         }
-                        setTenantIngressTransitionRule(device.id(), port, true);
+                        processPortAddition(device, port);
                     });
                     break;
                 case PORT_REMOVED:
                 default:
                     // do nothing
                     break;
+            }
+        }
+
+        private void processPortAddition(Device device, Port port) {
+            String portName = port.annotations().value(PORT_NAME);
+            String adminState = port.annotations().value(ADMIN_STATE);
+
+            // FIXME: since the physical port number can be changed on reboot,
+            // we need to add another intermediate bridge to handle this
+            if (!StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX) &&
+                    StringUtils.equals(adminState, STATE_ENABLED)) {
+                setIngressTransitionRule(device.id(), port, true);
+            }
+
+            if (StringUtils.startsWithIgnoreCase(portName, TENANT_TO_TUNNEL_PREFIX)) {
+                setIngressTransitionRule(device.id(), port, true);
             }
         }
     }

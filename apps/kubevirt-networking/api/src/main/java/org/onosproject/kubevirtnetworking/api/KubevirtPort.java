@@ -70,11 +70,25 @@ public interface KubevirtPort {
     DeviceId tenantDeviceId();
 
     /**
+     * Returns the physnet device ID of the port.
+     *
+     * @return device ID
+     */
+    DeviceId physnetDeviceId();
+
+    /**
      * Returns the result whether the port is associated with the tenant network.
      *
      * @return true if the port is associated with tenant network, false otherwise
      */
     boolean isTenant();
+
+    /**
+     * Returns the result whether the port is associated with the physnet (FLAT) network.
+     *
+     * @return true if the port is associated with physnet network, false otherwise
+     */
+    boolean isFlat();
 
     /**
      * Returns the port number of the port.
