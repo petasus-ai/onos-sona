@@ -24,7 +24,7 @@
         <property name="supportPacketRequest">true</property>
     </driver>
     <driver name="ovs" extends="default"
-            manufacturer="Nicira, Inc\." hwVersion="Open vSwitch" swVersion="2\..*">
+            manufacturer="Nicira, Inc\." hwVersion="Open vSwitch" swVersion="[23]\..*">
         <behaviour api="org.onosproject.openflow.controller.driver.OpenFlowSwitchDriver"
                    impl="org.onosproject.driver.handshaker.NiciraSwitchHandshaker"/>
         <behaviour api="org.onosproject.openflow.controller.ExtensionTreatmentInterpreter"
