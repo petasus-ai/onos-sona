@@ -61,6 +61,7 @@ public final class Constants {
     public static final int COMMON_INBOUND_TABLE = 0;
     public static final int COMMON_DHCP_TABLE = 5;
     public static final int COMMON_ARP_TABLE = 30;
+    public static final int COMMON_MULTICAST_TABLE = 32;
     public static final int COMMON_ICMP_TABLE = 35;
     public static final int COMMON_ACL_EGRESS_TABLE = 40;
     public static final int COMMON_ACL_RECIRC_TABLE = 43;
@@ -83,6 +84,8 @@ public final class Constants {
     public static final int PRIORITY_ARP_GATEWAY_RULE = 41000;
     public static final int PRIORITY_ARP_PHYSNET_RULE = 41000;
     public static final int PRIORITY_ARP_DEFAULT_RULE = 40000;
+
+    public static final int PRIORITY_IGMP_DEFAULT_RULE = 39000;
     public static final int PRIORITY_TUNNEL_RULE = 31000;
 
     public static final int PRIORITY_IP_INGRESS_RULE = 19000;

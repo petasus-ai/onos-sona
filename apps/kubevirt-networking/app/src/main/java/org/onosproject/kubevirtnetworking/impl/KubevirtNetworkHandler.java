@@ -99,6 +99,7 @@ import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_DHCP_TABLE
 import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_FORWARDING_TABLE;
 import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_ICMP_TABLE;
 import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_INBOUND_TABLE;
+import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_MULTICAST_TABLE;
 import static org.onosproject.kubevirtnetworking.api.Constants.FORWARDING_TABLE;
 import static org.onosproject.kubevirtnetworking.api.Constants.GW_ENTRY_TABLE;
 import static org.onosproject.kubevirtnetworking.api.Constants.INSTANCE_PORT_PREFIX;
@@ -108,6 +109,7 @@ import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_ARP_GATE
 import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_DHCP_RULE;
 import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_FORWARDING_RULE;
 import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_ICMP_RULE;
+import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_IGMP_DEFAULT_RULE;
 import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_INTERNAL_ROUTING_RULE;
 import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_IP_EGRESS_RULE;
 import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_IP_INGRESS_RULE;
@@ -425,10 +427,12 @@ public class KubevirtNetworkHandler {
 
             flowService.connectTables(deviceId, COMMON_INBOUND_TABLE, COMMON_DHCP_TABLE);
             flowService.connectTables(deviceId, COMMON_DHCP_TABLE, COMMON_ARP_TABLE);
-            flowService.connectTables(deviceId, COMMON_ARP_TABLE, COMMON_ICMP_TABLE);
+            flowService.connectTables(deviceId, COMMON_ARP_TABLE, COMMON_MULTICAST_TABLE);
+            flowService.connectTables(deviceId, COMMON_MULTICAST_TABLE, COMMON_ICMP_TABLE);
             flowService.connectTables(deviceId, COMMON_ICMP_TABLE, COMMON_FORWARDING_TABLE);
 
             setArpRule(deviceId, true);
+            setMulticastIngressRules(deviceId, true);
             setDhcpRule(deviceId, true);
             setForwardingRule(deviceId, true);
             setEgressTransitionRule(deviceId, true);
@@ -441,6 +445,8 @@ public class KubevirtNetworkHandler {
                 if (!StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX) &&
                         StringUtils.equals(adminState, STATE_ENABLED)) {
                     setIngressTransitionRule(deviceId, port, true);
+
+                    setIgmpRule(deviceId, port, true);
                 }
             }
         }
@@ -720,6 +726,45 @@ public class KubevirtNetworkHandler {
                 PRIORITY_ICMP_RULE,
                 tableNum,
                 install);
+    }
+
+    private void setIgmpRule(DeviceId deviceId, Port port, boolean install) {
+        TrafficSelector.Builder sBuilder = DefaultTrafficSelector.builder()
+                .matchEthType(Ethernet.TYPE_IPV4)
+                .matchIPProtocol(IPv4.PROTOCOL_IGMP);
+
+        TrafficTreatment.Builder tBuilder = DefaultTrafficTreatment.builder()
+                .setOutput(port.number());
+
+        flowService.setRule(
+                appId,
+                deviceId,
+                sBuilder.build(),
+                tBuilder.build(),
+                PRIORITY_IGMP_DEFAULT_RULE,
+                COMMON_MULTICAST_TABLE,
+                install
+        );
+    }
+
+    private void setMulticastIngressRules(DeviceId deviceId, boolean install) {
+        TrafficSelector.Builder sBuilder = DefaultTrafficSelector.builder()
+                .matchEthType(Ethernet.TYPE_IPV4)
+                .matchIPProtocol(IPv4.PROTOCOL_UDP)
+                .matchIPDst(IpPrefix.IPV4_MULTICAST_PREFIX);
+
+        TrafficTreatment.Builder tBuilder = DefaultTrafficTreatment.builder()
+                .transition(COMMON_FORWARDING_TABLE);
+
+        flowService.setRule(
+                appId,
+                deviceId,
+                sBuilder.build(),
+                tBuilder.build(),
+                PRIORITY_IGMP_DEFAULT_RULE,
+                COMMON_MULTICAST_TABLE,
+                install
+        );
     }
 
     private void setArpRule(DeviceId tenantDeviceId,
