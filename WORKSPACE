@@ -167,6 +167,7 @@ node_repositories(
         "10.16.0-windows_amd64": ("node-v10.16.0-win-x64.zip", "node-v10.16.0-win-x64", "aa22cb357f0fb54ccbc06b19b60e37eefea5d7dd9940912675d3ed988bf9a059"),
     },
     node_version = "10.16.0",
+    node_urls = ["https://mirrors.cloud.tencent.com/nodejs-release/v{version}/{filename}"],
 )
 
 # TODO give this a name like `gui2_npm` once the @bazel/karma tools can tolerate a name other than `npm`
