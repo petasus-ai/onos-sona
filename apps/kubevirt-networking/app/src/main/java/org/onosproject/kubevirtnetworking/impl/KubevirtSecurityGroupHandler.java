@@ -466,13 +466,6 @@ public class KubevirtSecurityGroupHandler {
             return;
         }
 
-        // XXX All egress traffic needs to go through connection tracking module,
-        // which might hurt its performance.
-        ExtensionTreatment ctTreatment =
-                niciraConnTrackTreatmentBuilder(driverService, deviceId)
-                        .commit(true)
-                        .build();
-
         TrafficTreatment.Builder tBuilder = DefaultTrafficTreatment.builder();
 
         KubevirtNetwork net = networkService.network(port.networkId());
@@ -495,8 +488,14 @@ public class KubevirtSecurityGroupHandler {
                 aclTable = COMMON_ACL_INGRESS_TABLE;
             }
 
-            tBuilder.extension(ctTreatment, deviceId)
-                    .transition(COMMON_FORWARDING_TABLE);
+            // XXX All egress traffic needs to go through connection tracking module,
+            // which might hurt its performance.
+            RulePopulatorUtil.NiciraConnTrackTreatmentBuilder ctTreatmentBuilder =
+                    niciraConnTrackTreatmentBuilder(driverService, deviceId)
+                            .commit(true)
+                            .table((short)COMMON_FORWARDING_TABLE);
+
+            tBuilder.extension(ctTreatmentBuilder.build(), deviceId);
         }
 
         int finalAclTable = aclTable;
