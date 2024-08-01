@@ -136,6 +136,7 @@ public final class KubevirtNetworkingUtil {
     private static final String INTERNAL_IP = "InternalIP";
     private static final String K8S_ROLE = "node-role.kubernetes.io";
     private static final String PHYSNET_CONFIG_KEY = SONA_PROJECT_DOMAIN + "/physnet-config";
+    private static final String TUNNEL_CONFIG_KEY = SONA_PROJECT_DOMAIN + "/tunnel-config";
     private static final String DATA_IP_KEY = SONA_PROJECT_DOMAIN + "/data-ip";
     private static final String GATEWAY_CONFIG_KEY = SONA_PROJECT_DOMAIN + "/gateway-config";
     private static final String GATEWAY_BRIDGE_NAME = "gatewayBridgeName";
@@ -928,7 +929,8 @@ public final class KubevirtNetworkingUtil {
         Map<String, String> annots = node.getMetadata().getAnnotations();
         String physnetConfig = annots.get(PHYSNET_CONFIG_KEY);
         String gatewayConfig = annots.get(GATEWAY_CONFIG_KEY);
-        String dataIpStr = annots.get(DATA_IP_KEY);
+        String tunnelConfig = annots.get(TUNNEL_CONFIG_KEY);
+        String dataIpStr = annots.get(DATA_IP_KEY);     // Deprecated. Use tunnelConfig instead
         Set<KubevirtPhyInterface> phys = new HashSet<>();
         String gatewayBridgeName = null;
         try {
@@ -959,7 +961,10 @@ public final class KubevirtNetworkingUtil {
                 }
             }
 
-            if (dataIpStr != null) {
+            if (tunnelConfig != null) {
+                JsonNode jsonNode = new ObjectMapper().readTree(tunnelConfig);
+                dataIp = IpAddress.valueOf(jsonNode.get("ip").asText());
+            } else if (dataIpStr != null) {
                 dataIp = IpAddress.valueOf(dataIpStr);
             }
 
