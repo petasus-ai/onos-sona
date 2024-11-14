@@ -135,6 +135,9 @@ public final class KubevirtNetworkingUtil {
 
     private static final String INTERNAL_IP = "InternalIP";
     private static final String K8S_ROLE = "node-role.kubernetes.io";
+    private static final String NODE_FEATURE_KERNEL_VERSION = "feature.node.kubernetes.io/kernel-version";
+    private static final String NODE_FEATURE_KERNEL_VERSION_MAJOR = NODE_FEATURE_KERNEL_VERSION + ".major";
+    private static final String NODE_FEATURE_KERNEL_VERSION_MINOR = NODE_FEATURE_KERNEL_VERSION + ".minor";
     private static final String PHYSNET_CONFIG_KEY = SONA_PROJECT_DOMAIN + "/physnet-config";
     private static final String TUNNEL_CONFIG_KEY = SONA_PROJECT_DOMAIN + "/tunnel-config";
     private static final String DATA_IP_KEY = SONA_PROJECT_DOMAIN + "/data-ip";
@@ -925,6 +928,16 @@ public final class KubevirtNetworkingUtil {
             }
         }
 
+        Map<String, String> labels = node.getMetadata().getLabels();
+        Integer kernelVersionMajor = -1;
+        Integer kernelVersionMinor = -1;
+        if (labels.containsKey(NODE_FEATURE_KERNEL_VERSION_MAJOR) &&
+                labels.containsKey(NODE_FEATURE_KERNEL_VERSION_MINOR)) {
+            kernelVersionMajor = Integer.parseInt(labels.get(NODE_FEATURE_KERNEL_VERSION_MAJOR));
+            kernelVersionMinor = Integer.parseInt(labels.get(NODE_FEATURE_KERNEL_VERSION_MINOR));
+        }
+        int[] kernelVersion = {kernelVersionMajor, kernelVersionMinor};
+
         // start to parse kubernetes annotation
         Map<String, String> annots = node.getMetadata().getAnnotations();
         String physnetConfig = annots.get(PHYSNET_CONFIG_KEY);
@@ -1003,6 +1016,7 @@ public final class KubevirtNetworkingUtil {
                 .state(KubevirtNodeState.ON_BOARDED)
                 .phyIntfs(phys)
                 .gatewayBridgeName(gatewayBridgeName)
+                .kernelVersion(kernelVersion)
                 .build();
     }
 

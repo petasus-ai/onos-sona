@@ -204,6 +204,13 @@ public interface KubevirtNode {
     KubernetesExternalLbInterface kubernetesExternalLbInterface();
 
     /**
+     * Returns the kernel major and minor version.
+     *
+     * @return kernel major and minor version
+     */
+    int[] kernelVersion();
+
+    /**
      * Builder of new node entity.
      */
     interface Builder {
@@ -302,5 +309,13 @@ public interface KubevirtNode {
          * @return kubevirt node builder
          */
         KubevirtNode.Builder kubernetesExternalLbInterface(KubernetesExternalLbInterface kubernetesExternalLbInterface);
+
+        /**
+         * Returns kubevirt node builder with supplied kernel major and minor version.
+         *
+         * @param kernelVersion kernel major and minor version
+         * @return kubevirt node builder
+         */
+        KubevirtNode.Builder kernelVersion(int[] kernelVersion);
     }
 }

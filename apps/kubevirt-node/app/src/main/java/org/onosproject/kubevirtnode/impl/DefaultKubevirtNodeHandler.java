@@ -261,7 +261,11 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                 createGeneveTunnelInterface(node);
             }
 
-            if (node.dataIp() != null && !isIntfEnabled(node, STT)) {
+            int major = node.kernelVersion()[0];
+            int minor = node.kernelVersion()[1];
+            log.info("STT is not supported for kernel version 5.14 or higher. Current version is {}.{}", major, minor);
+            if (node.dataIp() != null && !isIntfEnabled(node, STT) &&
+                    (major < 5 || (major == 5 && minor < 14))) {
                 createSttTunnelInterface(node);
             }
         } catch (Exception e) {

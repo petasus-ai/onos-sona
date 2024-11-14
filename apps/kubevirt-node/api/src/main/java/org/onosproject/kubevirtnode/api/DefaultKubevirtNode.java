@@ -60,6 +60,7 @@ public class DefaultKubevirtNode implements KubevirtNode {
     private final Collection<KubevirtPhyInterface> phyIntfs;
     private final String gatewayBridgeName;
     private final KubernetesExternalLbInterface kubernetesExternalLbIntf;
+    private final int[] kernelVersion;
 
     /**
      * A default constructor of kubevirt node.
@@ -82,7 +83,8 @@ public class DefaultKubevirtNode implements KubevirtNode {
                                   KubevirtNodeState state,
                                   Collection<KubevirtPhyInterface> phyIntfs,
                                   String gatewayBridgeName,
-                                  KubernetesExternalLbInterface kubernetesExternalLbIntf) {
+                                  KubernetesExternalLbInterface kubernetesExternalLbIntf,
+                                  int[] kernelVersion) {
         this.clusterName = clusterName;
         this.hostname = hostname;
         this.type = type;
@@ -94,6 +96,7 @@ public class DefaultKubevirtNode implements KubevirtNode {
         this.phyIntfs = phyIntfs;
         this.gatewayBridgeName = gatewayBridgeName;
         this.kubernetesExternalLbIntf = kubernetesExternalLbIntf;
+        this.kernelVersion = kernelVersion;
     }
 
     @Override
@@ -155,6 +158,7 @@ public class DefaultKubevirtNode implements KubevirtNode {
                 .phyIntfs(phyIntfs)
                 .gatewayBridgeName(gatewayBridgeName)
                 .kubernetesExternalLbInterface(kubernetesExternalLbIntf)
+                .kernelVersion(kernelVersion)
                 .build();
     }
 
@@ -172,6 +176,7 @@ public class DefaultKubevirtNode implements KubevirtNode {
                 .phyIntfs(phyIntfs)
                 .gatewayBridgeName(gatewayBridgeName)
                 .kubernetesExternalLbInterface(kubernetesExternalLbIntf)
+                .kernelVersion(kernelVersion)
                 .build();
     }
 
@@ -189,6 +194,7 @@ public class DefaultKubevirtNode implements KubevirtNode {
                 .phyIntfs(phyIntfs)
                 .gatewayBridgeName(gatewayBridgeName)
                 .kubernetesExternalLbInterface(kubernetesExternalLbIntf)
+                .kernelVersion(kernelVersion)
                 .build();
     }
 
@@ -214,6 +220,7 @@ public class DefaultKubevirtNode implements KubevirtNode {
                 .phyIntfs(phyIntfs)
                 .gatewayBridgeName(gatewayBridgeName)
                 .kubernetesExternalLbInterface(externalLbInterface)
+                .kernelVersion(kernelVersion)
                 .build();
     }
 
@@ -268,6 +275,11 @@ public class DefaultKubevirtNode implements KubevirtNode {
     @Override
     public KubernetesExternalLbInterface kubernetesExternalLbInterface() {
         return kubernetesExternalLbIntf;
+    }
+
+    @Override
+    public int[] kernelVersion() {
+        return kernelVersion;
     }
 
     private PortNumber tunnelPort(String tunnelType) {
@@ -335,7 +347,8 @@ public class DefaultKubevirtNode implements KubevirtNode {
                 .state(node.state())
                 .phyIntfs(node.phyIntfs())
                 .gatewayBridgeName(node.gatewayBridgeName())
-                .kubernetesExternalLbInterface(node.kubernetesExternalLbInterface());
+                .kubernetesExternalLbInterface(node.kubernetesExternalLbInterface())
+                .kernelVersion(node.kernelVersion());
     }
 
     @Override
@@ -376,6 +389,7 @@ public class DefaultKubevirtNode implements KubevirtNode {
                 .add("phyIntfs", phyIntfs)
                 .add("gatewayBridgeName", gatewayBridgeName)
                 .add("kubernetesExternalLbInterface", kubernetesExternalLbIntf)
+                .add("kernelVersion", kernelVersion)
                 .toString();
     }
 
@@ -392,6 +406,7 @@ public class DefaultKubevirtNode implements KubevirtNode {
         private Collection<KubevirtPhyInterface> phyIntfs;
         private String gatewayBridgeName;
         private KubernetesExternalLbInterface kubernetesExternalLbInterface;
+        private int[] kernelVersion;
 
         // private constructor not intended to use from external
         private Builder() {
@@ -419,7 +434,8 @@ public class DefaultKubevirtNode implements KubevirtNode {
                     state,
                     phyIntfs,
                     gatewayBridgeName,
-                    kubernetesExternalLbInterface
+                    kubernetesExternalLbInterface,
+                    kernelVersion
             );
         }
 
@@ -486,6 +502,12 @@ public class DefaultKubevirtNode implements KubevirtNode {
         @Override
         public Builder kubernetesExternalLbInterface(KubernetesExternalLbInterface kubernetesExternalLbInterface) {
             this.kubernetesExternalLbInterface = kubernetesExternalLbInterface;
+            return this;
+        }
+
+        @Override
+        public Builder kernelVersion(int[] kernelVersion) {
+            this.kernelVersion = kernelVersion;
             return this;
         }
     }
