@@ -15,6 +15,7 @@
  */
 package org.onosproject.kubevirtnetworking.impl;
 
+import org.apache.commons.lang.StringUtils;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.IpPrefix;
 import org.onosproject.cluster.ClusterService;
@@ -181,7 +182,7 @@ public class KaasExternalLbHandler {
         private void setElbIngressRules(KubevirtNetwork network, boolean install) {
             nodeService.completeNodes(WORKER).forEach(n -> {
                 KubevirtPhyInterface kpi = n.phyIntfs().stream().filter(pi ->
-                        pi.network().equals(network.physnetName())).findAny().orElse(null);
+                        StringUtils.equals(pi.network(), network.physnetName())).findAny().orElse(null);
                 if (kpi != null) {
                     kpi.kaasElbs().forEach(ke -> {
                         TrafficSelector selector = DefaultTrafficSelector.builder()
@@ -211,7 +212,7 @@ public class KaasExternalLbHandler {
         private void setElbEgressRules(KubevirtNetwork network, boolean install) {
             nodeService.completeNodes(WORKER).forEach(n -> {
                 KubevirtPhyInterface kpi = n.phyIntfs().stream().filter(pi ->
-                        pi.network().equals(network.physnetName())).findAny().orElse(null);
+                        StringUtils.equals(pi.network(), network.physnetName())).findAny().orElse(null);
                 if (kpi != null) {
                     kpi.kaasElbs().forEach(ke -> {
                         TrafficSelector selector = DefaultTrafficSelector.builder()
@@ -276,9 +277,9 @@ public class KaasExternalLbHandler {
         private void setElbIngressRules(KubevirtNode node, boolean install) {
 
             node.phyIntfs().forEach(pi -> {
-                if (pi.physBridge() != null) {
+                if (pi.physBridge() != null && pi.network() != null) {
                     KubevirtNetwork kn = networkService.networks().stream().filter(n ->
-                            n.physnetName().equals(pi.network())).findAny().orElse(null);
+                            StringUtils.equals(pi.network(), n.physnetName())).findAny().orElse(null);
                     if (kn != null) {
 
                         pi.kaasElbs().forEach(ke -> {
@@ -310,9 +311,9 @@ public class KaasExternalLbHandler {
 
         private void setElbEgressRules(KubevirtNode node, boolean install) {
             node.phyIntfs().forEach(pi -> {
-                if (pi.physBridge() != null) {
+                if (pi.physBridge() != null && pi.network() != null) {
                     KubevirtNetwork kn = networkService.networks().stream().filter(n ->
-                            n.physnetName().equals(pi.network())).findAny().orElse(null);
+                            StringUtils.equals(pi.network(), n.physnetName())).findAny().orElse(null);
                     if (kn != null) {
 
                         pi.kaasElbs().forEach(ke -> {
