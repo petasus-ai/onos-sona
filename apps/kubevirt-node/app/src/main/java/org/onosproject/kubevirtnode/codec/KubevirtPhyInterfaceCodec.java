@@ -16,12 +16,16 @@
 package org.onosproject.kubevirtnode.codec;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.onosproject.codec.CodecContext;
 import org.onosproject.codec.JsonCodec;
 import org.onosproject.kubevirtnode.api.DefaultKubevirtPhyInterface;
 import org.onosproject.kubevirtnode.api.KubevirtPhyInterface;
 import org.onosproject.net.DeviceId;
+
+import java.util.HashSet;
+import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static org.onlab.util.Tools.nullIsIllegal;
@@ -33,6 +37,8 @@ public final class KubevirtPhyInterfaceCodec extends JsonCodec<KubevirtPhyInterf
 
     private static final String NETWORK = "network";
     private static final String INTERFACE = "intf";
+
+    private static final String KAAS_ELB_GWS = "kaasElbGws";
     private static final String PHYS_BRIDGE_ID = "physBridgeId";
 
     private static final String MISSING_MESSAGE = " is required in KubevirtPhyInterface";
@@ -47,6 +53,13 @@ public final class KubevirtPhyInterfaceCodec extends JsonCodec<KubevirtPhyInterf
 
         if (phyIntf.physBridge() != null) {
             result.put(PHYS_BRIDGE_ID, phyIntf.physBridge().toString());
+        }
+
+
+        if (phyIntf.kaasElbs() != null) {
+            ArrayNode elbs = context.mapper().createArrayNode();
+            phyIntf.kaasElbs().forEach(elbs::add);
+            result.set(KAAS_ELB_GWS, elbs);
         }
 
         return result;
@@ -70,6 +83,13 @@ public final class KubevirtPhyInterfaceCodec extends JsonCodec<KubevirtPhyInterf
         JsonNode physBridgeJson = json.get(PHYS_BRIDGE_ID);
         if (physBridgeJson != null) {
             builder.physBridge(DeviceId.deviceId(physBridgeJson.asText()));
+        }
+
+        ArrayNode kaasElbsJson = (ArrayNode) json.get(KAAS_ELB_GWS);
+        if (kaasElbsJson != null) {
+            Set<String> kaasElbs = new HashSet<>();
+            kaasElbsJson.forEach(elbJson -> kaasElbs.add(elbJson.textValue()));
+            builder.kaasElbs(kaasElbs);
         }
 
         return builder.build();

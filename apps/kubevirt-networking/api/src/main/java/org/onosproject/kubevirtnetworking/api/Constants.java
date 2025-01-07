@@ -88,6 +88,8 @@ public final class Constants {
     public static final int PRIORITY_IGMP_DEFAULT_RULE = 39000;
     public static final int PRIORITY_TUNNEL_RULE = 31000;
 
+    public static final int PRIORITY_KAAS_ELB_RULE = 30900;
+
     public static final int PRIORITY_IP_INGRESS_RULE = 19000;
     public static final int PRIORITY_IP_EGRESS_RULE = 18000;
     public static final int PRIORITY_ACL_RULE = 31000;

@@ -40,12 +40,15 @@ import org.onosproject.net.DeviceId;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import static org.easymock.EasyMock.createMock;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.replay;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.onosproject.kubevirtnode.codec.KubevirtNodeJsonMatcher.matchesKubevirtNode;
@@ -94,12 +97,14 @@ public class KubevirtNodeCodecTest {
                 .network("mgmtnetwork")
                 .intf("eth3")
                 .physBridge(DEVICE_ID_1)
+                .kaasElbs(Set.of("10.10.10.1/32", "10.10.10.2/32"))
                 .build();
 
         KubevirtPhyInterface phyIntf2 = DefaultKubevirtPhyInterface.builder()
                 .network("oamnetwork")
                 .intf("eth4")
                 .physBridge(DEVICE_ID_2)
+                .kaasElbs(Set.of("20.20.20.1/32", "20.20.20.2/32"))
                 .build();
 
         KubevirtNode node = DefaultKubevirtNode.builder()
@@ -138,10 +143,12 @@ public class KubevirtNodeCodecTest {
             if (intf.network().equals("mgmtnetwork")) {
                 assertThat(intf.intf(), is("eth3"));
                 assertThat(intf.physBridge().toString(), is("of:00000000000000a3"));
+                assertThat(intf.kaasElbs(), is(Set.of("10.10.10.1/32", "10.10.10.2/32")));
             }
             if (intf.network().equals("oamnetwork")) {
                 assertThat(intf.intf(), is("eth4"));
                 assertThat(intf.physBridge().toString(), is("of:00000000000000a4"));
+                assertThat(intf.kaasElbs(), is(Set.of("20.20.20.1/32", "20.20.20.2/32")));
             }
         });
     }

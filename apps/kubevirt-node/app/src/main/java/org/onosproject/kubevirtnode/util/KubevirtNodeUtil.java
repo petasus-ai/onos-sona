@@ -17,6 +17,7 @@ package org.onosproject.kubevirtnode.util;
 
 import com.eclipsesource.json.JsonArray;
 import com.eclipsesource.json.JsonObject;
+import com.eclipsesource.json.JsonValue;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -100,6 +101,7 @@ public final class KubevirtNodeUtil {
     private static final String NETWORK_KEY = "network";
     private static final String INTERFACE_KEY = "interface";
     private static final String PHYS_BRIDGE_ID = "physBridgeId";
+    private static final String KAAS_ELB_GWS_KEY = "kaasElbGws";
 
     private static final int PORT_NAME_MAX_LENGTH = 15;
 
@@ -430,6 +432,7 @@ public final class KubevirtNodeUtil {
                     JsonObject object = configJson.get(i).asObject();
                     String network = object.get(NETWORK_KEY).asString();
                     String intf = object.get(INTERFACE_KEY).asString();
+                    JsonValue jsonKaasElbs = object.get(KAAS_ELB_GWS_KEY);
 
                     if (network != null && intf != null) {
                         String physBridgeId;
@@ -441,10 +444,16 @@ public final class KubevirtNodeUtil {
                                     hostname, network, intf, physBridgeId);
                         }
 
+                        Set<String> kaasElbs = new HashSet<>();
+                        if (jsonKaasElbs != null) {
+                            jsonKaasElbs.asArray().forEach(jsonElb -> kaasElbs.add(jsonElb.asString()));
+                        }
+
                         phys.add(DefaultKubevirtPhyInterface.builder()
                                 .network(network)
                                 .intf(intf)
                                 .physBridge(DeviceId.deviceId(physBridgeId))
+                                .kaasElbs(kaasElbs)
                                 .build());
                     }
                 }

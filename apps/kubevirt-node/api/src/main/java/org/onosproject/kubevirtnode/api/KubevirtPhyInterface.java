@@ -17,6 +17,9 @@ package org.onosproject.kubevirtnode.api;
 
 import org.onosproject.net.DeviceId;
 
+import java.util.List;
+import java.util.Set;
+
 /**
  * Representation of a KubeVirt physical interface used in KubeVirt networking service.
  */
@@ -34,6 +37,13 @@ public interface KubevirtPhyInterface {
      * @return name of this physical interface
      */
     String intf();
+
+    /**
+     * Returns the list of the allowed ELB CIDRs.
+     *
+     * @return list of the allowed ELB CIDRs
+     */
+    Set<String> kaasElbs();
 
     /**
      * Returns the device ID of the physical interface bridge at the node.
@@ -60,10 +70,18 @@ public interface KubevirtPhyInterface {
         /**
          * Returns physical interface name.
          *
-         * @param intf physical interface name of openstack node
+         * @param intf physical interface name of kubevirt node
          * @return kubevirt physical interface builder
          */
         Builder intf(String intf);
+
+        /**
+         * Returns KaaS ELB list.
+         *
+         * @param kaasElbs list of KaaS ELBs
+         * @return kubevirt physical interface builder
+         */
+        Builder kaasElbs(Set<String> kaasElbs);
 
         /**
          * Returns kubevirt physical interface builder with supplied.

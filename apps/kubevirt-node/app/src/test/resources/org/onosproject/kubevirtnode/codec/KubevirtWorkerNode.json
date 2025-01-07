@@ -9,13 +9,18 @@
     {
       "network": "mgmtnetwork",
       "intf": "eth3",
-      "physBridgeId": "of:00000000000000a3"
-
+      "physBridgeId": "of:00000000000000a3",
+      "kaasElbGws": [
+        "10.10.10.1/32", "10.10.10.2/32"
+      ]
     },
     {
       "network": "oamnetwork",
       "intf": "eth4",
-      "physBridgeId": "of:00000000000000a4"
+      "physBridgeId": "of:00000000000000a4",
+      "kaasElbGws": [
+        "20.20.20.1/32", "20.20.20.2/32"
+      ]
     }
   ]
 }

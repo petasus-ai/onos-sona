@@ -16,9 +16,13 @@
 package org.onosproject.kubevirtnode.codec;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import org.hamcrest.Description;
 import org.hamcrest.TypeSafeDiagnosingMatcher;
 import org.onosproject.kubevirtnode.api.KubevirtPhyInterface;
+
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Hamcrest matcher for kubevirt physical interface.
@@ -28,6 +32,7 @@ public final class KubevirtPhyInterfaceJsonMatcher extends TypeSafeDiagnosingMat
     private final KubevirtPhyInterface phyIntf;
     private static final String NETWORK = "network";
     private static final String INTERFACE = "intf";
+    private static final String KAAS_ELBS = "kaasElbs";
 
     private KubevirtPhyInterfaceJsonMatcher(KubevirtPhyInterface phyIntf) {
         this.phyIntf = phyIntf;
@@ -49,6 +54,18 @@ public final class KubevirtPhyInterfaceJsonMatcher extends TypeSafeDiagnosingMat
         if (!jsonIntf.equals(intf)) {
             description.appendText("interface name was " + jsonIntf);
             return false;
+        }
+
+        // check KaaS ELBs
+        ArrayNode jsonKaasElbs = (ArrayNode) jsonNode.get(KAAS_ELBS);
+        Set<String> kaasELbs = phyIntf.kaasElbs();
+        if (jsonKaasElbs != null) {
+            Set<String> tmpKaasElbs = new HashSet<>();
+            jsonKaasElbs.forEach(jsonElb -> tmpKaasElbs.add(jsonElb.asText()));
+            if (!tmpKaasElbs.equals(kaasELbs)) {
+                description.appendText("KaaS ELBs were " + jsonIntf);
+                return false;
+            }
         }
 
         return true;

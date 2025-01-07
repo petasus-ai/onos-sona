@@ -98,7 +98,7 @@ public final class KubevirtNodeCodec extends JsonCodec<KubevirtNode> {
             result.put(GATEWAY_BRIDGE_NAME, node.gatewayBridgeName());
         }
 
-        // serialize kubernetex external load balancer interface if exist
+        // serialize kubernetes external load balancer interface if exist
         if (node.kubernetesExternalLbInterface() != null) {
             ObjectNode elbIntfJson = context.codec(KubernetesExternalLbInterface.class)
                     .encode(node.kubernetesExternalLbInterface(), context);
