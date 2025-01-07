@@ -1,60 +1,86 @@
-# Copyright 2015-present Open Networking Foundation
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+ARG JOBS=6
+ARG PROFILE=sona
+ARG TAG=11.0.17-11.60.19
+# First stage is the build environment
+FROM registry.gitlab.com/sonaproject/zulu-openjdk:${TAG} as builder
+MAINTAINER Jian Li <gunine@sk.com>
 
-# With this dockerfile you can build a ONOS Docker container
+# Set the environment variables
+ENV HOME /root
+ENV BUILD_NUMBER docker
+ENV JAVA_TOOL_OPTIONS=-Dfile.encoding=UTF8
+ENV ONOS_VERSION 2.7
+ENV ONOS_BRANCH onos-2.7
 
-ARG JOBS=2
-ARG PROFILE=default
-ARG TAG=11.0.13-11.52.13
-ARG JAVA_PATH=/usr/lib/jvm/zulu11
-
-# First stage is the build environment.
-# zulu-openjdk images are based on Ubuntu.
-FROM azul/zulu-openjdk:${TAG} as builder
-
+# Install dependencies
 ENV BUILD_DEPS \
     ca-certificates \
     zip \
+    python \
     python3 \
     git \
     bzip2 \
     build-essential \
     curl \
     unzip
-RUN apt-get update && apt-get install -y ${BUILD_DEPS}
+
+RUN apt-get update && apt-get install git-review -y ${BUILD_DEPS}
 
 # Install Bazelisk, which will download the version of bazel specified in
 # .bazelversion
-RUN curl -L -o bazelisk https://github.com/bazelbuild/bazelisk/releases/download/v1.11.0/bazelisk-linux-amd64
+ARG TARGETOS TARGETARCH
+RUN curl -L -o bazelisk https://github.com/bazelbuild/bazelisk/releases/download/v1.20.0/bazelisk-linux-${TARGETARCH}
 RUN chmod +x bazelisk && mv bazelisk /usr/bin
 
-# Build-stage environment variables
-ENV ONOS_ROOT /src/onos
-ENV BUILD_NUMBER docker
-ENV JAVA_TOOL_OPTIONS=-Dfile.encoding=UTF8
+# Copy in the source
+RUN mkdir -p /src/onos
+COPY . /src/onos/
 
-# Copy in the sources
-COPY . ${ONOS_ROOT}
-WORKDIR ${ONOS_ROOT}
+#RUN ls /src/onos
+# Remove SONA apps sources
+RUN rm -rf /src/onos/apps/openstack*
+RUN rm -rf /src/onos/apps/k8s-*
 
-# Build ONOS using the JDK pre-installed in the base image, instead of the
-# Bazel-provided remote one. By doing wo we make sure to build with the most
-# updated JDK, including bug and security fixes, independently of the Bazel
-# version. NOTE that WORKSPACE-docker file defines dockerjdk
+COPY sona.bzl /src/onos/tools/build/bazel/sona.bzl
+
+RUN rm -rf /src/onos/BUILD
+COPY BUILD-sona /src/onos/BUILD
+
+RUN sed -i 's/modules.bzl/sona.bzl/g' /src/onos/BUILD
+
+# Download and patch ONOS core changes which affect ONOS
+RUN git clone https://github.com/sonaproject/onos-sona-patch.git patch && \
+    cp patch/${ONOS_VERSION}/*.patch /src/onos/ && \
+    cp patch/patch.sh /src/onos/
+
+# Build ONOS
+# We extract the tar in the build environment to avoid having to put the tar
+# in the runtime environment - this saves a lot of space
+# FIXME - dependence on ONOS_ROOT and git at build time is a hack to work around
+# build problems
+WORKDIR /src/onos
+RUN ./patch.sh
+
+# Download latest SONA app sources
+RUN mkdir -p /tmp/onos
+COPY . /tmp/onos/
+RUN cp -R /tmp/onos/apps/openstack* /src/onos/apps && \
+    cp -R /tmp/onos/apps/k8s-* /src/onos/apps && \
+    cp -R /tmp/onos/apps/kubevirt* /src/onos/apps
+
 ARG JOBS
-ARG JAVA_PATH
 ARG PROFILE
+
+WORKDIR /src/onos
+
+RUN git log -10
+
+RUN rm -rf /src/onos/WORKSPACE
+COPY WORKSPACE /src/onos/WORKSPACE
+
+RUN rm -rf /src/onos/tools/gui/package.json
+COPY package.json /src/onos/tools/gui/package.json
+
 RUN cat WORKSPACE-docker >> WORKSPACE && bazelisk build onos \
     --jobs ${JOBS} \
     --verbose_failures \
@@ -67,27 +93,24 @@ RUN cat WORKSPACE-docker >> WORKSPACE && bazelisk build onos \
 RUN mkdir /output
 RUN tar -xf bazel-bin/onos.tar.gz -C /output --strip-components=1
 
-# Second and final stage is the runtime environment.
-FROM azul/zulu-openjdk:${TAG}
+# Second stage is the runtime environment
+FROM registry.gitlab.com/sonaproject/zulu-openjdk:${TAG}-jre
 
 LABEL org.label-schema.name="ONOS" \
       org.label-schema.description="SDN Controller" \
       org.label-schema.usage="http://wiki.onosproject.org" \
       org.label-schema.url="http://onosproject.org" \
       org.label-scheme.vendor="Open Networking Foundation" \
-      org.label-schema.schema-version="1.0" \
-      maintainer="onos-dev@onosproject.org"
+      org.label-schema.schema-version="1.0"
 
-RUN apt-get update && apt-get install -y curl && \
-	rm -rf /var/lib/apt/lists/*
+RUN apt-get update -y && \
+        apt-get install wget curl libhyperic-sigar-java -y
+
+COPY lib/libsigar-aarch64-linux.so /root/onos/apache-karaf-4.2.14/lib/libsigar-aarch64-linux.so
 
 # Install ONOS in /root/onos
 COPY --from=builder /output/ /root/onos/
 WORKDIR /root/onos
-
-# Set JAVA_HOME (by default not exported by zulu images)
-ARG JAVA_PATH
-ENV JAVA_HOME ${JAVA_PATH}
 
 # Ports
 # 6653 - OpenFlow
@@ -95,8 +118,17 @@ ENV JAVA_HOME ${JAVA_PATH}
 # 8181 - GUI
 # 8101 - ONOS CLI
 # 9876 - ONOS intra-cluster communication
-EXPOSE 6653 6640 8181 8101 9876
+EXPOSE 6653 6640 8181 8101 9876 9300
 
-# Run ONOS
+RUN   touch apps/org.onosproject.gui/active && \
+      touch apps/org.onosproject.drivers/active && \
+      touch apps/org.onosproject.drivers.ovsdb/active && \
+      touch apps/org.onosproject.openflow-base/active && \
+      touch apps/org.onosproject.openstacknetworking/active && \
+      touch apps/org.onosproject.openstacktroubleshoot/active && \
+      #touch apps/org.onosproject.k8s-networking/active && \
+      touch apps/org.onosproject.kubevirt-networking/active
+
+# Get ready to run command
 ENTRYPOINT ["./bin/onos-service"]
 CMD ["server"]
