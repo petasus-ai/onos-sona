@@ -52,6 +52,7 @@ import java.util.stream.Collectors;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_ACL_EGRESS_TABLE;
+import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_ACL_INGRESS_TABLE;
 import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_ACL_RECIRC_TABLE;
 import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_FORWARDING_TABLE;
 import static org.onosproject.kubevirtnetworking.api.Constants.KUBEVIRT_NETWORKING_APP_ID;
@@ -196,6 +197,7 @@ public class KaasExternalLbHandler {
                             .transition(COMMON_FORWARDING_TABLE)
                             .build();
 
+                    // Rule for intra-subnet IPs
                     flowService.setRule(
                             appId,
                             kpi.physBridge(),
@@ -203,6 +205,17 @@ public class KaasExternalLbHandler {
                             treatment,
                             PRIORITY_KAAS_ELB_RULE,
                             COMMON_ACL_RECIRC_TABLE,
+                            install
+                    );
+
+                    // Rule for external IPs
+                    flowService.setRule(
+                            appId,
+                            kpi.physBridge(),
+                            selector,
+                            treatment,
+                            PRIORITY_KAAS_ELB_RULE,
+                            COMMON_ACL_INGRESS_TABLE,
                             install
                     );
                 }));
@@ -289,6 +302,7 @@ public class KaasExternalLbHandler {
                                 .transition(COMMON_FORWARDING_TABLE)
                                 .build();
 
+                        // Rule for intra-subnet IPs
                         flowService.setRule(
                                 appId,
                                 pi.physBridge(),
@@ -296,6 +310,17 @@ public class KaasExternalLbHandler {
                                 treatment,
                                 PRIORITY_KAAS_ELB_RULE,
                                 COMMON_ACL_RECIRC_TABLE,
+                                install
+                        );
+
+                        // Rule for external IPs
+                        flowService.setRule(
+                                appId,
+                                pi.physBridge(),
+                                selector,
+                                treatment,
+                                PRIORITY_KAAS_ELB_RULE,
+                                COMMON_ACL_INGRESS_TABLE,
                                 install
                         );
                     }));
