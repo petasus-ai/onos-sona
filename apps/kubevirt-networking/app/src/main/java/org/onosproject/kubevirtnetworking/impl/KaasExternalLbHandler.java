@@ -45,7 +45,9 @@ import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.slf4j.Logger;
 
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
+import java.util.stream.Collectors;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static org.onlab.util.Tools.groupedThreads;
@@ -181,61 +183,57 @@ public class KaasExternalLbHandler {
 
         private void setElbIngressRules(KubevirtNetwork network, boolean install) {
             nodeService.completeNodes(WORKER).forEach(n -> {
-                KubevirtPhyInterface kpi = n.phyIntfs().stream().filter(pi ->
-                        StringUtils.equals(pi.network(), network.physnetName())).findAny().orElse(null);
-                if (kpi != null) {
-                    kpi.kaasElbs().forEach(ke -> {
-                        TrafficSelector selector = DefaultTrafficSelector.builder()
-                                .matchEthType(Ethernet.TYPE_IPV4)
-                                .matchIPSrc(IpPrefix.valueOf(ke))
-                                .matchIPDst(IpPrefix.valueOf(network.cidr()))
-                                .build();
+                Set<KubevirtPhyInterface> kpis = n.phyIntfs().stream().filter(pi ->
+                        StringUtils.equals(pi.network(), network.physnetName())).collect(Collectors.toSet());
+                kpis.forEach(kpi -> kpi.kaasElbs().forEach(ke -> {
+                    TrafficSelector selector = DefaultTrafficSelector.builder()
+                            .matchEthType(Ethernet.TYPE_IPV4)
+                            .matchIPSrc(IpPrefix.valueOf(ke))
+                            .matchIPDst(IpPrefix.valueOf(network.cidr()))
+                            .build();
 
-                        TrafficTreatment treatment = DefaultTrafficTreatment.builder()
-                                .transition(COMMON_FORWARDING_TABLE)
-                                .build();
+                    TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                            .transition(COMMON_FORWARDING_TABLE)
+                            .build();
 
-                        flowService.setRule(
-                                appId,
-                                kpi.physBridge(),
-                                selector,
-                                treatment,
-                                PRIORITY_KAAS_ELB_RULE,
-                                COMMON_ACL_RECIRC_TABLE,
-                                install
-                        );
-                    });
-                }
+                    flowService.setRule(
+                            appId,
+                            kpi.physBridge(),
+                            selector,
+                            treatment,
+                            PRIORITY_KAAS_ELB_RULE,
+                            COMMON_ACL_RECIRC_TABLE,
+                            install
+                    );
+                }));
             });
         }
 
         private void setElbEgressRules(KubevirtNetwork network, boolean install) {
             nodeService.completeNodes(WORKER).forEach(n -> {
-                KubevirtPhyInterface kpi = n.phyIntfs().stream().filter(pi ->
-                        StringUtils.equals(pi.network(), network.physnetName())).findAny().orElse(null);
-                if (kpi != null) {
-                    kpi.kaasElbs().forEach(ke -> {
-                        TrafficSelector selector = DefaultTrafficSelector.builder()
-                                .matchEthType(Ethernet.TYPE_IPV4)
-                                .matchIPSrc(IpPrefix.valueOf(network.cidr()))
-                                .matchIPDst(IpPrefix.valueOf(ke))
-                                .build();
+                Set<KubevirtPhyInterface> kpis = n.phyIntfs().stream().filter(pi ->
+                        StringUtils.equals(pi.network(), network.physnetName())).collect(Collectors.toSet());
+                kpis.forEach(kpi -> kpi.kaasElbs().forEach(ke -> {
+                    TrafficSelector selector = DefaultTrafficSelector.builder()
+                            .matchEthType(Ethernet.TYPE_IPV4)
+                            .matchIPSrc(IpPrefix.valueOf(network.cidr()))
+                            .matchIPDst(IpPrefix.valueOf(ke))
+                            .build();
 
-                        TrafficTreatment treatment = DefaultTrafficTreatment.builder()
-                                .transition(COMMON_FORWARDING_TABLE)
-                                .build();
+                    TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                            .transition(COMMON_FORWARDING_TABLE)
+                            .build();
 
-                        flowService.setRule(
-                                appId,
-                                kpi.physBridge(),
-                                selector,
-                                treatment,
-                                PRIORITY_KAAS_ELB_RULE,
-                                COMMON_ACL_EGRESS_TABLE,
-                                install
-                        );
-                    });
-                }
+                    flowService.setRule(
+                            appId,
+                            kpi.physBridge(),
+                            selector,
+                            treatment,
+                            PRIORITY_KAAS_ELB_RULE,
+                            COMMON_ACL_EGRESS_TABLE,
+                            install
+                    );
+                }));
             });
         }
     }
@@ -278,66 +276,59 @@ public class KaasExternalLbHandler {
 
             node.phyIntfs().forEach(pi -> {
                 if (pi.physBridge() != null && pi.network() != null) {
-                    KubevirtNetwork kn = networkService.networks().stream().filter(n ->
-                            StringUtils.equals(pi.network(), n.physnetName())).findAny().orElse(null);
-                    if (kn != null) {
+                    Set<KubevirtNetwork> kns = networkService.networks().stream().filter(n ->
+                            StringUtils.equals(pi.network(), n.physnetName())).collect(Collectors.toSet());
+                    kns.forEach(kn -> pi.kaasElbs().forEach(ke -> {
+                        TrafficSelector selector = DefaultTrafficSelector.builder()
+                                .matchEthType(Ethernet.TYPE_IPV4)
+                                .matchIPSrc(IpPrefix.valueOf(ke))
+                                .matchIPDst(IpPrefix.valueOf(kn.cidr()))
+                                .build();
 
-                        pi.kaasElbs().forEach(ke -> {
-                            TrafficSelector selector = DefaultTrafficSelector.builder()
-                                    .matchEthType(Ethernet.TYPE_IPV4)
-                                    .matchIPSrc(IpPrefix.valueOf(ke))
-                                    .matchIPDst(IpPrefix.valueOf(kn.cidr()))
-                                    .build();
+                        TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                                .transition(COMMON_FORWARDING_TABLE)
+                                .build();
 
-                            TrafficTreatment treatment = DefaultTrafficTreatment.builder()
-                                    .transition(COMMON_FORWARDING_TABLE)
-                                    .build();
-
-                            flowService.setRule(
-                                    appId,
-                                    pi.physBridge(),
-                                    selector,
-                                    treatment,
-                                    PRIORITY_KAAS_ELB_RULE,
-                                    COMMON_ACL_RECIRC_TABLE,
-                                    install
-                            );
-                        });
-                    }
+                        flowService.setRule(
+                                appId,
+                                pi.physBridge(),
+                                selector,
+                                treatment,
+                                PRIORITY_KAAS_ELB_RULE,
+                                COMMON_ACL_RECIRC_TABLE,
+                                install
+                        );
+                    }));
                 }
             });
-
         }
 
         private void setElbEgressRules(KubevirtNode node, boolean install) {
             node.phyIntfs().forEach(pi -> {
                 if (pi.physBridge() != null && pi.network() != null) {
-                    KubevirtNetwork kn = networkService.networks().stream().filter(n ->
-                            StringUtils.equals(pi.network(), n.physnetName())).findAny().orElse(null);
-                    if (kn != null) {
+                    Set<KubevirtNetwork> kns = networkService.networks().stream().filter(n ->
+                            StringUtils.equals(pi.network(), n.physnetName())).collect(Collectors.toSet());
+                    kns.forEach(kn -> pi.kaasElbs().forEach(ke -> {
+                        TrafficSelector selector = DefaultTrafficSelector.builder()
+                                .matchEthType(Ethernet.TYPE_IPV4)
+                                .matchIPSrc(IpPrefix.valueOf(kn.cidr()))
+                                .matchIPDst(IpPrefix.valueOf(ke))
+                                .build();
 
-                        pi.kaasElbs().forEach(ke -> {
-                            TrafficSelector selector = DefaultTrafficSelector.builder()
-                                    .matchEthType(Ethernet.TYPE_IPV4)
-                                    .matchIPSrc(IpPrefix.valueOf(kn.cidr()))
-                                    .matchIPDst(IpPrefix.valueOf(ke))
-                                    .build();
+                        TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                                .transition(COMMON_FORWARDING_TABLE)
+                                .build();
 
-                            TrafficTreatment treatment = DefaultTrafficTreatment.builder()
-                                    .transition(COMMON_FORWARDING_TABLE)
-                                    .build();
-
-                            flowService.setRule(
-                                    appId,
-                                    pi.physBridge(),
-                                    selector,
-                                    treatment,
-                                    PRIORITY_KAAS_ELB_RULE,
-                                    COMMON_ACL_EGRESS_TABLE,
-                                    install
-                            );
-                        });
-                    }
+                        flowService.setRule(
+                                appId,
+                                pi.physBridge(),
+                                selector,
+                                treatment,
+                                PRIORITY_KAAS_ELB_RULE,
+                                COMMON_ACL_EGRESS_TABLE,
+                                install
+                        );
+                    }));
                 }
             });
         }
