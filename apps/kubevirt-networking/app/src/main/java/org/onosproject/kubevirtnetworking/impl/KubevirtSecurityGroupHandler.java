@@ -835,6 +835,7 @@ public class KubevirtSecurityGroupHandler {
                         // FIXME: since the physical port number can be changed on reboot,
                         // we need to add another intermediate bridge to handle this
                         if (!StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX) &&
+                                !port.number().equals(PortNumber.LOCAL) &&
                                 StringUtils.equals(adminState, STATE_ENABLED)) {
                             initializeCommonPipeline(device.id(), port.number(), true);
                         }
@@ -866,6 +867,7 @@ public class KubevirtSecurityGroupHandler {
                         // FIXME: since the physical port number can be changed on reboot,
                         // we need to add another intermediate bridge to handle this
                         if (!StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX) &&
+                                !port.number().equals(PortNumber.LOCAL) &&
                                 StringUtils.equals(adminState, STATE_ENABLED)) {
                             initializeCommonPipeline(device.id(), port.number(), false);
                         }
@@ -1081,6 +1083,7 @@ public class KubevirtSecurityGroupHandler {
             // FIXME: since the physical port number can be changed on reboot,
             // we need to add another intermediate bridge to handle this
             if (!StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX) &&
+                    !port.number().equals(PortNumber.LOCAL) &&
                     StringUtils.equals(adminState, STATE_ENABLED)) {
                 initializeCommonPipeline(device.id(), port.number(), true);
             }
@@ -1190,6 +1193,7 @@ public class KubevirtSecurityGroupHandler {
                     // FIXME: since the physical port number can be changed on reboot,
                     // we need to add another intermediate bridge to handle this
                     if (!StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX) &&
+                            !port.number().equals(PortNumber.LOCAL) &&
                             StringUtils.equals(adminState, STATE_ENABLED)) {
                         initializeCommonPipeline(device.id(), port.number(), true);
                     }
@@ -1220,6 +1224,7 @@ public class KubevirtSecurityGroupHandler {
                     // FIXME: since the physical port number can be changed on reboot,
                     // we need to add another intermediate bridge to handle this
                     if (!StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX) &&
+                            !port.number().equals(PortNumber.LOCAL) &&
                             StringUtils.equals(adminState, STATE_ENABLED)) {
                         initializeCommonPipeline(device.id(), port.number(), false);
                     }
