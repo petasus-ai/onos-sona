@@ -15,7 +15,7 @@
  */
 package org.onlab.util;
 
-import org.jboss.netty.buffer.ChannelBuffer;
+import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +36,7 @@ public final class HexDump {
      *
      * @param buff buffer content to dump in hex format
      */
-    public static void dump(ChannelBuffer buff) {
+    public static void dump(ByteBuf buff) {
         buff.markReaderIndex();
         try {
             do {

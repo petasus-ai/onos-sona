@@ -178,11 +178,11 @@
     "moshi": "mvn:com.squareup.moshi:moshi:1.4.0",
     "okio": "mvn:com.squareup.okio:okio:1.14.0",
     "jacoco-agent-runtime": "mvn:org.jacoco:org.jacoco.agent:jar:runtime:0.8.2",
-    "jackson-annotations": "mvn:com.fasterxml.jackson.core:jackson-annotations:2.11.4",
-    "jackson-core": "mvn:com.fasterxml.jackson.core:jackson-core:2.11.4",
+    "jackson-annotations": "mvn:com.fasterxml.jackson.core:jackson-annotations:2.13.4",
+    "jackson-core": "mvn:com.fasterxml.jackson.core:jackson-core:2.13.4",
     "jackson-databind": "mvn:com.fasterxml.jackson.core:jackson-databind:2.13.4",
-    "jackson-datatype-jsr310": "mvn:com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.11.4",
-    "jackson-dataformat-yaml": "mvn:com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.11.4",
+    "jackson-datatype-jsr310": "mvn:com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.4",
+    "jackson-dataformat-yaml": "mvn:com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.13.4",
 
     // Note: grpc imports "javax_annotation_api" has an http file, so we need to give a different name here
     // See WORKSPACE
