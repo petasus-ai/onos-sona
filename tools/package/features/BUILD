@@ -28,6 +28,7 @@ osgi_feature(
         "@io_netty_netty_codec_socks//jar",
         "@io_netty_netty_handler_proxy//jar",
         "@io_netty_netty_transport//jar",
+        "@io_netty_netty_transport_classes_epoll//jar",
         "@io_netty_netty_transport_native_epoll//jar",
         "@io_netty_netty_transport_native_unix_common//jar",
         "@io_netty_netty_resolver//jar",
