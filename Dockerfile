@@ -117,8 +117,8 @@ RUN   touch apps/org.onosproject.gui/active && \
       touch apps/org.onosproject.drivers/active && \
       touch apps/org.onosproject.drivers.ovsdb/active && \
       touch apps/org.onosproject.openflow-base/active && \
-      touch apps/org.onosproject.openstacknetworking/active && \
-      touch apps/org.onosproject.openstacktroubleshoot/active && \
+      #touch apps/org.onosproject.openstacknetworking/active && \
+      #touch apps/org.onosproject.openstacktroubleshoot/active && \
       #touch apps/org.onosproject.k8s-networking/active && \
       touch apps/org.onosproject.kubevirt-networking/active
 
