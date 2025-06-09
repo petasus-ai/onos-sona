@@ -1,8 +1,8 @@
 ARG JOBS=6
 ARG PROFILE=sona
-ARG TAG=11.0.17-11.60.19
+ARG TAG=11.0.27-11.80
 # First stage is the build environment
-FROM registry.gitlab.com/sonaproject/zulu-openjdk:${TAG} as builder
+FROM azul/zulu-openjdk:${TAG} as builder
 MAINTAINER Jian Li <gunine@sk.com>
 
 # Set the environment variables
@@ -16,7 +16,6 @@ ENV ONOS_BRANCH onos-2.7
 ENV BUILD_DEPS \
     ca-certificates \
     zip \
-    python \
     python3 \
     git \
     bzip2 \
@@ -48,18 +47,12 @@ COPY BUILD-sona /src/onos/BUILD
 
 RUN sed -i 's/modules.bzl/sona.bzl/g' /src/onos/BUILD
 
-# Download and patch ONOS core changes which affect ONOS
-RUN git clone https://github.com/sonaproject/onos-sona-patch.git patch && \
-    cp patch/${ONOS_VERSION}/*.patch /src/onos/ && \
-    cp patch/patch.sh /src/onos/
-
 # Build ONOS
 # We extract the tar in the build environment to avoid having to put the tar
 # in the runtime environment - this saves a lot of space
 # FIXME - dependence on ONOS_ROOT and git at build time is a hack to work around
 # build problems
 WORKDIR /src/onos
-RUN ./patch.sh
 
 # Download latest SONA app sources
 RUN mkdir -p /tmp/onos
@@ -94,7 +87,7 @@ RUN mkdir /output
 RUN tar -xf bazel-bin/onos.tar.gz -C /output --strip-components=1
 
 # Second stage is the runtime environment
-FROM registry.gitlab.com/sonaproject/zulu-openjdk:${TAG}-jre
+FROM azul/zulu-openjdk:${TAG}-jre
 
 LABEL org.label-schema.name="ONOS" \
       org.label-schema.description="SDN Controller" \

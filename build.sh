@@ -23,5 +23,5 @@ PLATFORMS=linux/amd64,linux/arm64
 ${CONTAINER_CLI} ${CONTAINER_BUILDER} \
   --platform ${PLATFORMS} \
   ${PUSH} \
-  -f Dockerfile.multiarch \
+  -f Dockerfile \
   -t "${REPO}"/onos-sona-nightly-docker:"${TAG}" .
