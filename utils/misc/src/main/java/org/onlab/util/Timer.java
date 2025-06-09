@@ -30,8 +30,6 @@ import io.netty.util.TimerTask;
  */
 public final class Timer {
 
-    private static volatile org.jboss.netty.util.HashedWheelTimer timer;
-
     private static final Supplier<HashedWheelTimer> TIMER =
             Suppliers.memoize(HashedWheelTimer::new);
 
