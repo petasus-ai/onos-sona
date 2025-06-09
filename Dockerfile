@@ -1,6 +1,6 @@
 ARG JOBS=6
 ARG PROFILE=sona
-ARG TAG=11.0.27-11.80
+ARG TAG=11.0.18-11.62.17
 # First stage is the build environment
 FROM azul/zulu-openjdk:${TAG} as builder
 MAINTAINER Jian Li <gunine@sk.com>
@@ -98,6 +98,8 @@ LABEL org.label-schema.name="ONOS" \
 
 RUN apt-get update -y && \
         apt-get install wget curl libhyperic-sigar-java -y
+
+RUN apt-get upgrade -y
 
 COPY lib/libsigar-aarch64-linux.so /root/onos/apache-karaf-4.2.14/lib/libsigar-aarch64-linux.so
 

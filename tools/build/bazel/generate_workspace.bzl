@@ -223,9 +223,9 @@ def generated_maven_jars():
     if "commons_beanutils" not in native.existing_rules():
         java_import_external(
             name = "commons_beanutils",
-            jar_sha256 = "9e44ba68ec9a3f21286fa2a8bbb003b735c0f69101bb43144b79f4f8aaa74709",
+	    jar_sha256 = "baea644043e8519f4723a32677ef959446146593952fdd8fb47b592992a2e283",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/commons-beanutils/commons-beanutils/1.11.0/commons-beanutils-1.11.0.jar"],        )
+	    jar_urls = ["https://github.com/sonaproject/onos-sona-patch/raw/master/2.7/commons-beanutils-1.11.0.jar"],        )
     if "commons_jxpath" not in native.existing_rules():
         java_import_external(
             name = "commons_jxpath",

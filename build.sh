@@ -3,7 +3,7 @@
 set -ex
 set -o pipefail
 
-TAG=${TAG:-kubevirt}
+TAG=${TAG:-kubevirt-cve-test}
 REPO=${REPO:-registry.gitlab.com/sonaproject}
 PUSH=${PUSH:-}
 
@@ -17,7 +17,7 @@ if [[ -z "${DRY_RUN:-}" ]]; then
 fi
 
 # supported platforms
-PLATFORMS=linux/amd64,linux/arm64
+PLATFORMS=linux/amd64
 
 # shellcheck disable=SC2086 # inteneded splitting of CONTAINER_BUILDER
 ${CONTAINER_CLI} ${CONTAINER_BUILDER} \
