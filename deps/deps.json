@@ -178,11 +178,11 @@
     "moshi": "mvn:com.squareup.moshi:moshi:1.4.0",
     "okio": "mvn:com.squareup.okio:okio:1.14.0",
     "jacoco-agent-runtime": "mvn:org.jacoco:org.jacoco.agent:jar:runtime:0.8.2",
-    "jackson-annotations": "mvn:com.fasterxml.jackson.core:jackson-annotations:2.13.4",
-    "jackson-core": "mvn:com.fasterxml.jackson.core:jackson-core:2.13.4",
-    "jackson-databind": "mvn:com.fasterxml.jackson.core:jackson-databind:2.13.4",
-    "jackson-datatype-jsr310": "mvn:com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.4",
-    "jackson-dataformat-yaml": "mvn:com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.13.4",
+    "jackson-annotations": "mvn:com.fasterxml.jackson.core:jackson-annotations:2.15.4",
+    "jackson-core": "mvn:com.fasterxml.jackson.core:jackson-core:2.15.4",
+    "jackson-databind": "mvn:com.fasterxml.jackson.core:jackson-databind:2.15.4",
+    "jackson-datatype-jsr310": "mvn:com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.4",
+    "jackson-dataformat-yaml": "mvn:com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.15.4",
 
     // Note: grpc imports "javax_annotation_api" has an http file, so we need to give a different name here
     // See WORKSPACE
@@ -312,7 +312,7 @@
     "jackson-coreutils": "mvn:com.github.fge:jackson-coreutils:1.6",
     "btf": "mvn:com.github.fge:btf:1.2",
     "msg-simple": "mvn:com.github.fge:msg-simple:1.1",
-    "snakeyaml": "mvn:org.yaml:snakeyaml:2.0",
+    "snakeyaml": "mvn:org.yaml:snakeyaml:2.1",
 
     // Kubernetes related jars
     "k8s-client": "mvn:io.fabric8:kubernetes-client:5.4.2",
