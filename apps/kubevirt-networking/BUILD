@@ -52,6 +52,7 @@ BUNDLES = [
     "@jetty_websocket_api//jar",
     "@geronimo_jaspic_1_0_spec//jar",
     "@geronimo_jaspi//jar",
+    "@sxc_jaxb//jar",
 ]
 
 onos_app(
