@@ -220,6 +220,7 @@
     "sxc-jaxb": "mvn:org.apache.geronimo.bundles:sxc-jaxb:0.7.3_1",
     "geronimo-activation-spec": "mvn:org.apache.geronimo.specs:geronimo-activation_1.1_spec:1.1",
     "jaxb-osgi": "mvn:com.sun.xml.bind:jaxb-osgi:4.0.5",
+    "geronimo-jaxb": "mvn:org.apache.geronimo.specs:geronimo-jaxb_2.2_spec:1.0.1",
     "servicemix-jaxb-api": "mvn:org.apache.servicemix.specs:org.apache.servicemix.specs.jaxb-api-2.2:2.3.0",
     "geronimo-jaspic-spec": "mvn:org.apache.geronimo.specs:geronimo-jaspic_1.0_spec:1.1",
     "geronimo-jaspi": "mvn:org.apache.geronimo.components:geronimo-jaspi:1.1.1",
