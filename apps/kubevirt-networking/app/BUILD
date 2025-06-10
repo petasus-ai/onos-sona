@@ -50,9 +50,9 @@ COMPILE_DEPS = CORE_DEPS + JACKSON + KRYO + CLI + REST + [
     "@jetty_util_ajax//jar",
     "@jetty_websocket//jar",
     "@jetty_websocket_api//jar",
-    "@sxc_jaxb//jar",
-    "@servicemix_jaxb_api//jar",
     "@servlet_api//jar",
+    "@geronimo_jaspic_spec//jar",
+    "@geronimo_jaspi//jar",
 ]
 
 TEST_DEPS = TEST_ADAPTERS + [
