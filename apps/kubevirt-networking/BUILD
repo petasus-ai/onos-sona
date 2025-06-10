@@ -49,6 +49,7 @@ BUNDLES = [
     "@jetty_util//jar",
     "@jetty_util_ajax//jar",
     "@jetty_websocket//jar",
+    "@jetty_websocket_api//jar",
 ]
 
 onos_app(
