@@ -52,6 +52,8 @@ BUNDLES = [
     "@jetty_websocket_api//jar",
     "@geronimo_jaspic_spec//jar",
     "@geronimo_jaspi//jar",
+    "@sxc_jaxb//jar",
+    "@sxc-runtime//jar",
 ]
 
 EXCLUDED_BUNDLES = [
