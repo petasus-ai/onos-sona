@@ -13,6 +13,8 @@ API = [
 CORE = UTILS + API + [
     "//core/net:onos-core-net",
     "//core/common:onos-core-common",
+    "//core/protobuf/models:onos-core-protobuf-models",
+    "//core/protobuf/models/proto:onos-core-protobuf-models-proto",
     "//core/store/primitives:onos-core-primitives",
     "//core/store/serializers:onos-core-serializers",
     "//core/store/dist:onos-core-dist",
@@ -87,7 +89,7 @@ PROTOCOL_MAP = {
 
 PROTOCOL_APP_MAP = {
     "//protocols/grpc:onos-protocols-grpc-oar": ["stratum", "tost", "sona"],
-    "//protocols/gnmi:onos-protocols-gnmi-oar": ["stratum", "tost"],
+    "//protocols/gnmi:onos-protocols-gnmi-oar": ["stratum", "tost", "sona"],
     "//protocols/gnoi:onos-protocols-gnoi-oar": ["stratum", "tost"],
     "//protocols/p4runtime:onos-protocols-p4runtime-oar": ["stratum", "tost"],
     "//protocols/restconf/server:onos-protocols-restconf-server-oar": [],
@@ -160,7 +162,7 @@ DRIVER_MAP = {
     "//drivers/corsa:onos-drivers-corsa-oar": [],
     "//drivers/flowspec:onos-drivers-flowspec-oar": [],
     "//drivers/fujitsu:onos-drivers-fujitsu-oar": [],
-    "//drivers/gnmi:onos-drivers-gnmi-oar": ["stratum", "tost"],
+    "//drivers/gnmi:onos-drivers-gnmi-oar": ["stratum", "tost", "sona"],
     "//drivers/gnoi:onos-drivers-gnoi-oar": ["stratum", "tost"],
     "//drivers/hp:onos-drivers-hp-oar": [],
     "//drivers/huawei:onos-drivers-huawei-oar": [],
