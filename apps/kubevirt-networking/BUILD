@@ -55,7 +55,6 @@ BUNDLES = [
     "@sxc_jaxb//jar",
     "@geronimo_activation_spec//jar",
     "@jaxb_osgi//jar",
-    "@geronimo_jaxb//jar",
 ]
 
 onos_app(

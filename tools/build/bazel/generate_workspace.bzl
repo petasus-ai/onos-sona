@@ -681,7 +681,7 @@ def generated_maven_jars():
             name = "jaxb_osgi",
             jar_sha256 = "fff6a205646844626e56e21804e4866b022de9944e4bd4db0afb972215b67abb",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/com/sun/xml/bind/jaxb-osgi/4.0.5/jaxb-osgi-4.0.5.jar"],        )
+            jar_urls = ["https://repository.mulesoft.org/nexus/content/repositories/public/com/sun/xml/bind/jaxb-all.osgi/2.1.6/jaxb-all.osgi-2.1.6.jar"],        )
     if "geronimo_jaxb" not in native.existing_rules():
         java_import_external(
             name = "geronimo_jaxb",
