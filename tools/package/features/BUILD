@@ -60,7 +60,6 @@ osgi_feature(
         "@org_osgi_util_promise//jar",
         "@jaxb_api//jar",
         "@kafka_clients//jar",
-        "@jetty_jaspi//jar",
     ],
     required_features = [],
     visibility = ["//visibility:public"],

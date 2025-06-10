@@ -51,6 +51,7 @@ COMPILE_DEPS = CORE_DEPS + JACKSON + KRYO + CLI + REST + [
     "@jetty_websocket//jar",
     "@jetty_websocket_api//jar",
     "@sxc_jaxb//jar",
+    "@servicemix_jaxb_api//jar",
     "@servlet_api//jar",
 ]
 

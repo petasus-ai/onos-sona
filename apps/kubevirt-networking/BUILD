@@ -51,12 +51,18 @@ BUNDLES = [
     "@jetty_websocket//jar",
     "@jetty_websocket_api//jar",
     "@sxc_jaxb//jar",
+    "@servicemix_jaxb_api//jar",
+]
+
+EXCLUDED_BUNDLES = [
+    "@jetty_jaspi//jar"
 ]
 
 onos_app(
     category = "Integration",
     description = "SONA KubeVirt Networking Application.",
     included_bundles = BUNDLES,
+    excluded_bundles = EXCLUDED_BUNDLES,
     required_apps = [
         "org.onosproject.kubevirt-node",
     ],
