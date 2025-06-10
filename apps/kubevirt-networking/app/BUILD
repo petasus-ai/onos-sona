@@ -55,6 +55,7 @@ COMPILE_DEPS = CORE_DEPS + JACKSON + KRYO + CLI + REST + [
     "@geronimo_jaspi//jar",
     "@sxc_jaxb//jar",
     "@geronimo_activation_spec//jar",
+    "@geronimo_osgi_registry//jar",
     "@jaxb_osgi//jar",
 ]
 
