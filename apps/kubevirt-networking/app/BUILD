@@ -41,10 +41,13 @@ COMPILE_DEPS = CORE_DEPS + JACKSON + KRYO + CLI + REST + [
     "@simpleclient_common//jar",
     "@simpleclient_hotspot//jar",
     "@simpleclient_servlet//jar",
+    "@jetty_security//jar",
+    "@jetty_io//jar",
     "@jetty_servlet//jar",
     "@jetty_http//jar",
     "@jetty_server//jar",
     "@jetty_util//jar",
+    "@jetty_util_ajax//jar",
     "@jetty_websocket//jar",
     "@servlet_api//jar",
 ]

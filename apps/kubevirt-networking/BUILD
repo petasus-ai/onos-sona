@@ -44,6 +44,7 @@ BUNDLES = [
     "@jetty_servlet//jar",
     "@jetty_server//jar",
     "@jetty_util//jar",
+    "@jetty_util_ajax//jar",
     "@jetty_websocket//jar",
 ]
 
