@@ -53,6 +53,7 @@ BUNDLES = [
     "@geronimo_jaspic_spec//jar",
     "@geronimo_jaspi//jar",
     "@sxc_jaxb//jar",
+    "@geronimo_activation_spec//jar",
 ]
 
 onos_app(
