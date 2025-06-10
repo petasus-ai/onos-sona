@@ -54,7 +54,7 @@ COMPILE_DEPS = CORE_DEPS + JACKSON + KRYO + CLI + REST + [
     "@geronimo_jaspic_spec//jar",
     "@geronimo_jaspi//jar",
     "@sxc_jaxb//jar",
-    "@sxc-runtime//jar",
+    "@sxc_runtime//jar",
 ]
 
 TEST_DEPS = TEST_ADAPTERS + [
