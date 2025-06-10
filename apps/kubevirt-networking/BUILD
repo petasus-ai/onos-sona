@@ -53,18 +53,12 @@ BUNDLES = [
     "@geronimo_jaspic_spec//jar",
     "@geronimo_jaspi//jar",
     "@sxc_jaxb//jar",
-    "@sxc_runtime//jar",
-]
-
-EXCLUDED_BUNDLES = [
-    "@jetty_jaspi//jar"
 ]
 
 onos_app(
     category = "Integration",
     description = "SONA KubeVirt Networking Application.",
     included_bundles = BUNDLES,
-    excluded_bundles = EXCLUDED_BUNDLES,
     required_apps = [
         "org.onosproject.kubevirt-node",
     ],
