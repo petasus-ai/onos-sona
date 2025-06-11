@@ -143,20 +143,17 @@ public final class JsonRpcReaderUtil {
      * @throws UnsupportedException this is an unsupported exception
      */
     private static void checkEncoding(ByteBuf in) throws IOException {
-        int inputStart = 0;
-        int inputLength = 4;
         fliterCharaters(in);
-        byte[] buff = new byte[4];
-        in.getBytes(in.readerIndex(), buff);
-        ByteSourceJsonBootstrapper strapper = new ByteSourceJsonBootstrapper(new IOContext(new BufferRecycler(),
-                                                                                           null,
-                                                                                           false),
-                                                                             buff, inputStart,
-                                                                             inputLength);
+        int readerIndex = in.readerIndex();
+        int probeLength  = Math.min(4, in.readableBytes());
+
+        byte[] buff = new byte[probeLength];
+        in.getBytes(readerIndex, buff);
+        IOContext ctx = new IOContext(new BufferRecycler(), buff, false);
+        ByteSourceJsonBootstrapper strapper = new ByteSourceJsonBootstrapper(ctx, buff, 0, probeLength);
         JsonEncoding jsonEncoding = strapper.detectEncoding();
         if (!JsonEncoding.UTF8.equals(jsonEncoding)) {
             throw new UnsupportedException("Only UTF-8 encoding is supported.");
         }
     }
-
 }
