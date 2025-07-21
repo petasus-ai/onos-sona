@@ -118,6 +118,7 @@ public final class KubevirtNetworkingUtil {
     private static final String INTERFACES = "interfaces";
     private static final String NODE_NAME = "nodeName";
 
+    private static final String NETWORK_ID = "networkId";
     private static final String NETWORK_CONFIG = "network-config";
     private static final String TYPE = "type";
     private static final String MTU = "mtu";
@@ -1048,6 +1049,7 @@ public final class KubevirtNetworkingUtil {
             KubevirtNetwork.Builder builder = DefaultKubevirtNetwork.builder();
 
             JsonObject configJson = JsonObject.readFrom(networkConfig);
+            String id = configJson.get(NETWORK_ID).asString();
             String type = configJson.get(TYPE).asString().toUpperCase(Locale.ROOT);
             Integer mtu = configJson.get(MTU).asInt();
             String gatewayIp = configJson.getString(GATEWAY_IP, "");
@@ -1103,7 +1105,7 @@ public final class KubevirtNetworkingUtil {
                 builder.dnses(dnses);
             }
 
-            builder.networkId(name).name(name).type(KubevirtNetwork.Type.valueOf(type))
+            builder.networkId(id).name(name).type(KubevirtNetwork.Type.valueOf(type))
                     .mtu(mtu).gatewayIp(IpAddress.valueOf(gatewayIp))
                     .defaultRoute(defaultRoute).cidr(cidr);
 
