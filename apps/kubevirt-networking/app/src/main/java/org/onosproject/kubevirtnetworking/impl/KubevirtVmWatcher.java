@@ -73,6 +73,8 @@ public class KubevirtVmWatcher {
     private static final String SPEC = "spec";
     private static final String TEMPLATE = "template";
     private static final String METADATA = "metadata";
+    private static final String NAMESPACE = "namespace";
+
     private static final String ANNOTATIONS = "annotations";
     private static final String DOMAIN = "domain";
     private static final String DEVICES = "devices";
@@ -399,6 +401,7 @@ public class KubevirtVmWatcher {
             try {
                 ObjectMapper mapper = new ObjectMapper();
                 JsonNode json = mapper.readTree(resource);
+                JsonNode metadata = json.get(METADATA);
                 JsonNode spec = json.get(SPEC).get(TEMPLATE).get(SPEC);
                 ArrayNode interfaces = (ArrayNode) spec.get(DOMAIN).get(DEVICES).get(INTERFACES);
 
@@ -408,7 +411,7 @@ public class KubevirtVmWatcher {
                 }
                 Map<MacAddress, String> result = new HashMap<>();
                 for (JsonNode intf : interfaces) {
-                    String network = intf.get(NAME).asText();
+                    String network = metadata.get(NAMESPACE).asText() + "/" + intf.get(NAME).asText();
                     JsonNode macJson = intf.get(MAC);
 
                     if (!DEFAULT.equals(network) && !CNI_ZERO.equals(network) && macJson != null) {
@@ -427,3 +430,4 @@ public class KubevirtVmWatcher {
         }
     }
 }
+
