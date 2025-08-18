@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-present Open Networking Foundation
+ * Copyright 2025-present Open Networking Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,9 @@
  */
 package org.onosproject.kubevirtnetworking.cli;
 
+import org.apache.karaf.shell.api.action.Argument;
 import org.apache.karaf.shell.api.action.Command;
+import org.apache.karaf.shell.api.action.Completion;
 import org.apache.karaf.shell.api.action.lifecycle.Service;
 import org.onosproject.cli.AbstractShellCommand;
 import org.onosproject.kubevirtnode.api.KubevirtNode;
@@ -29,9 +31,14 @@ import static org.onosproject.kubevirtnode.api.KubevirtNodeState.INIT;
  * Re-installs flow rules for KubeVirt networking.
  */
 @Service
-@Command(scope = "onos", name = "kubevirt-sync-rules",
+@Command(scope = "onos", name = "kubevirt-sync-node-rules",
         description = "Re-installs flow rules for KubeVirt networking")
-public class KubevirtSyncRulesCommand extends AbstractShellCommand {
+public class KubevirtSyncNodeRulesCommand extends AbstractShellCommand {
+
+    @Argument(index = 0, name = "hostname", description = "Hostname",
+            required = true, multiValued = false)
+    @Completion(KubevirtHostnameCompleter.class)
+    private String hostname = null;
 
     private static final int  SLEEP_S = 1;     // we re-check the status on every 1s
     private static final long TIMEOUT_MS = 15000;
@@ -49,8 +56,13 @@ public class KubevirtSyncRulesCommand extends AbstractShellCommand {
             return;
         }
 
-        nodeAdminService.completeNodes().forEach(node ->
-                syncRulesBaseForNode(nodeAdminService, node));
+        KubevirtNode node = nodeAdminService.node(hostname);
+        if (node == null) {
+            print("Cannot find %s from registered nodes", hostname);
+            return;
+        }
+
+        syncRulesBaseForNode(nodeAdminService, node);
 
         print("Done all flow rules synchronization, but some nodes may have issues.");
     }
