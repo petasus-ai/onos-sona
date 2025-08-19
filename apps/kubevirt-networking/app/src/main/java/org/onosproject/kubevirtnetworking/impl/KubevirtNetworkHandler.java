@@ -102,7 +102,6 @@ import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_INBOUND_TA
 import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_MULTICAST_TABLE;
 import static org.onosproject.kubevirtnetworking.api.Constants.FORWARDING_TABLE;
 import static org.onosproject.kubevirtnetworking.api.Constants.GW_ENTRY_TABLE;
-import static org.onosproject.kubevirtnetworking.api.Constants.INSTANCE_PORT_PREFIX;
 import static org.onosproject.kubevirtnetworking.api.Constants.KUBEVIRT_NETWORKING_APP_ID;
 import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_ARP_DEFAULT_RULE;
 import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_ARP_GATEWAY_RULE;
@@ -146,6 +145,7 @@ import static org.onosproject.kubevirtnode.api.Constants.TUNNEL_TO_INTEGRATION;
 import static org.onosproject.kubevirtnode.api.KubevirtNode.Type.GATEWAY;
 import static org.onosproject.kubevirtnode.api.KubevirtNode.Type.WORKER;
 import static org.onosproject.net.AnnotationKeys.ADMIN_STATE;
+import static org.onosproject.net.AnnotationKeys.PORT_MAC;
 import static org.onosproject.net.AnnotationKeys.PORT_NAME;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -438,11 +438,10 @@ public class KubevirtNetworkHandler {
             setEgressTransitionRule(deviceId, true);
 
             for (Port port : deviceService.getPorts(deviceId)) {
-                String portName = port.annotations().value(PORT_NAME);
                 String adminState = port.annotations().value(ADMIN_STATE);
-                // FIXME: since the physical port number can be changed on reboot,
-                // we need to add another intermediate bridge to handle this
-                if (!StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX) &&
+                // FIXME: we assume that the attached port should has the
+                // same MAC address of LOCAL port
+                if (isAttachedPort(port, deviceId) &&
                         StringUtils.equals(adminState, STATE_ENABLED)) {
                     setIngressTransitionRule(deviceId, port, true);
 
@@ -1521,6 +1520,26 @@ public class KubevirtNetworkHandler {
         );
     }
 
+    private boolean isAttachedPort(Port port, DeviceId deviceId) {
+        if (port.number() == PortNumber.LOCAL) {
+            return false;
+        }
+
+        Port localPort = null;
+        for (Port tmpPort : deviceService.getPorts(deviceId)) {
+            if (tmpPort.number() == PortNumber.LOCAL) {
+                localPort = tmpPort;
+                break;
+            }
+        }
+
+        if (localPort != null) {
+            return port.annotations().value(PORT_MAC).equals(localPort.annotations().value(PORT_MAC));
+        }
+
+        return false;
+    }
+
     private class InternalBridgeListener implements DeviceListener {
 
         @Override
@@ -1559,7 +1578,7 @@ public class KubevirtNetworkHandler {
 
             // FIXME: since the physical port number can be changed on reboot,
             // we need to add another intermediate bridge to handle this
-            if (!StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX) &&
+            if (isAttachedPort(port, device.id()) &&
                     StringUtils.equals(adminState, STATE_ENABLED)) {
                 setIngressTransitionRule(device.id(), port, true);
             }
