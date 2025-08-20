@@ -1521,20 +1521,16 @@ public class KubevirtNetworkHandler {
     }
 
     private boolean isAttachedPort(Port port, DeviceId deviceId) {
-        if (port.number() == PortNumber.LOCAL) {
+        if (port.number().equals(PortNumber.LOCAL)) {
             return false;
         }
 
-        Port localPort = null;
         for (Port tmpPort : deviceService.getPorts(deviceId)) {
-            if (tmpPort.number() == PortNumber.LOCAL) {
-                localPort = tmpPort;
-                break;
+            if (tmpPort.number().equals(PortNumber.LOCAL)) {
+                String tmpPortMac = tmpPort.annotations().value(PORT_MAC);
+                String inputPortMac = port.annotations().value(PORT_MAC);
+                return inputPortMac.equals(tmpPortMac);
             }
-        }
-
-        if (localPort != null) {
-            return port.annotations().value(PORT_MAC).equals(localPort.annotations().value(PORT_MAC));
         }
 
         return false;
