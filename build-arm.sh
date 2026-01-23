@@ -24,4 +24,5 @@ ${CONTAINER_CLI} ${CONTAINER_BUILDER} \
   --platform ${PLATFORMS} \
   ${PUSH} \
   -f Dockerfile \
+  --provenance=false \
   -t "${REPO}"/onos-sona-nightly-docker:"${TAG}" .
