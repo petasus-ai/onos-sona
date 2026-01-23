@@ -87,6 +87,7 @@ import java.util.stream.Collectors;
 
 import static org.onosproject.kubevirtnetworking.api.Constants.TUNNEL_TO_TENANT_PREFIX;
 import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.FLAT;
+import static org.onosproject.kubevirtnode.api.Constants.CALICO_PROJECT_DOMAIN;
 import static org.onosproject.kubevirtnode.api.Constants.SONA_PROJECT_DOMAIN;
 import static org.onosproject.kubevirtnode.api.KubevirtNode.Type.GATEWAY;
 import static org.onosproject.kubevirtnode.api.KubevirtNode.Type.MASTER;
@@ -149,7 +150,7 @@ public final class KubevirtNetworkingUtil {
     private static final String INTERFACE_KEY = "interface";
     private static final String PHYS_BRIDGE_ID = "physBridgeId";
     private static final String KAAS_ELB_GWS_KEY = "kaasElbGws";
-
+    private static final String CALICO_VXLAN_TUNNEL_ADDR = CALICO_PROJECT_DOMAIN + "/IPv4VXLANTunnelAddr";
     private static final String NO_SCHEDULE_EFFECT = "NoSchedule";
     private static final String KUBEVIRT_IO_KEY = "kubevirt.io/drain";
     private static final String DRAINING_VALUE = "draining";
@@ -947,8 +948,11 @@ public final class KubevirtNetworkingUtil {
         String gatewayConfig = annots.get(GATEWAY_CONFIG_KEY);
         String tunnelConfig = annots.get(TUNNEL_CONFIG_KEY);
         String dataIpStr = annots.get(DATA_IP_KEY);     // Deprecated. Use tunnelConfig instead
+        String calicoVxlanIpStr = annots.get(CALICO_VXLAN_TUNNEL_ADDR);
         Set<KubevirtPhyInterface> phys = new HashSet<>();
         String gatewayBridgeName = null;
+        boolean vxlanInUse = calicoVxlanIpStr != null;
+
         try {
             if (physnetConfig != null) {
                 JsonArray configJson = JsonArray.readFrom(physnetConfig);
@@ -1027,6 +1031,7 @@ public final class KubevirtNetworkingUtil {
                 .phyIntfs(phys)
                 .gatewayBridgeName(gatewayBridgeName)
                 .kernelVersion(kernelVersion)
+                .vxlanInUse(vxlanInUse)
                 .build();
     }
 

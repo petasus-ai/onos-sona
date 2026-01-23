@@ -249,7 +249,11 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
             // as br-int only deals with FLAT and VLAN network
             // createPatchInterfaces(node);
 
-            if (node.dataIp() != null && !isIntfEnabled(node, VXLAN)) {
+            if (node.vxlanInUse()) {
+                log.info("VxLAN port will not be created, as it already used by other CNIs.");
+            }
+
+            if (node.dataIp() != null && !isIntfEnabled(node, VXLAN) && !node.vxlanInUse()) {
                 createVxlanTunnelInterface(node);
             }
 
@@ -575,7 +579,7 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
             log.error("Exception caused during init state checking...");
         }
 
-        if (node.dataIp() != null && !isIntfEnabled(node, VXLAN)) {
+        if (node.dataIp() != null && !isIntfEnabled(node, VXLAN) && !node.vxlanInUse()) {
             log.warn("VXLAN interface is not enabled!");
             return false;
         }

@@ -61,6 +61,7 @@ public class DefaultKubevirtNode implements KubevirtNode {
     private final String gatewayBridgeName;
     private final KubernetesExternalLbInterface kubernetesExternalLbIntf;
     private final int[] kernelVersion;
+    private final boolean vxlanInUse;
 
     /**
      * A default constructor of kubevirt node.
@@ -76,6 +77,8 @@ public class DefaultKubevirtNode implements KubevirtNode {
      * @param phyIntfs          physical interfaces
      * @param gatewayBridgeName  gateway bridge name
      * @param kubernetesExternalLbIntf kubernetesExternalLbIntf
+     * @param kernelVersion     kernel version number
+     * @param vxlanInUse        VxLAN in use status
      */
     protected DefaultKubevirtNode(String clusterName, String hostname, Type type,
                                   DeviceId intgBridge, DeviceId tunBridge,
@@ -84,7 +87,7 @@ public class DefaultKubevirtNode implements KubevirtNode {
                                   Collection<KubevirtPhyInterface> phyIntfs,
                                   String gatewayBridgeName,
                                   KubernetesExternalLbInterface kubernetesExternalLbIntf,
-                                  int[] kernelVersion) {
+                                  int[] kernelVersion, boolean vxlanInUse) {
         this.clusterName = clusterName;
         this.hostname = hostname;
         this.type = type;
@@ -97,6 +100,7 @@ public class DefaultKubevirtNode implements KubevirtNode {
         this.gatewayBridgeName = gatewayBridgeName;
         this.kubernetesExternalLbIntf = kubernetesExternalLbIntf;
         this.kernelVersion = kernelVersion;
+        this.vxlanInUse = vxlanInUse;
     }
 
     @Override
@@ -159,6 +163,7 @@ public class DefaultKubevirtNode implements KubevirtNode {
                 .gatewayBridgeName(gatewayBridgeName)
                 .kubernetesExternalLbInterface(kubernetesExternalLbIntf)
                 .kernelVersion(kernelVersion)
+                .vxlanInUse(vxlanInUse)
                 .build();
     }
 
@@ -177,6 +182,7 @@ public class DefaultKubevirtNode implements KubevirtNode {
                 .gatewayBridgeName(gatewayBridgeName)
                 .kubernetesExternalLbInterface(kubernetesExternalLbIntf)
                 .kernelVersion(kernelVersion)
+                .vxlanInUse(vxlanInUse)
                 .build();
     }
 
@@ -195,6 +201,7 @@ public class DefaultKubevirtNode implements KubevirtNode {
                 .gatewayBridgeName(gatewayBridgeName)
                 .kubernetesExternalLbInterface(kubernetesExternalLbIntf)
                 .kernelVersion(kernelVersion)
+                .vxlanInUse(vxlanInUse)
                 .build();
     }
 
@@ -221,6 +228,7 @@ public class DefaultKubevirtNode implements KubevirtNode {
                 .gatewayBridgeName(gatewayBridgeName)
                 .kubernetesExternalLbInterface(externalLbInterface)
                 .kernelVersion(kernelVersion)
+                .vxlanInUse(vxlanInUse)
                 .build();
     }
 
@@ -280,6 +288,11 @@ public class DefaultKubevirtNode implements KubevirtNode {
     @Override
     public int[] kernelVersion() {
         return kernelVersion;
+    }
+
+    @Override
+    public boolean vxlanInUse() {
+        return vxlanInUse;
     }
 
     private PortNumber tunnelPort(String tunnelType) {
@@ -348,7 +361,8 @@ public class DefaultKubevirtNode implements KubevirtNode {
                 .phyIntfs(node.phyIntfs())
                 .gatewayBridgeName(node.gatewayBridgeName())
                 .kubernetesExternalLbInterface(node.kubernetesExternalLbInterface())
-                .kernelVersion(node.kernelVersion());
+                .kernelVersion(node.kernelVersion())
+                .vxlanInUse(node.vxlanInUse());
     }
 
     @Override
@@ -390,6 +404,7 @@ public class DefaultKubevirtNode implements KubevirtNode {
                 .add("gatewayBridgeName", gatewayBridgeName)
                 .add("kubernetesExternalLbInterface", kubernetesExternalLbIntf)
                 .add("kernelVersion", kernelVersion)
+                .add("vxlanInUse", vxlanInUse)
                 .toString();
     }
 
@@ -407,6 +422,7 @@ public class DefaultKubevirtNode implements KubevirtNode {
         private String gatewayBridgeName;
         private KubernetesExternalLbInterface kubernetesExternalLbInterface;
         private int[] kernelVersion;
+        private boolean vxlanInUse;
 
         // private constructor not intended to use from external
         private Builder() {
@@ -435,7 +451,8 @@ public class DefaultKubevirtNode implements KubevirtNode {
                     phyIntfs,
                     gatewayBridgeName,
                     kubernetesExternalLbInterface,
-                    kernelVersion
+                    kernelVersion,
+                    vxlanInUse
             );
         }
 
@@ -508,6 +525,12 @@ public class DefaultKubevirtNode implements KubevirtNode {
         @Override
         public Builder kernelVersion(int[] kernelVersion) {
             this.kernelVersion = kernelVersion;
+            return this;
+        }
+
+        @Override
+        public Builder vxlanInUse(boolean vxlanInUse) {
+            this.vxlanInUse = vxlanInUse;
             return this;
         }
     }

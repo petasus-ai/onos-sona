@@ -211,6 +211,13 @@ public interface KubevirtNode {
     int[] kernelVersion();
 
     /**
+     * Returns the VxLAN in-use status by other CNIs (e.g., calico).
+     *
+     * @return flag to denote VxLAN in-use status
+     */
+    boolean vxlanInUse();
+
+    /**
      * Builder of new node entity.
      */
     interface Builder {
@@ -317,5 +324,13 @@ public interface KubevirtNode {
          * @return kubevirt node builder
          */
         KubevirtNode.Builder kernelVersion(int[] kernelVersion);
+
+        /**
+         * Returns kubevirt node builder with supplied VxLAN is use status.
+         *
+         * @param vxlanInUse VxLAN in-use status
+         * @return kubevirt node builder
+         */
+        KubevirtNode.Builder vxlanInUse(boolean vxlanInUse);
     }
 }

@@ -63,6 +63,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.onlab.util.Tools.get;
+import static org.onosproject.kubevirtnode.api.Constants.CALICO_PROJECT_DOMAIN;
 import static org.onosproject.kubevirtnode.api.Constants.SONA_PROJECT_DOMAIN;
 import static org.onosproject.kubevirtnode.api.KubevirtNode.Type.GATEWAY;
 import static org.onosproject.kubevirtnode.api.KubevirtNode.Type.MASTER;
@@ -102,6 +103,8 @@ public final class KubevirtNodeUtil {
     private static final String INTERFACE_KEY = "interface";
     private static final String PHYS_BRIDGE_ID = "physBridgeId";
     private static final String KAAS_ELB_GWS_KEY = "kaasElbGws";
+
+    private static final String CALICO_VXLAN_TUNNEL_ADDR = CALICO_PROJECT_DOMAIN + "/IPv4VXLANTunnelAddr";
 
     private static final int PORT_NAME_MAX_LENGTH = 15;
 
@@ -417,10 +420,12 @@ public final class KubevirtNodeUtil {
         String elbIpStr = annots.get(EXTERNAL_LB_IP_KEY);
         String elbGwIpStr = annots.get(EXTERNAL_LB_GATEWAY_IP_KEY);
         String elbGwMacStr = annots.get(EXTERNAL_LB_GATEWAY_MAC_KEY);
+        String calicoVxlanIpStr = annots.get(CALICO_VXLAN_TUNNEL_ADDR);
         String elbBridgeName = null;
         IpAddress elbIp = null;
         IpAddress elbGwIp = null;
         MacAddress elbGwMac = null;
+        boolean vxlanInUse = calicoVxlanIpStr != null;
 
         KubernetesExternalLbInterface kubernetesExternalLbInterface = null;
 
@@ -522,6 +527,7 @@ public final class KubevirtNodeUtil {
                 .gatewayBridgeName(gatewayBridgeName)
                 .kubernetesExternalLbInterface(kubernetesExternalLbInterface)
                 .kernelVersion(kernelVersion)
+                .vxlanInUse(vxlanInUse)
                 .build();
     }
 

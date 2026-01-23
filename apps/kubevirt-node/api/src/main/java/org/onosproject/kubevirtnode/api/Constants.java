@@ -49,6 +49,7 @@ public final class Constants {
     public static final String DEFAULT_CLUSTER_NAME = "default";
 
     public static final String SONA_PROJECT_DOMAIN = "sonaproject.github.io";
+    public static final String CALICO_PROJECT_DOMAIN = "projectcalico.org";
 
     // CLI item length
     public static final int CLI_NAME_LENGTH = 30;
