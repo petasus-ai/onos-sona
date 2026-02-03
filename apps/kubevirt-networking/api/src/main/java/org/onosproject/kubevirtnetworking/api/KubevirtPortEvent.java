@@ -118,6 +118,11 @@ public class KubevirtPortEvent extends AbstractEvent<KubevirtPortEvent.Type, Kub
         KUBEVIRT_PORT_MIGRATED,
 
         /**
+         * Signifies that the IP address bound with kubevirt port has been updated.
+         */
+        KUBEVIRT_PORT_IP_UPDATED,
+
+        /**
          * Signifies that the kubevirt security group rule is added to a specific port.
          */
         KUBEVIRT_PORT_SECURITY_GROUP_ADDED,

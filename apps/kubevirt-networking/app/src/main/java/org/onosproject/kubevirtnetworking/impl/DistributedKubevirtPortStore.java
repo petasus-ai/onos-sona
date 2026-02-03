@@ -16,6 +16,7 @@
 package org.onosproject.kubevirtnetworking.impl;
 
 import com.google.common.collect.ImmutableSet;
+import org.onlab.packet.IpAddress;
 import org.onlab.packet.MacAddress;
 import org.onlab.util.KryoNamespace;
 import org.onosproject.core.ApplicationId;
@@ -51,6 +52,7 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnetworking.api.KubevirtPortEvent.Type.KUBEVIRT_PORT_CREATED;
 import static org.onosproject.kubevirtnetworking.api.KubevirtPortEvent.Type.KUBEVIRT_PORT_DEVICE_ADDED;
+import static org.onosproject.kubevirtnetworking.api.KubevirtPortEvent.Type.KUBEVIRT_PORT_IP_UPDATED;
 import static org.onosproject.kubevirtnetworking.api.KubevirtPortEvent.Type.KUBEVIRT_PORT_MIGRATED;
 import static org.onosproject.kubevirtnetworking.api.KubevirtPortEvent.Type.KUBEVIRT_PORT_REMOVED;
 import static org.onosproject.kubevirtnetworking.api.KubevirtPortEvent.Type.KUBEVIRT_PORT_SECURITY_GROUP_ADDED;
@@ -174,6 +176,7 @@ public class DistributedKubevirtPortStore
                                     KUBEVIRT_PORT_UPDATED, event.newValue().value())));
                     processSecurityGroupEvent(event.oldValue().value(), event.newValue().value());
                     processDeviceEvent(event.oldValue().value(), event.newValue().value());
+                    processPortEvent(event.oldValue().value(), event.newValue().value());
                     break;
                 case REMOVE:
                     log.debug("Kubevirt port removed");
@@ -224,6 +227,17 @@ public class DistributedKubevirtPortStore
             if (oldDeviceId != null && newDeviceId != null && !oldDeviceId.equals(newDeviceId)) {
                 notifyDelegate(new KubevirtPortEvent(
                         KUBEVIRT_PORT_MIGRATED, newPort, oldPort, newDeviceId
+                ));
+            }
+        }
+
+        private void processPortEvent(KubevirtPort oldPort, KubevirtPort newPort) {
+            IpAddress oldIp = oldPort.ipAddress();
+            IpAddress newIp = newPort.ipAddress();
+
+            if (oldIp != null && newIp != null && !oldIp.equals(newIp)) {
+                notifyDelegate(new KubevirtPortEvent(
+                        KUBEVIRT_PORT_IP_UPDATED, newPort, oldPort, newPort.deviceId()
                 ));
             }
         }

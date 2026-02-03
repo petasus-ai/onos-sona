@@ -938,6 +938,7 @@ public class KubevirtSecurityGroupHandler {
                     eventExecutor.execute(() -> processPortDeviceAdded(event));
                     break;
                 case KUBEVIRT_PORT_MIGRATED:
+                case KUBEVIRT_PORT_IP_UPDATED:
                     eventExecutor.execute(() -> processPortDeviceAdded(event));
                     eventExecutor.execute(() -> processOldPortRemove(event));
                     break;
