@@ -32,8 +32,8 @@ import org.onosproject.cluster.NodeId;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.kubevirtnetworking.api.DefaultKubevirtPort;
+import org.onosproject.kubevirtnetworking.api.KubevirtNetwork;
 import org.onosproject.kubevirtnetworking.api.KubevirtNetworkAdminService;
-import org.onosproject.kubevirtnetworking.api.KubevirtPodService;
 import org.onosproject.kubevirtnetworking.api.KubevirtPort;
 import org.onosproject.kubevirtnetworking.api.KubevirtPortAdminService;
 import org.onosproject.kubevirtnode.api.KubevirtApiConfigEvent;
@@ -55,6 +55,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
+import java.util.stream.Collectors;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static org.onlab.util.Tools.groupedThreads;
@@ -83,6 +84,7 @@ public class KubevirtVmWatcher {
     private static final String NAME = "name";
     private static final String NETWORK = "network";
     private static final String MAC = "macAddress";
+    private static final String SRIOV = "sriov";
     private static final String IP = "ipAddress";
     private static final String DEFAULT = "default";
     private static final String CNI_ZERO = "cni0";
@@ -108,9 +110,6 @@ public class KubevirtVmWatcher {
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected KubevirtPortAdminService portAdminService;
-
-    @Reference(cardinality = ReferenceCardinality.MANDATORY)
-    protected KubevirtPodService podService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected KubevirtApiConfigService configService;
@@ -413,8 +412,9 @@ public class KubevirtVmWatcher {
                 for (JsonNode intf : interfaces) {
                     String network = metadata.get(NAMESPACE).asText() + "/" + intf.get(NAME).asText();
                     JsonNode macJson = intf.get(MAC);
+                    JsonNode sriov = intf.get(SRIOV);
 
-                    if (!DEFAULT.equals(network) && !CNI_ZERO.equals(network) && macJson != null) {
+                    if (!DEFAULT.equals(network) && !CNI_ZERO.equals(network) && macJson != null && sriov == null) {
                         String compact = StringUtils.substringBeforeLast(network, NETWORK_SUFFIX);
                         MacAddress mac = MacAddress.valueOf(macJson.asText());
                         result.put(mac, compact);
