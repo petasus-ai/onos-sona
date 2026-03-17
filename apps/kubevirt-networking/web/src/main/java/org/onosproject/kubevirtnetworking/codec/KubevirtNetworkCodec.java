@@ -45,10 +45,12 @@ public final class KubevirtNetworkCodec extends JsonCodec<KubevirtNetwork> {
     private static final String NETWORK_ID = "networkId";
     private static final String TYPE = "type";
     private static final String NAME = "name";
+    private static final String PROJECT = "project";
     private static final String MTU = "mtu";
     private static final String SEGMENT_ID = "segmentId";
     private static final String PHYSNET_NAME = "physnetName";
     private static final String GATEWAY_IP = "gatewayIp";
+    private static final String IS_ELB_DEDICATED = "elb";
     private static final String DEFAULT_ROUTE = "defaultRoute";
     private static final String CIDR = "cidr";
     private static final String HOST_ROUTES = "hostRoutes";
@@ -65,8 +67,10 @@ public final class KubevirtNetworkCodec extends JsonCodec<KubevirtNetwork> {
                 .put(NETWORK_ID, network.networkId())
                 .put(TYPE, network.type().name())
                 .put(NAME, network.name())
+                .put(PROJECT, network.project())
                 .put(MTU, network.mtu())
                 .put(GATEWAY_IP, network.gatewayIp().toString())
+                .put(IS_ELB_DEDICATED, network.isElbDedicated())
                 .put(DEFAULT_ROUTE, network.defaultRoute())
                 .put(CIDR, network.cidr());
 
@@ -116,10 +120,13 @@ public final class KubevirtNetworkCodec extends JsonCodec<KubevirtNetwork> {
                 TYPE + MISSING_MESSAGE);
         String name = nullIsIllegal(json.get(NAME).asText(),
                 NAME + MISSING_MESSAGE);
+        String project = networkId.split("/")[0];
         Integer mtu = nullIsIllegal(json.get(MTU).asInt(),
                 MTU + MISSING_MESSAGE);
         String gatewayIp = nullIsIllegal(json.get(GATEWAY_IP).asText(),
                 GATEWAY_IP + MISSING_MESSAGE);
+        boolean isElbDedicated = nullIsIllegal(json.get(IS_ELB_DEDICATED).asBoolean(),
+                IS_ELB_DEDICATED + MISSING_MESSAGE);
         boolean defaultRoute = nullIsIllegal(json.get(DEFAULT_ROUTE).asBoolean(),
                 DEFAULT_ROUTE + MISSING_MESSAGE);
         String cidr = nullIsIllegal(json.get(CIDR).asText(),
@@ -129,6 +136,7 @@ public final class KubevirtNetworkCodec extends JsonCodec<KubevirtNetwork> {
                 .networkId(networkId)
                 .type(KubevirtNetwork.Type.valueOf(type))
                 .name(name)
+                .project(project)
                 .mtu(mtu)
                 .gatewayIp(IpAddress.valueOf(gatewayIp))
                 .defaultRoute(defaultRoute)

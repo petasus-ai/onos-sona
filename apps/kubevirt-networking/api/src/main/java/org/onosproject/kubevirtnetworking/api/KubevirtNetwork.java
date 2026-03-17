@@ -84,6 +84,13 @@ public interface KubevirtNetwork {
     String name();
 
     /**
+     * Returns project name.
+     *
+     * @return project name
+     */
+    String project();
+
+    /**
      * Returns maximum transmission unit (MTU) value to address fragmentation.
      *
      * @return maximum transmission unit (MTU) value to address fragmentation
@@ -131,6 +138,13 @@ public interface KubevirtNetwork {
      * @return default route
      */
     boolean defaultRoute();
+
+    /**
+     * Returns ELB dedication flag.
+     *
+     * @return ELB dedicated
+     */
+    boolean isElbDedicated();
 
     /**
      * Returns the IP pool.
@@ -207,6 +221,14 @@ public interface KubevirtNetwork {
         Builder name(String name);
 
         /**
+         * Returns network builder with supplied project name.
+         *
+         * @param project project name
+         * @return network builder
+         */
+        Builder project(String project);
+
+        /**
          * Returns network builder with supplied network type.
          *
          * @param type network type
@@ -245,6 +267,14 @@ public interface KubevirtNetwork {
          * @return network builder
          */
         Builder gatewayIp(IpAddress ipAddress);
+
+        /**
+         * Returns network builder with supplied ELB dedication flag.
+         *
+         * @param flag ELB dedication flag
+         * @return network builder
+         */
+        Builder isElbDedicated(boolean flag);
 
         /**
          * Returns network builder with supplied default route flag.

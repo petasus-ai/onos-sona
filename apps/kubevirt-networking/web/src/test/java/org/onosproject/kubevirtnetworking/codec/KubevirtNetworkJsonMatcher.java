@@ -32,10 +32,12 @@ public final class KubevirtNetworkJsonMatcher extends TypeSafeDiagnosingMatcher<
     private static final String NETWORK_ID = "networkId";
     private static final String TYPE = "type";
     private static final String NAME = "name";
+    private static final String PROJECT = "project";
     private static final String MTU = "mtu";
     private static final String SEGMENT_ID = "segmentId";
     private static final String PHYSNET_NAME = "physnetName";
     private static final String GATEWAY_IP = "gatewayIp";
+    private static final String IS_ELB_DEDICATED = "elb";
     private static final String DEFAULT_ROUTE = "defaultRoute";
     private static final String CIDR = "cidr";
     private static final String HOST_ROUTES = "hostRoutes";
@@ -85,6 +87,14 @@ public final class KubevirtNetworkJsonMatcher extends TypeSafeDiagnosingMatcher<
         String gatewayIp = network.gatewayIp().toString();
         if (!jsonGatewayIp.equals(gatewayIp)) {
             description.appendText("gateway IP was " + jsonGatewayIp);
+            return false;
+        }
+
+        // check is ELB dedicated
+        boolean jsonIsElbDedicated = jsonNode.get(IS_ELB_DEDICATED).asBoolean();
+        boolean isElbDedicated = network.isElbDedicated();
+        if (jsonIsElbDedicated != isElbDedicated) {
+            description.appendText("ELB was " + jsonIsElbDedicated);
             return false;
         }
 

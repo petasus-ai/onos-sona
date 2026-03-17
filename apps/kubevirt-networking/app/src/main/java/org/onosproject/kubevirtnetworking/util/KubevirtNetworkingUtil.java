@@ -127,6 +127,7 @@ public final class KubevirtNetworkingUtil {
     private static final String PHYSNET_NAME = "physnetName";
     private static final String GATEWAY_IP = "gatewayIp";
     private static final String DEFAULT_ROUTE = "defaultRoute";
+    private static final String IS_ELB_DEDICATED = "elb";
     private static final String CIDR = "cidr";
     private static final String HOST_ROUTES = "hostRoutes";
     private static final String DESTINATION = "destination";
@@ -1059,6 +1060,7 @@ public final class KubevirtNetworkingUtil {
             Integer mtu = configJson.get(MTU).asInt();
             String gatewayIp = configJson.getString(GATEWAY_IP, "");
             boolean defaultRoute = configJson.getBoolean(DEFAULT_ROUTE, false);
+            boolean isElbDedicated = configJson.getBoolean(IS_ELB_DEDICATED, false);
 
             if (!type.equalsIgnoreCase(FLAT.name())) {
                 builder.segmentId(configJson.getString(SEGMENT_ID, ""));
@@ -1112,7 +1114,7 @@ public final class KubevirtNetworkingUtil {
 
             builder.networkId(id).name(name).type(KubevirtNetwork.Type.valueOf(type))
                     .mtu(mtu).gatewayIp(IpAddress.valueOf(gatewayIp))
-                    .defaultRoute(defaultRoute).cidr(cidr);
+                    .defaultRoute(defaultRoute).cidr(cidr).isElbDedicated(isElbDedicated);
 
             return builder.build();
         }
