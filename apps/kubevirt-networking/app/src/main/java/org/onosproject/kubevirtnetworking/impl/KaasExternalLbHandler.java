@@ -366,7 +366,7 @@ public class KaasExternalLbHandler {
                     Set<KubevirtNetwork> kns = networkService.networks().stream().filter(n ->
                             StringUtils.equals(pi.network(), n.physnetName()) &&
                                     n.type() == KubevirtNetwork.Type.FLAT).collect(Collectors.toSet());
-                    kns.forEach(kn -> pi.kaasElbs().forEach(ke -> {
+                    kns.forEach(kn -> {
                         TrafficSelector selector = DefaultTrafficSelector.builder()
                                 .matchEthType(Ethernet.TYPE_IPV4)
                                 .matchIPSrc(IpPrefix.valueOf(kn.cidr()))
@@ -396,7 +396,7 @@ public class KaasExternalLbHandler {
                                 COMMON_ACL_INGRESS_TABLE,
                                 install
                         );
-                    }));
+                    });
                 }
             });
         }
