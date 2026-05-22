@@ -186,47 +186,39 @@ public class KaasExternalLbHandler {
             nodeService.completeNodes(WORKER).forEach(n -> {
                 Set<KubevirtPhyInterface> kpis = n.phyIntfs().stream().filter(pi ->
                         StringUtils.equals(pi.network(), network.physnetName())).collect(Collectors.toSet());
+                kpis.forEach(kpi -> kpi.kaasElbs().forEach(ke -> {
+                    TrafficSelector selector = DefaultTrafficSelector.builder()
+                            .matchEthType(Ethernet.TYPE_IPV4)
+                            .matchIPSrc(IpPrefix.valueOf(ke))
+                            .matchIPDst(IpPrefix.valueOf(network.cidr()))
+                            .build();
 
-                // we derive the ELB networks which are managed under the same project/namespace
-                Set<KubevirtNetwork> ens = networkService.networks().stream()
-                        .filter(KubevirtNetwork::isElbDedicated)
-                        .filter(elbnet -> elbnet.project().equals(network.project()))
-                        .collect(Collectors.toSet());
+                    TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                            .transition(COMMON_FORWARDING_TABLE)
+                            .build();
 
-                kpis.forEach(kpi -> ens.forEach(en -> {
-                            TrafficSelector selector = DefaultTrafficSelector.builder()
-                                    .matchEthType(Ethernet.TYPE_IPV4)
-                                    .matchIPSrc(IpPrefix.valueOf(en.cidr()))
-                                    .matchIPDst(IpPrefix.valueOf(network.cidr()))
-                                    .build();
+                    // Rule for intra-subnet IPs
+                    flowService.setRule(
+                            appId,
+                            kpi.physBridge(),
+                            selector,
+                            treatment,
+                            PRIORITY_KAAS_ELB_RULE,
+                            COMMON_ACL_RECIRC_TABLE,
+                            install
+                    );
 
-                            TrafficTreatment treatment = DefaultTrafficTreatment.builder()
-                                    .transition(COMMON_FORWARDING_TABLE)
-                                    .build();
-
-                            // Rule for intra-subnet IPs
-                            flowService.setRule(
-                                    appId,
-                                    kpi.physBridge(),
-                                    selector,
-                                    treatment,
-                                    PRIORITY_KAAS_ELB_RULE,
-                                    COMMON_ACL_RECIRC_TABLE,
-                                    install
-                            );
-
-                            // Rule for external IPs
-                            flowService.setRule(
-                                    appId,
-                                    kpi.physBridge(),
-                                    selector,
-                                    treatment,
-                                    PRIORITY_KAAS_ELB_RULE,
-                                    COMMON_ACL_INGRESS_TABLE,
-                                    install
-                            );
-                        }
-                ));
+                    // Rule for external IPs
+                    flowService.setRule(
+                            appId,
+                            kpi.physBridge(),
+                            selector,
+                            treatment,
+                            PRIORITY_KAAS_ELB_RULE,
+                            COMMON_ACL_INGRESS_TABLE,
+                            install
+                    );
+                }));
             });
         }
 
@@ -234,18 +226,11 @@ public class KaasExternalLbHandler {
             nodeService.completeNodes(WORKER).forEach(n -> {
                 Set<KubevirtPhyInterface> kpis = n.phyIntfs().stream().filter(pi ->
                         StringUtils.equals(pi.network(), network.physnetName())).collect(Collectors.toSet());
-
-                // we derive the ELB networks which are managed under the same project/namespace
-                Set<KubevirtNetwork> ens = networkService.networks().stream()
-                        .filter(KubevirtNetwork::isElbDedicated)
-                        .filter(elbnet -> elbnet.project().equals(network.project()))
-                        .collect(Collectors.toSet());
-
-                kpis.forEach(kpi -> ens.forEach(en -> {
+                kpis.forEach(kpi -> kpi.kaasElbs().forEach(ke -> {
                     TrafficSelector selector = DefaultTrafficSelector.builder()
                             .matchEthType(Ethernet.TYPE_IPV4)
                             .matchIPSrc(IpPrefix.valueOf(network.cidr()))
-                            .matchIPDst(IpPrefix.valueOf(en.cidr()))
+                            .matchIPDst(IpPrefix.valueOf(ke))
                             .build();
 
                     TrafficTreatment treatment = DefaultTrafficTreatment.builder()
@@ -302,63 +287,39 @@ public class KaasExternalLbHandler {
         private void setElbFlatRules(KubevirtNode node, boolean install) {
             node.phyIntfs().forEach(pi -> {
                 if (pi.physBridge() != null && pi.network() != null) {
-                    Set<KubevirtNetwork> kns = networkService.networks().stream()
-                            .filter(n -> StringUtils.equals(pi.network(), n.physnetName()))
-                            .filter(n -> n.type() == KubevirtNetwork.Type.FLAT)
-                            .filter(n -> !n.isElbDedicated())
-                            .collect(Collectors.toSet());
-                    kns.forEach(kn -> networkService.networks().stream()
-                            .filter(KubevirtNetwork::isElbDedicated)
-                            .filter(n -> n.project().equals(kn.project()))
-                            .forEach(en -> {
-                                TrafficSelector ingressSelector = DefaultTrafficSelector.builder()
-                                        .matchEthType(Ethernet.TYPE_IPV4)
-                                        .matchIPSrc(IpPrefix.valueOf(en.cidr()))
-                                        .matchIPDst(IpPrefix.valueOf(kn.cidr()))
-                                        .build();
+                    Set<KubevirtNetwork> kns = networkService.networks().stream().filter(n ->
+                            StringUtils.equals(pi.network(), n.physnetName()) &&
+                                    n.type() == KubevirtNetwork.Type.FLAT).collect(Collectors.toSet());
+                    kns.forEach(kn -> pi.kaasElbs().forEach(ke -> {
+                        TrafficSelector selector = DefaultTrafficSelector.builder()
+                                .matchEthType(Ethernet.TYPE_IPV4)
+                                .matchIPSrc(IpPrefix.valueOf(kn.cidr()))
+                                .matchIPDst(IpPrefix.valueOf(kn.cidr()))
+                                .build();
 
-                                TrafficSelector egressSelector = DefaultTrafficSelector.builder()
-                                        .matchEthType(Ethernet.TYPE_IPV4)
-                                        .matchIPSrc(IpPrefix.valueOf(kn.cidr()))
-                                        .matchIPDst(IpPrefix.valueOf(en.cidr()))
-                                        .build();
+                        TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                                .transition(COMMON_FORWARDING_TABLE)
+                                .build();
 
-                                TrafficTreatment treatment = DefaultTrafficTreatment.builder()
-                                        .transition(COMMON_FORWARDING_TABLE)
-                                        .build();
+                        flowService.setRule(
+                                appId,
+                                pi.physBridge(),
+                                selector,
+                                treatment,
+                                PRIORITY_KAAS_ELB_RULE,
+                                COMMON_ACL_EGRESS_TABLE,
+                                install
+                        );
 
-                                // Rule for egress
-                                flowService.setRule(
-                                        appId,
-                                        pi.physBridge(),
-                                        egressSelector,
-                                        treatment,
-                                        PRIORITY_KAAS_ELB_RULE,
-                                        COMMON_ACL_EGRESS_TABLE,
-                                        install
-                                );
-
-                                // Rule for ingress, handle intra-subnet
-                                flowService.setRule(
-                                        appId,
-                                        pi.physBridge(),
-                                        ingressSelector,
-                                        treatment,
-                                        PRIORITY_KAAS_ELB_RULE,
-                                        COMMON_ACL_RECIRC_TABLE,
-                                        install
-                                );
-
-                                // Rule for ingress, handle external IPs
-                                flowService.setRule(
-                                        appId,
-                                        pi.physBridge(),
-                                        ingressSelector,
-                                        treatment,
-                                        PRIORITY_KAAS_ELB_RULE,
-                                        COMMON_ACL_INGRESS_TABLE,
-                                        install
-                                );
+                        flowService.setRule(
+                                appId,
+                                pi.physBridge(),
+                                selector,
+                                treatment,
+                                PRIORITY_KAAS_ELB_RULE,
+                                COMMON_ACL_INGRESS_TABLE,
+                                install
+                        );
                     }));
                 }
             });
