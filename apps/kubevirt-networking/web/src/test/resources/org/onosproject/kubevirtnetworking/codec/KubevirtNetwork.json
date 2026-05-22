@@ -1,12 +1,11 @@
 {
-  "networkId": "default/network-1",
+  "networkId": "network-1",
   "name": "network-1",
   "type": "FLAT",
   "mtu": 1500,
   "cidr": "10.10.0.0/24",
   "gatewayIp": "10.10.0.1",
   "physnetName": "physnet",
-  "elb": false,
   "defaultRoute": true,
   "ipPool": {
     "start": "10.10.10.100",

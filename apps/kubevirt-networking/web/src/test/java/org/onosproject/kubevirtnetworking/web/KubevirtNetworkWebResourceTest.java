@@ -82,16 +82,14 @@ public class KubevirtNetworkWebResourceTest extends ResourceTest {
         setServiceDirectory(testDirectory);
 
         network = DefaultKubevirtNetwork.builder()
-                .networkId("default/network")
+                .networkId("network")
                 .name("network")
-                .project("default")
                 .type(KubevirtNetwork.Type.FLAT)
                 .physnetName("physnet")
                 .cidr("10.10.10.0/24")
                 .mtu(1500)
                 .gatewayIp(IpAddress.valueOf("10.10.10.1"))
                 .defaultRoute(true)
-                .isElbDedicated(true)
                 .ipPool(new KubevirtIpPool(IpAddress.valueOf("10.10.10.100"),
                         IpAddress.valueOf("10.10.10.200")))
                 .build();
@@ -135,8 +133,9 @@ public class KubevirtNetworkWebResourceTest extends ResourceTest {
                 .put(Entity.json(jsonStream));
         final int status = response.getStatus();
 
-        // assertThat(status, is(200));
-        // verify(mockAdminService);
+        assertThat(status, is(200));
+
+        verify(mockAdminService);
     }
 
     /**

@@ -51,12 +51,10 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
     private final String networkId;
     private final Type type;
     private final String name;
-    private final String project;
     private final Integer mtu;
     private final String segmentId;
     private final String physnetName;
     private final IpAddress gatewayIp;
-    private final boolean isElbDedicated;
     private final boolean defaultRoute;
     private final String cidr;
     private final Set<KubevirtHostRoute> hostRoutes;
@@ -69,32 +67,28 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
      * @param networkId         network identifier
      * @param type              type of network
      * @param name              network name
-     * @param project           project name
      * @param mtu               network MTU
      * @param segmentId         segment identifier
      * @param physnetName       physnet name
      * @param gatewayIp         gateway IP address
-     * @param isElbDedicated    ELB dedication flag
      * @param defaultRoute      default route
      * @param cidr              CIDR of network
      * @param hostRoutes        a set of host routes
      * @param ipPool            IP pool
      * @param dnses             a set of DNSes
      */
-    public DefaultKubevirtNetwork(String networkId, Type type, String name, String project,
+    public DefaultKubevirtNetwork(String networkId, Type type, String name,
                                   Integer mtu, String segmentId, String physnetName,
-                                  IpAddress gatewayIp, boolean isElbDedicated, boolean defaultRoute,
-                                  String cidr, Set<KubevirtHostRoute> hostRoutes,
+                                  IpAddress gatewayIp, boolean defaultRoute, String cidr,
+                                  Set<KubevirtHostRoute> hostRoutes,
                                   KubevirtIpPool ipPool, Set<IpAddress> dnses) {
         this.networkId = networkId;
         this.type = type;
         this.name = name;
-        this.project = project;
         this.mtu = mtu;
         this.segmentId = segmentId;
         this.physnetName = physnetName;
         this.gatewayIp = gatewayIp;
-        this.isElbDedicated = isElbDedicated;
         this.defaultRoute = defaultRoute;
         this.cidr = cidr;
         this.hostRoutes = hostRoutes;
@@ -115,11 +109,6 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
     @Override
     public String name() {
         return name;
-    }
-
-    @Override
-    public String project() {
-        return project;
     }
 
     @Override
@@ -159,11 +148,6 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
     @Override
     public boolean defaultRoute() {
         return defaultRoute;
-    }
-
-    @Override
-    public boolean isElbDedicated() {
-        return isElbDedicated;
     }
 
     @Override
@@ -229,9 +213,8 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
         }
         DefaultKubevirtNetwork that = (DefaultKubevirtNetwork) o;
         return networkId.equals(that.networkId) && type == that.type &&
-                name.equals(that.name) && project.equals(that.project) && mtu.equals(that.mtu) &&
+                name.equals(that.name) && mtu.equals(that.mtu) &&
                 gatewayIp.equals(that.gatewayIp) && defaultRoute == that.defaultRoute &&
-                isElbDedicated == that.isElbDedicated &&
                 cidr.equals(that.cidr) && hostRoutes.equals(that.hostRoutes) &&
                 ipPool.equals(that.ipPool) &&
                 dnses.equals(that.dnses);
@@ -239,8 +222,8 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
 
     @Override
     public int hashCode() {
-        return Objects.hash(networkId, type, name, project, mtu, segmentId, physnetName,
-                gatewayIp, isElbDedicated, defaultRoute, cidr, hostRoutes, ipPool, dnses);
+        return Objects.hash(networkId, type, name, mtu, segmentId, physnetName,
+                gatewayIp, defaultRoute, cidr, hostRoutes, ipPool, dnses);
     }
 
     @Override
@@ -249,12 +232,10 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
                 .add("networkId", networkId)
                 .add("type", type)
                 .add("name", name)
-                .add("project", project)
                 .add("mtu", mtu)
                 .add("segmentId", segmentId)
                 .add("physnetName", physnetName)
                 .add("gatewayIp", gatewayIp)
-                .add("isElbDedicated", isElbDedicated)
                 .add("defaultRoute", defaultRoute)
                 .add("cidr", cidr)
                 .add("hostRouts", hostRoutes)
@@ -299,12 +280,10 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
         private String networkId;
         private Type type;
         private String name;
-        private String project;
         private Integer mtu;
         private String segmentId;
         private String physnetName;
         private IpAddress gatewayIp;
-        private boolean isElbDedicated;
         private boolean defaultRoute;
         private String cidr;
         private Set<KubevirtHostRoute> hostRouts;
@@ -332,10 +311,8 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
                 dnses = new HashSet<>();
             }
 
-            project = networkId.split("/")[0];
-
-            return new DefaultKubevirtNetwork(networkId, type, name, project, mtu, segmentId,
-                    physnetName, gatewayIp, isElbDedicated, defaultRoute, cidr, hostRouts, ipPool, dnses);
+            return new DefaultKubevirtNetwork(networkId, type, name, mtu, segmentId,
+                    physnetName, gatewayIp, defaultRoute, cidr, hostRouts, ipPool, dnses);
         }
 
         @Override
@@ -347,12 +324,6 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
         @Override
         public Builder name(String name) {
             this.name = name;
-            return this;
-        }
-
-        @Override
-        public Builder project(String project) {
-            this.project = project;
             return this;
         }
 
@@ -387,13 +358,7 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
         }
 
         @Override
-        public Builder isElbDedicated(boolean flag) {
-            this.isElbDedicated = flag;
-            return this;
-        }
-
-        @Override
-        public Builder defaultRoute(boolean flag) {
+        public KubevirtNetwork.Builder defaultRoute(boolean flag) {
             this.defaultRoute = flag;
             return this;
         }

@@ -37,8 +37,6 @@ public class DefaultKubevirtNetworkTest {
     private static final KubevirtNetwork.Type TYPE_2 = VXLAN;
     private static final String NAME_1 = "net-1";
     private static final String NAME_2 = "net-2";
-    private static final String PROJECT_1 = "project-1";
-    private static final String PROJECT_2 = "project-2";
     private static final Integer MTU_1 = 1500;
     private static final Integer MTU_2 = 1400;
     private static final String SEGMENT_ID_1 = null;
@@ -51,8 +49,6 @@ public class DefaultKubevirtNetworkTest {
     private static final IpAddress GATEWAY_IP_2 = IpAddress.valueOf("20.20.20.1");
     private static final boolean DEFAULT_ROUTE_1 = true;
     private static final boolean DEFAULT_ROUTE_2 = false;
-    private static final boolean IS_ELB_DEDICATED_1 = true;
-    private static final boolean IS_ELB_DEDICATED_2 = false;
     private static final String CIDR_1 = "10.10.10.0/24";
     private static final String CIDR_2 = "20.20.20.0/24";
     private static final IpAddress IP_POOL_START_1 = IpAddress.valueOf("10.10.10.100");
@@ -82,14 +78,12 @@ public class DefaultKubevirtNetworkTest {
         network1 = DefaultKubevirtNetwork.builder()
                 .networkId(NETWORK_ID_1)
                 .name(NAME_1)
-                .project(PROJECT_1)
                 .type(TYPE_1)
                 .mtu(MTU_1)
                 .segmentId(SEGMENT_ID_1)
                 .physnetName(PHYSNET_NAME_1)
                 .gatewayIp(GATEWAY_IP_1)
                 .defaultRoute(DEFAULT_ROUTE_1)
-                .isElbDedicated(IS_ELB_DEDICATED_1)
                 .cidr(CIDR_1)
                 .ipPool(new KubevirtIpPool(IP_POOL_START_1, IP_POOL_END_1))
                 .hostRoutes(ImmutableSet.of())
@@ -99,14 +93,12 @@ public class DefaultKubevirtNetworkTest {
         sameAsNetwork1 = DefaultKubevirtNetwork.builder()
                 .networkId(NETWORK_ID_1)
                 .name(NAME_1)
-                .project(PROJECT_1)
                 .type(TYPE_1)
                 .mtu(MTU_1)
                 .segmentId(SEGMENT_ID_1)
                 .physnetName(PHYSNET_NAME_1)
                 .gatewayIp(GATEWAY_IP_1)
                 .defaultRoute(DEFAULT_ROUTE_1)
-                .isElbDedicated(IS_ELB_DEDICATED_1)
                 .cidr(CIDR_1)
                 .ipPool(new KubevirtIpPool(IP_POOL_START_1, IP_POOL_END_1))
                 .hostRoutes(ImmutableSet.of())
@@ -116,14 +108,12 @@ public class DefaultKubevirtNetworkTest {
         network2 = DefaultKubevirtNetwork.builder()
                 .networkId(NETWORK_ID_2)
                 .name(NAME_2)
-                .project(PROJECT_2)
                 .type(TYPE_2)
                 .mtu(MTU_2)
                 .segmentId(SEGMENT_ID_2)
                 .physnetName(PHYSNET_NAME_2)
                 .gatewayIp(GATEWAY_IP_2)
                 .defaultRoute(DEFAULT_ROUTE_2)
-                .isElbDedicated(IS_ELB_DEDICATED_2)
                 .cidr(CIDR_2)
                 .ipPool(new KubevirtIpPool(IP_POOL_START_2, IP_POOL_END_2))
                 .hostRoutes(ImmutableSet.of())
@@ -151,11 +141,9 @@ public class DefaultKubevirtNetworkTest {
         assertEquals(NETWORK_ID_1, network.networkId());
         assertEquals(TYPE_1, network.type());
         assertEquals(NAME_1, network.name());
-        assertEquals(PROJECT_1, network.project());
         assertEquals(MTU_1, network.mtu());
         assertEquals(GATEWAY_IP_1, network.gatewayIp());
         assertEquals(DEFAULT_ROUTE_1, network.defaultRoute());
-        assertEquals(IS_ELB_DEDICATED_1, network.isElbDedicated());
         assertEquals(CIDR_1, network.cidr());
         assertEquals(new KubevirtIpPool(IP_POOL_START_1, IP_POOL_END_1), network.ipPool());
         assertEquals(ImmutableSet.of(DNS_1), network.dnses());

@@ -92,14 +92,12 @@ public final class KubevirtNetworkCodecTest {
                 IpAddress.valueOf("10.10.10.200"));
 
         KubevirtNetwork network = DefaultKubevirtNetwork.builder()
-                .networkId("default/net-1")
+                .networkId("net-1")
                 .name("net-1")
-                .project("default")
                 .type(KubevirtNetwork.Type.FLAT)
                 .physnetName("physnet")
                 .gatewayIp(IpAddress.valueOf("10.10.10.1"))
                 .defaultRoute(true)
-                .isElbDedicated(true)
                 .mtu(1500)
                 .cidr("10.10.10.0/24")
                 .hostRoutes(ImmutableSet.of(hostRoute1, hostRoute2))
@@ -120,14 +118,12 @@ public final class KubevirtNetworkCodecTest {
     public void testKubevirtNetworkDecode() throws IOException {
         KubevirtNetwork network = getKubevirtNetwork("KubevirtNetwork.json");
 
-        assertThat(network.networkId(), is("default/network-1"));
+        assertThat(network.networkId(), is("network-1"));
         assertThat(network.name(), is("network-1"));
-        assertThat(network.project(), is("default"));
         assertThat(network.type().name(), is("FLAT"));
         assertThat(network.physnetName(), is("physnet"));
         assertThat(network.cidr(), is("10.10.0.0/24"));
         assertThat(network.gatewayIp().toString(), is("10.10.0.1"));
-        assertThat(network.isElbDedicated(), is(false));
         assertThat(network.defaultRoute(), is(true));
         assertThat(network.ipPool().start().toString(), is("10.10.10.100"));
         assertThat(network.ipPool().end().toString(), is("10.10.10.200"));

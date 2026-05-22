@@ -281,7 +281,83 @@ public class KaasExternalLbHandler {
             // FIXME: we wait all port get its deviceId updated
             waitFor(5);
 
+            // setElbIngressRules(node, true);
+            // setElbEgressRules(node, true);
+
             setElbFlatRules(node, true);
+        }
+
+        private void setElbIngressRules(KubevirtNode node, boolean install) {
+
+            node.phyIntfs().forEach(pi -> {
+                if (pi.physBridge() != null && pi.network() != null) {
+                    Set<KubevirtNetwork> kns = networkService.networks().stream().filter(n ->
+                            StringUtils.equals(pi.network(), n.physnetName())).collect(Collectors.toSet());
+                    kns.forEach(kn -> pi.kaasElbs().forEach(ke -> {
+                        TrafficSelector selector = DefaultTrafficSelector.builder()
+                                .matchEthType(Ethernet.TYPE_IPV4)
+                                .matchIPSrc(IpPrefix.valueOf(ke))
+                                .matchIPDst(IpPrefix.valueOf(kn.cidr()))
+                                .build();
+
+                        TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                                .transition(COMMON_FORWARDING_TABLE)
+                                .build();
+
+                        // Rule for intra-subnet IPs
+                        flowService.setRule(
+                                appId,
+                                pi.physBridge(),
+                                selector,
+                                treatment,
+                                PRIORITY_KAAS_ELB_RULE,
+                                COMMON_ACL_RECIRC_TABLE,
+                                install
+                        );
+
+                        // Rule for external IPs
+                        flowService.setRule(
+                                appId,
+                                pi.physBridge(),
+                                selector,
+                                treatment,
+                                PRIORITY_KAAS_ELB_RULE,
+                                COMMON_ACL_INGRESS_TABLE,
+                                install
+                        );
+                    }));
+                }
+            });
+        }
+
+        private void setElbEgressRules(KubevirtNode node, boolean install) {
+            node.phyIntfs().forEach(pi -> {
+                if (pi.physBridge() != null && pi.network() != null) {
+                    Set<KubevirtNetwork> kns = networkService.networks().stream().filter(n ->
+                            StringUtils.equals(pi.network(), n.physnetName())).collect(Collectors.toSet());
+                    kns.forEach(kn -> pi.kaasElbs().forEach(ke -> {
+                        TrafficSelector selector = DefaultTrafficSelector.builder()
+                                .matchEthType(Ethernet.TYPE_IPV4)
+                                .matchIPSrc(IpPrefix.valueOf(kn.cidr()))
+                                .matchIPDst(IpPrefix.valueOf(ke))
+                                .build();
+
+                        TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                                .transition(COMMON_FORWARDING_TABLE)
+                                .build();
+
+                        flowService.setRule(
+                                appId,
+                                pi.physBridge(),
+                                selector,
+                                treatment,
+                                PRIORITY_KAAS_ELB_RULE,
+                                COMMON_ACL_EGRESS_TABLE,
+                                install
+                        );
+                    }));
+                }
+            });
         }
 
         private void setElbFlatRules(KubevirtNode node, boolean install) {
