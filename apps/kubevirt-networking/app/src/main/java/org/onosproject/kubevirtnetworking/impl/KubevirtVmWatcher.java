@@ -410,11 +410,13 @@ public class KubevirtVmWatcher {
                 }
                 Map<MacAddress, String> result = new HashMap<>();
                 for (JsonNode intf : interfaces) {
-                    String network = metadata.get(NAMESPACE).asText() + "/" + intf.get(NAME).asText();
+                    String intfName = intf.get(NAME).asText();
+                    String namespace = metadata.get(NAMESPACE).asText();
+                    String network = namespace + "/" + intfName;
                     JsonNode macJson = intf.get(MAC);
                     JsonNode sriov = intf.get(SRIOV);
 
-                    if (!DEFAULT.equals(network) && !CNI_ZERO.equals(network) && macJson != null && sriov == null) {
+                    if (!StringUtils.equals(DEFAULT, intfName) && macJson != null && sriov == null) {
                         String compact = StringUtils.substringBeforeLast(network, NETWORK_SUFFIX);
                         MacAddress mac = MacAddress.valueOf(macJson.asText());
                         result.put(mac, compact);

@@ -112,9 +112,7 @@ public final class KubevirtNetworkingUtil {
     private static final String NAME = "name";
     private static final String NETWORK_PREFIX = "default/";
     private static final String MAC = "mac";
-    private static final String IPS = "ips";
-    private static final String BR_INT = "br-int";
-    private static final String METADATA = "metadata";
+    private static final String DEFAULT = "default";
     private static final String STATUS = "status";
     private static final String INTERFACES = "interfaces";
     private static final String NODE_NAME = "nodeName";
@@ -433,7 +431,7 @@ public final class KubevirtNetworkingUtil {
                         .filter(n -> (NETWORK_PREFIX + n.name()).equals(name) ||
                                      (n.name() + "-net").equals(name))
                         .findAny().orElse(null);
-                if (network != null && interfaceJson.get(MAC) != null) {
+                if (network != null && interfaceJson.get(MAC) != null && !StringUtils.equals(name, DEFAULT)) {
                     // FIXME: we do not update IP address, as learning IP address
                     // requires much more time due to the lag from VM agent
                     String mac = interfaceJson.get(MAC).asText();
