@@ -47,11 +47,6 @@ public interface KubevirtNetwork {
         GENEVE,
 
         /**
-         * STT typed virtual network.
-         */
-        STT,
-
-        /**
          * FLAT typed provider network.
          */
         FLAT,

@@ -75,7 +75,6 @@ import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_FLOATING
 import static org.onosproject.kubevirtnetworking.api.Constants.TUNNEL_DEFAULT_TABLE;
 import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.GENEVE;
 import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.GRE;
-import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.STT;
 import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.VXLAN;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.buildGarpPacket;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.externalPatchPortNum;
@@ -174,7 +173,7 @@ public class KubevirtFloatingIpHandler {
 
         KubevirtNetwork kubevirtNetwork = kubevirtNetworkService.network(kubevirtPort.networkId());
         if (kubevirtNetwork.type() == VXLAN || kubevirtNetwork.type() == GENEVE ||
-                kubevirtNetwork.type() == GRE || kubevirtNetwork.type() == STT) {
+                kubevirtNetwork.type() == GRE) {
             setFloatingIpDownstreamRulesToGatewayTunBridge(floatingIp,
                     electedGw, kubevirtNetwork, kubevirtPort, install);
         }

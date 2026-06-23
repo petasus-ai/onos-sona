@@ -83,7 +83,6 @@ import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_LB_RULE;
 import static org.onosproject.kubevirtnetworking.api.Constants.TUNNEL_DEFAULT_TABLE;
 import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.GENEVE;
 import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.GRE;
-import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.STT;
 import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.VXLAN;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.buildGarpPacket;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.externalPatchPortNum;
@@ -238,7 +237,7 @@ public class KubevirtLbHandler {
             setLbDownstreamRules(loadBalancer, router, gateway, true);
             setLbUpstreamRules(loadBalancer, router, gateway, true);
 
-            if (network.type() == VXLAN || network.type() == GENEVE || network.type() == GRE || network.type() == STT) {
+            if (network.type() == VXLAN || network.type() == GENEVE || network.type() == GRE) {
                 setLbDownStreamRulesForTunBridge(loadBalancer, gateway, true);
             }
         }
@@ -276,7 +275,7 @@ public class KubevirtLbHandler {
             setLbDownstreamRules(old, oldRouter, oldGateway, false);
             setLbUpstreamRules(old, oldRouter, oldGateway, false);
             if (oldNetwork.type() == VXLAN || oldNetwork.type() == GENEVE ||
-                    oldNetwork.type() == GRE || oldNetwork.type() == STT) {
+                    oldNetwork.type() == GRE) {
                 setLbDownStreamRulesForTunBridge(loadBalancer, oldGateway, false);
             }
             setBucketsToGroup(old, oldGateway, false);
@@ -313,7 +312,7 @@ public class KubevirtLbHandler {
             setLbDownstreamRules(loadBalancer, router, gateway, true);
             setLbUpstreamRules(loadBalancer, router, gateway, true);
             if (network.type() == VXLAN || network.type() == GENEVE ||
-                    network.type() == GRE || network.type() == STT) {
+                    network.type() == GRE) {
                 setLbDownStreamRulesForTunBridge(loadBalancer, gateway, true);
             }
         }
@@ -353,7 +352,7 @@ public class KubevirtLbHandler {
             setBucketsToGroup(loadBalancer, gateway, false);
             setLbGroup(loadBalancer, gateway, false);
 
-            if (network.type() == VXLAN || network.type() == GENEVE || network.type() == GRE || network.type() == STT) {
+            if (network.type() == VXLAN || network.type() == GENEVE || network.type() == GRE) {
                 setLbDownStreamRulesForTunBridge(loadBalancer, gateway, false);
             }
         }
@@ -751,7 +750,7 @@ public class KubevirtLbHandler {
 
                 KubevirtNetwork network = networkService.network(loadBalancer.networkId());
                 if (network.type() == VXLAN || network.type() == GENEVE ||
-                        network.type() == GRE || network.type() == STT) {
+                        network.type() == GRE) {
                     setLbDownStreamRulesForTunBridge(loadBalancer, gatewayNode, true);
                 }
 
@@ -786,7 +785,7 @@ public class KubevirtLbHandler {
 
                 KubevirtNetwork network = networkService.network(loadBalancer.networkId());
                 if (network.type() == VXLAN || network.type() == GENEVE ||
-                        network.type() == GRE || network.type() == STT) {
+                        network.type() == GRE) {
                     setLbDownStreamRulesForTunBridge(loadBalancer, gatewayNode, false);
                 }
 

@@ -36,7 +36,6 @@ import java.util.stream.Collectors;
 import static org.onosproject.kubevirtnode.api.Constants.GENEVE;
 import static org.onosproject.kubevirtnode.api.Constants.GRE;
 import static org.onosproject.kubevirtnode.api.Constants.INTEGRATION_BRIDGE;
-import static org.onosproject.kubevirtnode.api.Constants.STT;
 import static org.onosproject.kubevirtnode.api.Constants.TUNNEL_BRIDGE;
 import static org.onosproject.kubevirtnode.api.Constants.VXLAN;
 import static org.onosproject.kubevirtnode.api.KubevirtNode.Type.WORKER;
@@ -98,7 +97,6 @@ public class KubevirtCheckNodeCommand extends AbstractShellCommand {
                 printPortState(deviceService, node.tunBridge(), VXLAN);
                 printPortState(deviceService, node.tunBridge(), GRE);
                 printPortState(deviceService, node.tunBridge(), GENEVE);
-                printPortState(deviceService, node.tunBridge(), STT);
             }
         }
 
@@ -122,8 +120,7 @@ public class KubevirtCheckNodeCommand extends AbstractShellCommand {
         Set<KubevirtNetwork> networks = networkService.networks().stream()
                 .filter(n -> n.type() == KubevirtNetwork.Type.VXLAN ||
                         n.type() == KubevirtNetwork.Type.GRE ||
-                        n.type() == KubevirtNetwork.Type.GENEVE ||
-                        n.type() == KubevirtNetwork.Type.STT).collect(Collectors.toSet());
+                        n.type() == KubevirtNetwork.Type.GENEVE).collect(Collectors.toSet());
         if (networks.size() > 0 && node.type() == WORKER) {
             print("");
             print("[Tenant Network Bridge Status]");

@@ -535,7 +535,6 @@ public class KubevirtNetworkHandler {
             case VXLAN:
             case GRE:
             case GENEVE:
-            case STT:
                 setDefaultEgressRuleToGatewayNode(router, network,
                         electedGateway.intgBridge(), install);
                 kubevirtNodeService.completeNodes(WORKER).forEach(node -> {
@@ -1295,7 +1294,6 @@ public class KubevirtNetworkHandler {
                 case VXLAN:
                 case GRE:
                 case GENEVE:
-                case STT:
                     initIntegrationTunnelBridge(network);
                     break;
                 case FLAT:
@@ -1316,7 +1314,6 @@ public class KubevirtNetworkHandler {
                 case VXLAN:
                 case GRE:
                 case GENEVE:
-                case STT:
                     purgeIntegrationTunnelBridge(network);
                     break;
                 case FLAT:
@@ -1400,7 +1397,6 @@ public class KubevirtNetworkHandler {
                         case VXLAN:
                         case GRE:
                         case GENEVE:
-                        case STT:
                             createBridge(node, network);
                             createPatchTenantInterface(node, network);
                             setDefaultRulesForTenantNetwork(node, network);

@@ -80,7 +80,6 @@ import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_STATEFUL
 import static org.onosproject.kubevirtnetworking.api.Constants.TUNNEL_DEFAULT_TABLE;
 import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.GENEVE;
 import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.GRE;
-import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.STT;
 import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.VLAN;
 import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.VXLAN;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.buildGarpPacket;
@@ -320,7 +319,7 @@ public class KubevirtRoutingSnatHandler {
                 GW_DROP_TABLE,
                 install);
 
-        if (network.type() == VXLAN || network.type() == GENEVE || network.type() == GRE || network.type() == STT) {
+        if (network.type() == VXLAN || network.type() == GENEVE || network.type() == GRE) {
             setDownStreamRulesToGatewayTunBridge(network, gatewayNode, kubevirtPort, install);
         }
     }

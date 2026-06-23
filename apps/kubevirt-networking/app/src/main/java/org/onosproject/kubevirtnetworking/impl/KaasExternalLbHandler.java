@@ -153,7 +153,6 @@ public class KaasExternalLbHandler {
                 case VXLAN:
                 case GRE:
                 case GENEVE:
-                case STT:
                 case VLAN:
                 default:
                     // do nothing
@@ -174,7 +173,6 @@ public class KaasExternalLbHandler {
                 case VXLAN:
                 case GRE:
                 case GENEVE:
-                case STT:
                 case VLAN:
                 default:
                     // do nothing
