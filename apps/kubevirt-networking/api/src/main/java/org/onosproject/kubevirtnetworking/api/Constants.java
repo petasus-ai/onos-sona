@@ -82,7 +82,6 @@ public final class Constants {
     public static final int PRIORITY_LB_GATEWAY_TUN_BRIDGE_RULE = 33000;
     public static final int PRIORITY_DHCP_RULE = 42000;
     public static final int PRIORITY_ARP_GATEWAY_RULE = 41000;
-    public static final int PRIORITY_ARP_PHYSNET_RULE = 41000;
     public static final int PRIORITY_ARP_DEFAULT_RULE = 40000;
 
     public static final int PRIORITY_IGMP_DEFAULT_RULE = 39000;
@@ -100,22 +99,17 @@ public final class Constants {
 
     // CLI item length
     public static final int CLI_ID_LENGTH = 30;
-    public static final int CLI_NAME_LENGTH = 30;
-    public static final int CLI_LONG_NAME_LENGTH = 50;
+    public static final int CLI_NAME_LENGTH = 50;
+    public static final int CLI_LONG_NAME_LENGTH = 70;
     public static final int CLI_LONG_SERVICE_PORT_LENGTH = 100;
     public static final int CLI_IP_ADDRESSES_LENGTH = 50;
     public static final int CLI_IP_ADDRESS_LENGTH = 25;
     public static final int CLI_IP_ADDRESS_AVAILABILITY = 15;
     public static final int CLI_MAC_ADDRESS_LENGTH = 25;
-    public static final int CLI_PORTS_LENGTH = 20;
-    public static final int CLI_NAMESPACE_LENGTH = 15;
+    public static final int CLI_NAMESPACE_LENGTH = 20;
     public static final int CLI_STATUS_LENGTH = 15;
-    public static final int CLI_PHASE_LENGTH = 15;
     public static final int CLI_TYPE_LENGTH = 15;
-    public static final int CLI_TYPES_LENGTH = 30;
     public static final int CLI_SEG_ID_LENGTH = 10;
-    public static final int CLI_LABELS_LENGTH = 30;
-    public static final int CLI_CONTAINERS_LENGTH = 30;
     public static final int CLI_FLAG_LENGTH = 10;
     public static final int CLI_NUMBER_LENGTH = 10;
     public static final int CLI_MARGIN_LENGTH = 2;
@@ -128,5 +122,4 @@ public final class Constants {
 
     public static final int PRIORITY_INTERNAL_ROUTING_RULE = 41000;
     public static final int PRIORITY_LB_RULE = 41500;
-    public static final int PRIORITY_LB_FIP_RULE = 41500;
 }
