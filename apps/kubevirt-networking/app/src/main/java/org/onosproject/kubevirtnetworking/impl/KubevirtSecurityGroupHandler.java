@@ -470,6 +470,11 @@ public class KubevirtSecurityGroupHandler {
 
         KubevirtNetwork net = networkService.network(port.networkId());
 
+        // if the network is not found we do not perform any action
+        if (net == null) {
+            return;
+        }
+
         int aclTable;
         if (sgRule.direction().equalsIgnoreCase(EGRESS)) {
 
