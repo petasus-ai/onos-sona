@@ -280,8 +280,11 @@ public class KubevirtDhcpHandler {
             Ethernet discoverReply = buildReply(ethPacket,
                     (byte) DHCPOFFER.getValue(),
                     port);
-            sendReply(context, discoverReply);
-            log.trace("DHCP OFFER({}) is sent for {}", port.ipAddress().toString(), clientMac);
+
+            if (discoverReply != null) {
+                sendReply(context, discoverReply);
+                log.trace("DHCP OFFER({}) is sent for {}", port.ipAddress().toString(), clientMac);
+            }
         }
 
         private void processDhcpRequest(PacketContext context, MacAddress clientMac,
@@ -290,8 +293,11 @@ public class KubevirtDhcpHandler {
             Ethernet requestReply = buildReply(ethPacket,
                     (byte) DHCPACK.getValue(),
                     port);
-            sendReply(context, requestReply);
-            log.trace("DHCP ACK({}) is sent for {}", port.ipAddress(), clientMac);
+
+            if (requestReply != null) {
+                sendReply(context, requestReply);
+                log.trace("DHCP ACK({}) is sent for {}", port.ipAddress(), clientMac);
+            }
         }
 
         private DHCP.MsgType getPacketType(DHCP dhcpPacket) {
@@ -310,14 +316,19 @@ public class KubevirtDhcpHandler {
 
         private Ethernet buildReply(Ethernet ethRequest, byte packetType,
                                     KubevirtPort port) {
-            log.trace("Build for DHCP reply msg for openstack port {}", port.toString());
+            log.trace("Build for DHCP reply msg for kubevirt port {}", port.toString());
 
             // pick one IP address to make a reply
             // since we check the validity of fixed IP address at parent method,
-            // so no need to double check the fixed IP existence here
+            // so no need to double-check the fixed IP existence here
             IpAddress fixedIp = port.ipAddress();
 
             KubevirtNetwork network = networkService.network(port.networkId());
+
+            if (network == null) {
+                log.debug("Failed to resolve the network {} during DHCP reply build", port.networkId());
+                return null;
+            }
 
             Ethernet ethReply = new Ethernet();
             ethReply.setSourceMACAddress(dhcpServerMac);
@@ -341,7 +352,7 @@ public class KubevirtDhcpHandler {
             DHCP dhcpReply = buildDhcpReply(
                     dhcpRequest,
                     packetType,
-                    Ip4Address.valueOf(fixedIp.toString()), port, network);
+                    Ip4Address.valueOf(fixedIp.toString()), network);
 
             udpReply.setPayload(dhcpReply);
             ipv4Reply.setPayload(udpReply);
@@ -368,7 +379,7 @@ public class KubevirtDhcpHandler {
         }
 
         private DHCP buildDhcpReply(DHCP request, byte msgType, Ip4Address yourIp,
-                                    KubevirtPort port, KubevirtNetwork network) {
+                                    KubevirtNetwork network) {
             Ip4Address gatewayIp = clusterService.getLocalNode().ip().getIp4Address();
             int subnetPrefixLen = IpPrefix.valueOf(network.cidr()).prefixLength();
 
