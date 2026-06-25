@@ -58,6 +58,7 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
     private final String cidr;
     private final Set<KubevirtHostRoute> hostRoutes;
     private final KubevirtIpPool ipPool;
+    private final KubevirtIpPool lbIpPool;
     private final Set<IpAddress> dnses;
 
     /**
@@ -74,13 +75,15 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
      * @param cidr              CIDR of network
      * @param hostRoutes        a set of host routes
      * @param ipPool            IP pool
+     * @param lbIpPool          load balancer IP pool (nullable)
      * @param dnses             a set of DNSes
      */
     public DefaultKubevirtNetwork(String networkId, Type type, String name,
                                   Integer mtu, String segmentId, String physnetName,
                                   IpAddress gatewayIp, boolean defaultRoute, String cidr,
                                   Set<KubevirtHostRoute> hostRoutes,
-                                  KubevirtIpPool ipPool, Set<IpAddress> dnses) {
+                                  KubevirtIpPool ipPool, KubevirtIpPool lbIpPool,
+                                  Set<IpAddress> dnses) {
         this.networkId = networkId;
         this.type = type;
         this.name = name;
@@ -92,6 +95,7 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
         this.cidr = cidr;
         this.hostRoutes = hostRoutes;
         this.ipPool = ipPool;
+        this.lbIpPool = lbIpPool;
         this.dnses = dnses;
     }
 
@@ -152,6 +156,11 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
     @Override
     public KubevirtIpPool ipPool() {
         return ipPool;
+    }
+
+    @Override
+    public KubevirtIpPool lbIpPool() {
+        return lbIpPool;
     }
 
     @Override
@@ -216,13 +225,14 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
                 gatewayIp.equals(that.gatewayIp) && defaultRoute == that.defaultRoute &&
                 cidr.equals(that.cidr) && hostRoutes.equals(that.hostRoutes) &&
                 ipPool.equals(that.ipPool) &&
+                Objects.equals(lbIpPool, that.lbIpPool) &&
                 dnses.equals(that.dnses);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(networkId, type, name, mtu, segmentId, physnetName,
-                gatewayIp, defaultRoute, cidr, hostRoutes, ipPool, dnses);
+                gatewayIp, defaultRoute, cidr, hostRoutes, ipPool, lbIpPool, dnses);
     }
 
     @Override
@@ -239,6 +249,7 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
                 .add("cidr", cidr)
                 .add("hostRouts", hostRoutes)
                 .add("ipPool", ipPool)
+                .add("lbIpPool", lbIpPool)
                 .add("dnses", dnses)
                 .toString();
     }
@@ -287,6 +298,7 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
         private String cidr;
         private Set<KubevirtHostRoute> hostRouts;
         private KubevirtIpPool ipPool;
+        private KubevirtIpPool lbIpPool;
         private Set<IpAddress> dnses;
 
         @Override
@@ -311,7 +323,7 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
             }
 
             return new DefaultKubevirtNetwork(networkId, type, name, mtu, segmentId,
-                    physnetName, gatewayIp, defaultRoute, cidr, hostRouts, ipPool, dnses);
+                    physnetName, gatewayIp, defaultRoute, cidr, hostRouts, ipPool, lbIpPool, dnses);
         }
 
         @Override
@@ -371,6 +383,12 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
         @Override
         public Builder ipPool(KubevirtIpPool ipPool) {
             this.ipPool = ipPool;
+            return this;
+        }
+
+        @Override
+        public Builder lbIpPool(KubevirtIpPool lbIpPool) {
+            this.lbIpPool = lbIpPool;
             return this;
         }
 

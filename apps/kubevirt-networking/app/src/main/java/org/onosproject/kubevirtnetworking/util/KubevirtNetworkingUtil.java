@@ -130,6 +130,7 @@ public final class KubevirtNetworkingUtil {
     private static final String DESTINATION = "destination";
     private static final String NEXTHOP = "nexthop";
     private static final String IP_POOL = "ipPool";
+    private static final String LB_IP_POOL = "lbIpPool";
     private static final String START = "start";
     private static final String END = "end";
     private static final String DNSES = "dnses";
@@ -1068,6 +1069,20 @@ public final class KubevirtNetworkingUtil {
                 String end = poolJson.getString(END, "");
                 builder.ipPool(new KubevirtIpPool(
                         IpAddress.valueOf(start), IpAddress.valueOf(end)));
+            }
+
+            // lbIpPool is optional: only set by the Service Hub on FLAT/external
+            // networks with tenant management enabled. Absent on every other NAD.
+            if (configJson.get(LB_IP_POOL) != null) {
+                JsonObject lbPoolJson = configJson.get(LB_IP_POOL).asObject();
+                if (lbPoolJson != null) {
+                    String lbStart = lbPoolJson.getString(START, "");
+                    String lbEnd = lbPoolJson.getString(END, "");
+                    if (StringUtils.isNotEmpty(lbStart) && StringUtils.isNotEmpty(lbEnd)) {
+                        builder.lbIpPool(new KubevirtIpPool(
+                                IpAddress.valueOf(lbStart), IpAddress.valueOf(lbEnd)));
+                    }
+                }
             }
 
             if (configJson.get(HOST_ROUTES) != null) {

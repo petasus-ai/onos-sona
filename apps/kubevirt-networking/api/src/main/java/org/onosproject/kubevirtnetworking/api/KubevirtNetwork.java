@@ -135,6 +135,18 @@ public interface KubevirtNetwork {
     KubevirtIpPool ipPool();
 
     /**
+     * Returns the load balancer (ELB) IP pool.
+     * <p>
+     * This is the {@code lbIpPool} range declared on the NAD's
+     * {@code network-config} annotation (set by the Service Hub). It is only
+     * present on FLAT/external networks that have tenant management enabled and
+     * an LB IP pool configured; otherwise it is {@code null}.
+     *
+     * @return load balancer IP pool, or null when not configured
+     */
+    KubevirtIpPool lbIpPool();
+
+    /**
      * Returns a set of DNS.
      *
      * @return a set of DNS
@@ -264,6 +276,14 @@ public interface KubevirtNetwork {
          * @return network builder
          */
         Builder ipPool(KubevirtIpPool ipPool);
+
+        /**
+         * Returns network builder with the supplied load balancer IP pool.
+         *
+         * @param lbIpPool load balancer IP pool
+         * @return network builder
+         */
+        Builder lbIpPool(KubevirtIpPool lbIpPool);
 
         /**
          * Returns network builder with the host routes.
