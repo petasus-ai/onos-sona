@@ -1013,23 +1013,34 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
             }
 
             KubevirtNode node = nodeAdminService.node(device.id());
-
             if (node == null) {
                 return;
             }
 
             if (deviceService.isAvailable(device.id())) {
-                log.debug("Bridge created on {}", node.hostname());
-                bootstrapNode(node);
-            } else if (node.state() == COMPLETE) {
-                log.info("Device {} disconnected", device.id());
-                setState(node, INCOMPLETE);
-            }
+                // Auto-recovery must only re-initialize nodes that have actually
+                // fallen back to INCOMPLETE. DEVICE_CREATED is a transient state of
+                // the normal bootstrap flow (INIT -> DEVICE_CREATED -> COMPLETE),
+                // so it must never be forced back to INIT here. Otherwise the bridge
+                // and port events emitted during bootstrap can reset an in-progress
+                // node and create a self-sustaining COMPLETE/INIT/DEVICE_CREATED loop.
+                if (autoRecovery && node.state() == INCOMPLETE) {
+                    log.info("Device {} reconnected, re-initializing node {}",
+                            device.id(), node.hostname());
+                    setState(node, INIT);
+                    return;
+                }
 
-            if (autoRecovery) {
-                if (node.state() == INCOMPLETE || node.state() == DEVICE_CREATED) {
-                    log.info("Device {} is reconnected", device.id());
-                    nodeAdminService.updateNode(node.updateState(INIT));
+                log.debug("Bridge available on {}", node.hostname());
+                bootstrapNode(node);
+            } else {
+                // The device is no longer available. If the node was operating
+                // normally (COMPLETE), only mark it INCOMPLETE here. Do not promote
+                // it to INIT directly; recovery is handled when the device
+                // reconnects (the branch above), using a fresh state read.
+                if (node.state() == COMPLETE) {
+                    log.info("Device {} disconnected", device.id());
+                    setState(node, INCOMPLETE);
                 }
             }
         }
