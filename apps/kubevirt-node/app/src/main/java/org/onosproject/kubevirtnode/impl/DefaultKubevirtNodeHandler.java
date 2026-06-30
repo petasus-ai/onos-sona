@@ -464,6 +464,11 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
      * @param node kubevirt node
      */
     private void bootstrapNode(KubevirtNode node) {
+        KubevirtNode current = nodeAdminService.node(node.hostname());
+        if (current == null) {
+            return;
+        }
+
         if (isCurrentStateDone(node)) {
             setState(node, node.state().nextState());
         } else {
@@ -1133,6 +1138,17 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                             return;
                         }
                         if (event.subject() == null) {
+                            return;
+                        }
+                        // Re-read from the store rather than trusting the event snapshot.
+                        KubevirtNode latest = nodeAdminService.node(event.subject().hostname());
+                        if (latest == null) {
+                            return;
+                        }
+                        // A COMPLETE node needs no bootstrap work; processCompleteState() is a
+                        // no-op. Skipping here also avoids re-amplifying the UPDATE event that
+                        // our own setState(COMPLETE) just emitted.
+                        if (latest.state() == COMPLETE) {
                             return;
                         }
                         bootstrapNode(event.subject());
