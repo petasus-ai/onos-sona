@@ -42,6 +42,12 @@ out/
 
 bazel-*
 
+# Bzlmod is disabled (.bazelrc: --noenable_bzlmod); this ONOS build uses the
+# WORKSPACE path. Bazel 7 still auto-generates these placeholder/lock files,
+# but they are unused here. Ignore them so they are never committed.
+MODULE.bazel
+MODULE.bazel.lock
+
 web/gui2/node_modules/
 web/gui2/documentation/
 web/gui2/dist/
