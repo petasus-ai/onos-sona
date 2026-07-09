@@ -836,76 +836,69 @@ public class KubevirtSecurityGroupHandler {
         }
     }
 
+    // initialize the ACL pipeline for a single node; a failure on one
+    // device/port must never abort the rest, otherwise the node would come
+    // up with a partially initialized pipeline that silently drops or
+    // mis-forwards VM traffic
+    private void initializeAclPipeline(KubevirtNode node, boolean install) {
+        try {
+            initializeProviderPipeline(node, install);
+        } catch (Exception e) {
+            log.error("Failed to initialize provider pipeline for node {}",
+                    node.hostname(), e);
+        }
+
+        // pipeline for tenant bridge
+        for (Device device : deviceService.getDevices()) {
+            for (Port port : deviceService.getPorts(device.id())) {
+                String portName = port.annotations().value(PORT_NAME);
+                if (StringUtils.startsWithIgnoreCase(portName, TENANT_TO_TUNNEL_PREFIX)) {
+                    try {
+                        initializeCommonPipeline(device.id(), port.number(), install);
+                    } catch (Exception e) {
+                        log.error("Failed to initialize tenant pipeline for port {} on device {}",
+                                portName, device.id(), e);
+                    }
+                }
+            }
+        }
+
+        // pipeline for physnet bridge
+        for (Device device : deviceService.getDevices()) {
+            for (Port port : deviceService.getPorts(device.id())) {
+                String portName = port.annotations().value(PORT_NAME);
+                String adminState = port.annotations().value(ADMIN_STATE);
+                // FIXME: since the physical port number can be changed on reboot,
+                // we need to add another intermediate bridge to handle this
+                if (!StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX) &&
+                        !port.number().equals(PortNumber.LOCAL) &&
+                        StringUtils.equals(adminState, STATE_ENABLED)) {
+                    try {
+                        initializeCommonPipeline(device.id(), port.number(), install);
+                    } catch (Exception e) {
+                        log.error("Failed to initialize physnet pipeline for port {} on device {}",
+                                portName, device.id(), e);
+                    }
+                }
+            }
+        }
+    }
+
     private void resetSecurityGroupRules() {
+        boolean install = getUseSecurityGroupFlag();
 
-        if (getUseSecurityGroupFlag()) {
-            nodeService.completeNodes(WORKER).forEach(node -> {
-                initializeProviderPipeline(node, true);
+        nodeService.completeNodes(WORKER).forEach(node -> initializeAclPipeline(node, install));
 
-                // pipeline for tenant bridge
-                for (Device device : deviceService.getDevices()) {
-                    for (Port port : deviceService.getPorts(device.id())) {
-                        String portName = port.annotations().value(PORT_NAME);
-                        if (StringUtils.startsWithIgnoreCase(portName, TENANT_TO_TUNNEL_PREFIX)) {
-                            initializeCommonPipeline(device.id(), port.number(), true);
-                        }
-                    }
-                }
-
-                // pipeline for physnet bridge
-                for (Device device : deviceService.getDevices()) {
-                    for (Port port : deviceService.getPorts(device.id())) {
-                        String portName = port.annotations().value(PORT_NAME);
-                        String adminState = port.annotations().value(ADMIN_STATE);
-                        // FIXME: since the physical port number can be changed on reboot,
-                        // we need to add another intermediate bridge to handle this
-                        if (!StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX) &&
-                                !port.number().equals(PortNumber.LOCAL) &&
-                                StringUtils.equals(adminState, STATE_ENABLED)) {
-                            initializeCommonPipeline(device.id(), port.number(), true);
-                        }
-                    }
-                }
-            });
-
+        if (install) {
             securityGroupService.securityGroups().forEach(securityGroup ->
                     securityGroup.rules().forEach(this::securityGroupRuleAdded));
         } else {
-            nodeService.completeNodes(WORKER).forEach(node -> {
-                initializeProviderPipeline(node, false);
-
-                // pipeline for tenant bridge
-                for (Device device : deviceService.getDevices()) {
-                    for (Port port : deviceService.getPorts(device.id())) {
-                        String portName = port.annotations().value(PORT_NAME);
-                        if (StringUtils.startsWithIgnoreCase(portName, TENANT_TO_TUNNEL_PREFIX)) {
-                            initializeCommonPipeline(device.id(), port.number(), false);
-                        }
-                    }
-                }
-
-                // pipeline for physnet bridge
-                for (Device device : deviceService.getDevices()) {
-                    for (Port port : deviceService.getPorts(device.id())) {
-                        String portName = port.annotations().value(PORT_NAME);
-                        String adminState = port.annotations().value(ADMIN_STATE);
-                        // FIXME: since the physical port number can be changed on reboot,
-                        // we need to add another intermediate bridge to handle this
-                        if (!StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX) &&
-                                !port.number().equals(PortNumber.LOCAL) &&
-                                StringUtils.equals(adminState, STATE_ENABLED)) {
-                            initializeCommonPipeline(device.id(), port.number(), false);
-                        }
-                    }
-                }
-            });
-
             securityGroupService.securityGroups().forEach(securityGroup ->
                     securityGroup.rules().forEach(this::securityGroupRuleRemoved));
         }
 
         log.info("Reset security group info " +
-                (getUseSecurityGroupFlag() ? "with" : "without") + " Security Group");
+                (install ? "with" : "without") + " Security Group");
     }
 
     private void securityGroupRuleAdded(KubevirtSecurityGroupRule sgRule) {
@@ -1034,8 +1027,17 @@ public class KubevirtSecurityGroupHandler {
             }
 
             KubevirtPort port = event.subject();
+            if (port.securityGroups() == null) {
+                return;
+            }
             for (String sgStr : port.securityGroups()) {
                 KubevirtSecurityGroup sg = securityGroupService.securityGroup(sgStr);
+                if (sg == null) {
+                    // the security group was deleted (or has not yet been
+                    // replicated on this instance); skip it rather than NPE and
+                    // abort removal for the port's remaining security groups
+                    continue;
+                }
                 sg.rules().forEach(sgRule -> {
                     updateSecurityGroupRule(port, sgRule, false);
                 });
@@ -1050,8 +1052,14 @@ public class KubevirtSecurityGroupHandler {
             }
 
             KubevirtPort oldPort = event.oldSubject();
+            if (oldPort.securityGroups() == null) {
+                return;
+            }
             for (String sgStr : oldPort.securityGroups()) {
                 KubevirtSecurityGroup sg = securityGroupService.securityGroup(sgStr);
+                if (sg == null) {
+                    continue;
+                }
                 sg.rules().forEach(sgRule -> {
                     updateSecurityGroupRule(oldPort, sgRule, false);
                 });
@@ -1065,9 +1073,14 @@ public class KubevirtSecurityGroupHandler {
                 return;
             }
 
+            if (event.subject().securityGroups() == null) {
+                return;
+            }
             for (String sgId : event.subject().securityGroups()) {
                 KubevirtSecurityGroup sg = securityGroupService.securityGroup(sgId);
-
+                if (sg == null) {
+                    continue;
+                }
                 sg.rules().forEach(sgRule -> {
                     updateSecurityGroupRule(event.subject(), sgRule, true);
                 });
@@ -1218,71 +1231,19 @@ public class KubevirtSecurityGroupHandler {
     }
 
     private void resetSecurityGroupRulesByNode(KubevirtNode node) {
-        if (getUseSecurityGroupFlag()) {
-            initializeProviderPipeline(node, true);
+        boolean install = getUseSecurityGroupFlag();
 
-            // pipeline for tenant bridge
-            for (Device device : deviceService.getDevices()) {
-                for (Port port : deviceService.getPorts(device.id())) {
-                    String portName = port.annotations().value(PORT_NAME);
-                    if (StringUtils.startsWithIgnoreCase(portName, TENANT_TO_TUNNEL_PREFIX)) {
-                        initializeCommonPipeline(device.id(), port.number(), true);
-                    }
-                }
-            }
+        initializeAclPipeline(node, install);
 
-            // pipeline for physnet bridge
-            for (Device device : deviceService.getDevices()) {
-                for (Port port : deviceService.getPorts(device.id())) {
-                    String portName = port.annotations().value(PORT_NAME);
-                    String adminState = port.annotations().value(ADMIN_STATE);
-                    // FIXME: since the physical port number can be changed on reboot,
-                    // we need to add another intermediate bridge to handle this
-                    if (!StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX) &&
-                            !port.number().equals(PortNumber.LOCAL) &&
-                            StringUtils.equals(adminState, STATE_ENABLED)) {
-                        initializeCommonPipeline(device.id(), port.number(), true);
-                    }
-                }
-            }
-
+        if (install) {
             securityGroupService.securityGroups().forEach(securityGroup ->
-                    securityGroup.rules().forEach(
-                            KubevirtSecurityGroupHandler.this::securityGroupRuleAdded));
+                    securityGroup.rules().forEach(this::securityGroupRuleAdded));
         } else {
-            initializeProviderPipeline(node, false);
-
-            // pipeline for tenant bridge
-            for (Device device : deviceService.getDevices()) {
-                for (Port port : deviceService.getPorts(device.id())) {
-                    String portName = port.annotations().value(PORT_NAME);
-                    if (StringUtils.startsWithIgnoreCase(portName, TENANT_TO_TUNNEL_PREFIX)) {
-                        initializeCommonPipeline(device.id(), port.number(), false);
-                    }
-                }
-            }
-
-            // pipeline for physnet bridge
-            for (Device device : deviceService.getDevices()) {
-                for (Port port : deviceService.getPorts(device.id())) {
-                    String portName = port.annotations().value(PORT_NAME);
-                    String adminState = port.annotations().value(ADMIN_STATE);
-                    // FIXME: since the physical port number can be changed on reboot,
-                    // we need to add another intermediate bridge to handle this
-                    if (!StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX) &&
-                            !port.number().equals(PortNumber.LOCAL) &&
-                            StringUtils.equals(adminState, STATE_ENABLED)) {
-                        initializeCommonPipeline(device.id(), port.number(), false);
-                    }
-                }
-            }
-
             securityGroupService.securityGroups().forEach(securityGroup ->
-                    securityGroup.rules().forEach(
-                            KubevirtSecurityGroupHandler.this::securityGroupRuleRemoved));
+                    securityGroup.rules().forEach(this::securityGroupRuleRemoved));
         }
 
         log.info("Reset security group info " +
-                (getUseSecurityGroupFlag() ? "with" : "without") + " Security Group");
+                (install ? "with" : "without") + " Security Group");
     }
 }
