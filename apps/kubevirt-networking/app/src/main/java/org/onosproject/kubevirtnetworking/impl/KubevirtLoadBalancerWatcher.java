@@ -101,6 +101,11 @@ public class KubevirtLoadBalancerWatcher extends AbstractWatcher {
     // with "Exec Failure ... executor rejected" warnings
     private Watch watch;
 
+    // set while WE close the watch on purpose (re-instantiation, shutdown);
+    // an onClose callback fired by that intentional close must not schedule
+    // another re-instantiation, or the watch would flap forever
+    private volatile boolean closingWatch;
+
     private final InternalLoadBalancerWatcher watcher = new InternalLoadBalancerWatcher();
     private final InternalKubevirtApiConfigListener
             configListener = new InternalKubevirtApiConfigListener();
@@ -166,9 +171,12 @@ public class KubevirtLoadBalancerWatcher extends AbstractWatcher {
     private synchronized void closeWatch() {
         if (watch != null) {
             try {
+                closingWatch = true;
                 watch.close();
             } catch (Exception e) {
                 log.debug("Failed to close the previous watch", e);
+            } finally {
+                closingWatch = false;
             }
             watch = null;
         }
@@ -254,6 +262,10 @@ public class KubevirtLoadBalancerWatcher extends AbstractWatcher {
 
         @Override
         public void onClose(WatcherException e) {
+            if (closingWatch) {
+                // intentional close during re-instantiation or shutdown
+                return;
+            }
             // the watch dies on API server restarts, resourceVersion expiry
             // (HTTP 410) and fabric8 bugs; re-watch after a short delay so a
             // down API server does not turn this into a tight reconnect loop

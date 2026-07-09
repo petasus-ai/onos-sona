@@ -106,6 +106,11 @@ public class KubevirtNodeWatcher {
     // with "Exec Failure ... executor rejected" warnings
     private Watch watch;
 
+    // set while WE close the watch on purpose (re-instantiation, shutdown);
+    // an onClose callback fired by that intentional close must not schedule
+    // another re-instantiation, or the watch would flap forever
+    private volatile boolean closingWatch;
+
     @Activate
     protected void activate() {
         appId = coreService.registerApplication(APP_ID);
@@ -137,9 +142,12 @@ public class KubevirtNodeWatcher {
     private synchronized void closeWatch() {
         if (watch != null) {
             try {
+                closingWatch = true;
                 watch.close();
             } catch (Exception e) {
                 log.debug("Failed to close the previous watch", e);
+            } finally {
+                closingWatch = false;
             }
             watch = null;
         }
@@ -244,6 +252,10 @@ public class KubevirtNodeWatcher {
 
         @Override
         public void onClose(WatcherException e) {
+            if (closingWatch) {
+                // intentional close during re-instantiation or shutdown
+                return;
+            }
             // the watch dies on API server restarts, resourceVersion expiry
             // (HTTP 410) and fabric8 bugs; re-list and re-watch after a short
             // delay so events missed during the gap are replayed and a down

@@ -103,6 +103,12 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
     private Watch sgWatch;
     private Watch sgrWatch;
 
+    // set while WE close a watch on purpose (re-instantiation, shutdown);
+    // an onClose callback fired by that intentional close must not schedule
+    // another re-instantiation, or the watch would flap forever
+    private volatile boolean closingSgWatch;
+    private volatile boolean closingSgrWatch;
+
     private final InternalSecurityGroupWatcher
             sgWatcher = new InternalSecurityGroupWatcher();
     private final InternalSecurityGroupRuleWatcher
@@ -201,9 +207,12 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
     private synchronized void closeSgWatch() {
         if (sgWatch != null) {
             try {
+                closingSgWatch = true;
                 sgWatch.close();
             } catch (Exception e) {
                 log.debug("Failed to close the previous watch", e);
+            } finally {
+                closingSgWatch = false;
             }
             sgWatch = null;
         }
@@ -212,9 +221,12 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
     private synchronized void closeSgrWatch() {
         if (sgrWatch != null) {
             try {
+                closingSgrWatch = true;
                 sgrWatch.close();
             } catch (Exception e) {
                 log.debug("Failed to close the previous watch", e);
+            } finally {
+                closingSgrWatch = false;
             }
             sgrWatch = null;
         }
@@ -323,6 +335,10 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
 
         @Override
         public void onClose(WatcherException e) {
+            if (closingSgWatch) {
+                // intentional close during re-instantiation or shutdown
+                return;
+            }
             // the watch dies on API server restarts, resourceVersion expiry
             // (HTTP 410) and fabric8 bugs; re-watch after a short delay so a
             // down API server does not turn this into a tight reconnect loop
@@ -404,6 +420,10 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
 
         @Override
         public void onClose(WatcherException e) {
+            if (closingSgrWatch) {
+                // intentional close during re-instantiation or shutdown
+                return;
+            }
             // the watch dies on API server restarts, resourceVersion expiry
             // (HTTP 410) and fabric8 bugs; re-watch after a short delay so a
             // down API server does not turn this into a tight reconnect loop
