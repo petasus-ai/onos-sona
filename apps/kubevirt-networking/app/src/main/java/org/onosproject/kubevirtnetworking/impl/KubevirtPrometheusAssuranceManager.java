@@ -15,6 +15,8 @@
  */
 package org.onosproject.kubevirtnetworking.impl;
 
+import io.prometheus.client.Collector;
+import io.prometheus.client.CollectorRegistry;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.exporter.MetricsServlet;
 import org.eclipse.jetty.server.Server;
@@ -100,48 +102,15 @@ public class KubevirtPrometheusAssuranceManager implements KubevirtPrometheusAss
     private StatsCollector collector;
     private ScheduledFuture result;
 
-    private static Gauge byteFIPTx = Gauge.build()
-            .name("fip_tx_byte")
-            .help("fip_tx_byte")
-            .labelNames(FIP_LABEL_TAGS)
-            .register();
-    private static Gauge pktFIPTx = Gauge.build()
-            .name("fip_tx_pkts")
-            .help("fip_tx_pkts")
-            .labelNames(FIP_LABEL_TAGS)
-            .register();
-    private static Gauge byteFIPRx = Gauge.build()
-            .name("fip_rx_byte")
-            .help("fip_rx_byte")
-            .labelNames(FIP_LABEL_TAGS)
-            .register();
-    private static Gauge pktFIPRx = Gauge.build()
-            .name("fip_rx_pkts")
-            .help("fip_rx_pkts")
-            .labelNames(FIP_LABEL_TAGS)
-            .register();
+    private Gauge byteFIPTx;
+    private Gauge pktFIPTx;
+    private Gauge byteFIPRx;
+    private Gauge pktFIPRx;
 
-    private static Gauge byteSNATTx = Gauge.build()
-            .name("snat_tx_byte")
-            .help("snat_rx_pkts")
-            .labelNames(SNAT_LABEL_TAGS)
-            .register();
-    private static Gauge pktSNATTx = Gauge.build()
-            .name("snat_tx_pkts")
-            .help("snat_tx_pkts")
-            .labelNames(SNAT_LABEL_TAGS)
-            .register();
-
-    private static Gauge byteSNATRx = Gauge.build()
-            .name("snat_rx_byte")
-            .help("snat_rx_byte")
-            .labelNames(SNAT_LABEL_TAGS)
-            .register();
-    private static Gauge pktSNATRx = Gauge.build()
-            .name("snat_rx_pkts")
-            .help("snat_rx_pkts")
-            .labelNames(SNAT_LABEL_TAGS)
-            .register();
+    private Gauge byteSNATTx;
+    private Gauge pktSNATTx;
+    private Gauge byteSNATRx;
+    private Gauge pktSNATRx;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected CoreService coreService;
@@ -163,6 +132,7 @@ public class KubevirtPrometheusAssuranceManager implements KubevirtPrometheusAss
 
     @Activate
     protected void activate() {
+        registerMetrics();
         startPrometheusExporter();
         log.info("Started");
     }
@@ -170,7 +140,73 @@ public class KubevirtPrometheusAssuranceManager implements KubevirtPrometheusAss
     @Deactivate
     protected void deactivate() {
         stopPrometheusExporter();
+        unregisterMetrics();
         log.info("Stopped");
+    }
+
+    private void registerMetrics() {
+        byteFIPTx = Gauge.build()
+                .name("fip_tx_byte")
+                .help("fip_tx_byte")
+                .labelNames(FIP_LABEL_TAGS)
+                .register();
+        pktFIPTx = Gauge.build()
+                .name("fip_tx_pkts")
+                .help("fip_tx_pkts")
+                .labelNames(FIP_LABEL_TAGS)
+                .register();
+        byteFIPRx = Gauge.build()
+                .name("fip_rx_byte")
+                .help("fip_rx_byte")
+                .labelNames(FIP_LABEL_TAGS)
+                .register();
+        pktFIPRx = Gauge.build()
+                .name("fip_rx_pkts")
+                .help("fip_rx_pkts")
+                .labelNames(FIP_LABEL_TAGS)
+                .register();
+
+        byteSNATTx = Gauge.build()
+                .name("snat_tx_byte")
+                .help("snat_rx_pkts")
+                .labelNames(SNAT_LABEL_TAGS)
+                .register();
+        pktSNATTx = Gauge.build()
+                .name("snat_tx_pkts")
+                .help("snat_tx_pkts")
+                .labelNames(SNAT_LABEL_TAGS)
+                .register();
+        byteSNATRx = Gauge.build()
+                .name("snat_rx_byte")
+                .help("snat_rx_byte")
+                .labelNames(SNAT_LABEL_TAGS)
+                .register();
+        pktSNATRx = Gauge.build()
+                .name("snat_rx_pkts")
+                .help("snat_rx_pkts")
+                .labelNames(SNAT_LABEL_TAGS)
+                .register();
+    }
+
+    private void unregisterMetrics() {
+        unregister(byteFIPTx);
+        unregister(pktFIPTx);
+        unregister(byteFIPRx);
+        unregister(pktFIPRx);
+        unregister(byteSNATTx);
+        unregister(pktSNATTx);
+        unregister(byteSNATRx);
+        unregister(pktSNATRx);
+    }
+
+    private void unregister(Collector collector) {
+        if (collector != null) {
+            try {
+                CollectorRegistry.defaultRegistry.unregister(collector);
+            } catch (Exception e) {
+                log.warn("Failed to unregister prometheus collector", e);
+            }
+        }
     }
 
     @Override
@@ -206,7 +242,9 @@ public class KubevirtPrometheusAssuranceManager implements KubevirtPrometheusAss
             log.warn("Failed to stop prometheus server due to {}", e);
         }
 
-        result.cancel(true);
+        if (result != null) {
+            result.cancel(true);
+        }
         log.info("Prometheus exporter has stopped");
     }
 
