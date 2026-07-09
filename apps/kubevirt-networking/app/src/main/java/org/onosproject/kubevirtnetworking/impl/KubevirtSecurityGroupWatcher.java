@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
 import io.fabric8.kubernetes.client.WatcherException;
 import io.fabric8.kubernetes.client.dsl.base.CustomResourceDefinitionContext;
@@ -95,6 +96,13 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
     private KubernetesClient sgWatchClient;
     private KubernetesClient sgrWatchClient;
 
+    // the handles of the active watches; they MUST be closed before their
+    // clients, otherwise the fabric8 watch manager keeps re-running its
+    // reconnect loop on top of a terminated dispatcher, flooding the log
+    // with "Exec Failure ... executor rejected" warnings
+    private Watch sgWatch;
+    private Watch sgrWatch;
+
     private final InternalSecurityGroupWatcher
             sgWatcher = new InternalSecurityGroupWatcher();
     private final InternalSecurityGroupRuleWatcher
@@ -144,6 +152,8 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
         leadershipService.withdraw(appId.name());
         reconnectExecutor.shutdown();
         eventExecutor.shutdown();
+        closeSgWatch();
+        closeSgrWatch();
         closeSgWatchClient();
         closeSgrWatchClient();
 
@@ -151,6 +161,7 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
     }
 
     private synchronized void instantiateSgWatcher() {
+        closeSgWatch();
         closeSgWatchClient();
         sgWatchClient = k8sClient(configService);
 
@@ -160,7 +171,7 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
         }
 
         try {
-            sgWatchClient.customResource(securityGroupCrdCxt).watch(sgWatcher);
+            sgWatch = sgWatchClient.customResource(securityGroupCrdCxt).watch(sgWatcher);
         } catch (Exception e) {
             log.error("Failed to instantiate security group watcher, retrying in {}s",
                     RECONNECT_DELAY_S, e);
@@ -169,6 +180,7 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
     }
 
     private synchronized void instantiateSgrWatcher() {
+        closeSgrWatch();
         closeSgrWatchClient();
         sgrWatchClient = k8sClient(configService);
 
@@ -178,11 +190,33 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
         }
 
         try {
-            sgrWatchClient.customResource(securityGroupRuleCrdCxt).watch(sgrWatcher);
+            sgrWatch = sgrWatchClient.customResource(securityGroupRuleCrdCxt).watch(sgrWatcher);
         } catch (Exception e) {
             log.error("Failed to instantiate security group rule watcher, retrying in {}s",
                     RECONNECT_DELAY_S, e);
             scheduleSgrReconnect();
+        }
+    }
+
+    private synchronized void closeSgWatch() {
+        if (sgWatch != null) {
+            try {
+                sgWatch.close();
+            } catch (Exception e) {
+                log.debug("Failed to close the previous watch", e);
+            }
+            sgWatch = null;
+        }
+    }
+
+    private synchronized void closeSgrWatch() {
+        if (sgrWatch != null) {
+            try {
+                sgrWatch.close();
+            } catch (Exception e) {
+                log.debug("Failed to close the previous watch", e);
+            }
+            sgrWatch = null;
         }
     }
 

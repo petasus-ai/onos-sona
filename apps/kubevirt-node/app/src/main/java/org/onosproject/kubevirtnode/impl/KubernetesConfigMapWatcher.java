@@ -17,6 +17,7 @@ package org.onosproject.kubevirtnode.impl;
 
 import io.fabric8.kubernetes.api.model.ConfigMap;
 import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
 import io.fabric8.kubernetes.client.WatcherException;
 import org.onlab.packet.IpAddress;
@@ -112,6 +113,12 @@ public class KubernetesConfigMapWatcher {
     // and client (thread/connection pool) leaks on re-instantiation
     private KubernetesClient client;
 
+    // the handle of the active watch; it MUST be closed before its client,
+    // otherwise the fabric8 watch manager keeps re-running its reconnect
+    // loop on top of the client's terminated dispatcher, flooding the log
+    // with "Exec Failure ... executor rejected" warnings
+    private Watch watch;
+
     @Activate
     protected void activate() {
         appId = coreService.registerApplication(APP_ID);
@@ -135,9 +142,21 @@ public class KubernetesConfigMapWatcher {
         leadershipService.withdraw(appId.name());
         reconnectExecutor.shutdown();
         eventExecutor.shutdown();
+        closeWatch();
         closeClient();
 
         log.info("Stopped");
+    }
+
+    private synchronized void closeWatch() {
+        if (watch != null) {
+            try {
+                watch.close();
+            } catch (Exception e) {
+                log.debug("Failed to close the previous watch", e);
+            }
+            watch = null;
+        }
     }
 
     private synchronized void closeClient() {
@@ -148,6 +167,7 @@ public class KubernetesConfigMapWatcher {
     }
 
     private synchronized void instantiateWatcher() {
+        closeWatch();
         KubevirtApiConfig config = configService.apiConfig();
         if (config == null) {
             return;
@@ -169,7 +189,7 @@ public class KubernetesConfigMapWatcher {
             if (existing != null) {
                 mapWatcher.eventReceived(Watcher.Action.MODIFIED, existing);
             }
-            client.configMaps().inNamespace(KUBE_SYSTEM).withName(KUBE_VIP).watch(mapWatcher);
+            watch = client.configMaps().inNamespace(KUBE_SYSTEM).withName(KUBE_VIP).watch(mapWatcher);
         } catch (Exception e) {
             log.error("Failed to watch kube-vip config map, retrying in {}s",
                     RECONNECT_DELAY_S, e);

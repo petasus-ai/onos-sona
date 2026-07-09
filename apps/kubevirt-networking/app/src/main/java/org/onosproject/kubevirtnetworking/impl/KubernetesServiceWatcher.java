@@ -22,6 +22,7 @@ import io.fabric8.kubernetes.api.model.LoadBalancerIngress;
 import io.fabric8.kubernetes.api.model.LoadBalancerStatus;
 import io.fabric8.kubernetes.api.model.Service;
 import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
 import io.fabric8.kubernetes.client.WatcherException;
 import org.onlab.packet.IpAddress;
@@ -125,6 +126,12 @@ public class KubernetesServiceWatcher {
     // and client (thread/connection pool) leaks on re-instantiation
     private KubernetesClient watchClient;
 
+    // the handle of the active watch; it MUST be closed before its client,
+    // otherwise the fabric8 watch manager keeps re-running its reconnect
+    // loop on top of the client's terminated dispatcher, flooding the log
+    // with "Exec Failure ... executor rejected" warnings
+    private Watch watch;
+
     private final InternalKubevirtApiConfigListener
             apiConfigListener = new InternalKubevirtApiConfigListener();
 
@@ -171,12 +178,14 @@ public class KubernetesServiceWatcher {
 
         reconnectExecutor.shutdown();
         eventExecutor.shutdown();
+        closeWatch();
         closeWatchClient();
 
         log.info("Stopped");
     }
 
     private synchronized void instantiateWatcher() {
+        closeWatch();
         closeWatchClient();
         watchClient = k8sClient(apiConfigService);
 
@@ -186,11 +195,22 @@ public class KubernetesServiceWatcher {
         }
 
         try {
-            watchClient.services().inAnyNamespace().watch(serviceWatcher);
+            watch = watchClient.services().inAnyNamespace().watch(serviceWatcher);
         } catch (Exception e) {
             log.error("Failed to instantiate watcher, retrying in {}s",
                     RECONNECT_DELAY_S, e);
             scheduleReconnect();
+        }
+    }
+
+    private synchronized void closeWatch() {
+        if (watch != null) {
+            try {
+                watch.close();
+            } catch (Exception e) {
+                log.debug("Failed to close the previous watch", e);
+            }
+            watch = null;
         }
     }
 

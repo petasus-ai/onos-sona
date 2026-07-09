@@ -17,6 +17,7 @@ package org.onosproject.kubevirtnetworking.impl;
 
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
 import io.fabric8.kubernetes.client.WatcherException;
 import org.onosproject.cluster.ClusterService;
@@ -86,6 +87,12 @@ public class KubevirtPodWatcher {
     // watch, so keeping exactly one instance prevents both duplicated watches
     // and client (thread/connection pool) leaks on re-instantiation
     private KubernetesClient watchClient;
+
+    // the handle of the active watch; it MUST be closed before its client,
+    // otherwise the fabric8 watch manager keeps re-running its reconnect
+    // loop on top of the client's terminated dispatcher, flooding the log
+    // with "Exec Failure ... executor rejected" warnings
+    private Watch watch;
     private final Watcher<Pod> internalKubevirtPodWatcher = new InternalKubevirtPodWatcher();
     private final InternalKubevirtApiConfigListener
             internalKubevirtApiConfigListener = new InternalKubevirtApiConfigListener();
@@ -115,12 +122,14 @@ public class KubevirtPodWatcher {
         leadershipService.withdraw(appId.name());
         reconnectExecutor.shutdown();
         eventExecutor.shutdown();
+        closeWatch();
         closeWatchClient();
 
         log.info("Stopped");
     }
 
     private synchronized void instantiatePodWatcher() {
+        closeWatch();
         closeWatchClient();
         watchClient = k8sClient(kubevirtApiConfigService);
 
@@ -130,11 +139,22 @@ public class KubevirtPodWatcher {
         }
 
         try {
-            watchClient.pods().inAnyNamespace().watch(internalKubevirtPodWatcher);
+            watch = watchClient.pods().inAnyNamespace().watch(internalKubevirtPodWatcher);
         } catch (Exception e) {
             log.error("Failed to instantiate watcher, retrying in {}s",
                     RECONNECT_DELAY_S, e);
             scheduleReconnect();
+        }
+    }
+
+    private synchronized void closeWatch() {
+        if (watch != null) {
+            try {
+                watch.close();
+            } catch (Exception e) {
+                log.debug("Failed to close the previous watch", e);
+            }
+            watch = null;
         }
     }
 
