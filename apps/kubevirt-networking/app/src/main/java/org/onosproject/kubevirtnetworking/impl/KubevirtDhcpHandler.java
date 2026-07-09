@@ -497,7 +497,7 @@ public class KubevirtDhcpHandler {
 
                 option.setLength((byte) dnsLength);
 
-                ByteBuffer dnsByteBuf = ByteBuffer.allocate(DHCP_OPTION_DNS_LENGTH);
+                ByteBuffer dnsByteBuf = ByteBuffer.allocate(dnsLength);
 
                 for (IpAddress dnsServer : network.dnses()) {
                     dnsByteBuf.put(dnsServer.toOctets());
