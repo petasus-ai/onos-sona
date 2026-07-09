@@ -46,7 +46,6 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnetworking.api.KubernetesExternalLbEvent.Type.KUBERNETES_EXTERNAL_LOAD_BALANCER_CREATED;
@@ -116,20 +115,19 @@ public class DistributedKubernetesExternalLbStore
 
     @Override
     public void createLoadBalancer(KubernetesExternalLb lb) {
-        lbStore.compute(lb.serviceName(), (seviceName, existing) -> {
-            final String error = lb.serviceName() + ERR_DUPLICATE;
-            checkArgument(existing == null, error);
-            return lb;
-        });
+        Versioned<KubernetesExternalLb> existing = lbStore.putIfAbsent(lb.serviceName(), lb);
+        if (existing != null && !lb.equals(existing.value())) {
+            throw new IllegalArgumentException(lb.serviceName() + ERR_DUPLICATE);
+        }
     }
 
     @Override
     public void updateLoadBalancer(KubernetesExternalLb lb) {
-        lbStore.compute(lb.serviceName(), (seviceName, existing) -> {
-            final String error = lb.serviceName() + ERR_NOT_FOUND;
-            checkArgument(existing != null, error);
-            return lb;
-        });
+        Versioned<KubernetesExternalLb> result =
+                lbStore.computeIfPresent(lb.serviceName(), (seviceName, existing) -> lb);
+        if (result == null) {
+            throw new IllegalArgumentException(lb.serviceName() + ERR_NOT_FOUND);
+        }
     }
 
     @Override

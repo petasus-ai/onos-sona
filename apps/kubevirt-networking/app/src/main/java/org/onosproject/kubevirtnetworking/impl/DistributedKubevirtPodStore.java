@@ -116,7 +116,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnetworking.api.KubevirtPodEvent.Type.KUBEVIRT_POD_ANNOTATION_ADDED;
@@ -278,20 +277,20 @@ public class DistributedKubevirtPodStore
 
     @Override
     public void createPod(Pod pod) {
-        podStore.compute(pod.getMetadata().getUid(), (uid, existing) -> {
-            final String error = pod.getMetadata().getUid() + ERR_DUPLICATE;
-            checkArgument(existing == null, error);
-            return pod;
-        });
+        String uid = pod.getMetadata().getUid();
+        Versioned<Pod> existing = podStore.putIfAbsent(uid, pod);
+        if (existing != null && !pod.equals(existing.value())) {
+            throw new IllegalArgumentException(uid + ERR_DUPLICATE);
+        }
     }
 
     @Override
     public void updatePod(Pod pod) {
-        podStore.compute(pod.getMetadata().getUid(), (uid, existing) -> {
-            final String error = pod.getMetadata().getUid() + ERR_NOT_FOUND;
-            checkArgument(existing != null, error);
-            return pod;
-        });
+        String uid = pod.getMetadata().getUid();
+        Versioned<Pod> result = podStore.computeIfPresent(uid, (k, existing) -> pod);
+        if (result == null) {
+            throw new IllegalArgumentException(uid + ERR_NOT_FOUND);
+        }
     }
 
     @Override

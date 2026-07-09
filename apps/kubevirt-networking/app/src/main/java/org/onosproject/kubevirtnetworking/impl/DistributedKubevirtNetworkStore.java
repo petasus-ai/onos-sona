@@ -45,7 +45,6 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnetworking.api.KubevirtNetworkEvent.Type.KUBEVIRT_NETWORK_CREATED;
@@ -112,20 +111,19 @@ public class DistributedKubevirtNetworkStore
 
     @Override
     public void createNetwork(KubevirtNetwork network) {
-        networkStore.compute(network.networkId(), (networkId, existing) -> {
-            final String error = network.networkId() + ERR_DUPLICATE;
-            checkArgument(existing == null, error);
-            return network;
-        });
+        Versioned<KubevirtNetwork> existing = networkStore.putIfAbsent(network.networkId(), network);
+        if (existing != null && !network.equals(existing.value())) {
+            throw new IllegalArgumentException(network.networkId() + ERR_DUPLICATE);
+        }
     }
 
     @Override
     public void updateNetwork(KubevirtNetwork network) {
-        networkStore.compute(network.networkId(), (networkId, existing) -> {
-            final String error = network.networkId() + ERR_NOT_FOUND;
-            checkArgument(existing != null, error);
-            return network;
-        });
+        Versioned<KubevirtNetwork> result =
+                networkStore.computeIfPresent(network.networkId(), (networkId, existing) -> network);
+        if (result == null) {
+            throw new IllegalArgumentException(network.networkId() + ERR_NOT_FOUND);
+        }
     }
 
     @Override

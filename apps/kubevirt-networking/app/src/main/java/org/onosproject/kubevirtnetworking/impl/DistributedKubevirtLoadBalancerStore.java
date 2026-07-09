@@ -47,7 +47,6 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnetworking.api.KubevirtLoadBalancerEvent.Type.KUBEVIRT_LOAD_BALANCER_CREATED;
@@ -117,20 +116,19 @@ public class DistributedKubevirtLoadBalancerStore
 
     @Override
     public void createLoadBalancer(KubevirtLoadBalancer lb) {
-        loadBalancerStore.compute(lb.id(), (id, existing) -> {
-            final String error = lb.id() + ERR_DUPLICATE;
-            checkArgument(existing == null, error);
-            return lb;
-        });
+        Versioned<KubevirtLoadBalancer> existing = loadBalancerStore.putIfAbsent(lb.id(), lb);
+        if (existing != null && !lb.equals(existing.value())) {
+            throw new IllegalArgumentException(lb.id() + ERR_DUPLICATE);
+        }
     }
 
     @Override
     public void updateLoadBalancer(KubevirtLoadBalancer lb) {
-        loadBalancerStore.compute(lb.id(), (id, existing) -> {
-            final String error = lb.id() + ERR_NOT_FOUND;
-            checkArgument(existing != null, error);
-            return lb;
-        });
+        Versioned<KubevirtLoadBalancer> result =
+                loadBalancerStore.computeIfPresent(lb.id(), (id, existing) -> lb);
+        if (result == null) {
+            throw new IllegalArgumentException(lb.id() + ERR_NOT_FOUND);
+        }
     }
 
     @Override

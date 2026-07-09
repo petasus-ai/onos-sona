@@ -47,7 +47,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnetworking.api.KubevirtPortEvent.Type.KUBEVIRT_PORT_CREATED;
@@ -117,20 +116,20 @@ public class DistributedKubevirtPortStore
 
     @Override
     public void createPort(KubevirtPort port) {
-        portStore.compute(port.macAddress().toString(), (mac, existing) -> {
-            final String error = port.macAddress().toString() + ERR_DUPLICATE;
-            checkArgument(existing == null, error);
-            return port;
-        });
+        String mac = port.macAddress().toString();
+        Versioned<KubevirtPort> existing = portStore.putIfAbsent(mac, port);
+        if (existing != null && !port.equals(existing.value())) {
+            throw new IllegalArgumentException(mac + ERR_DUPLICATE);
+        }
     }
 
     @Override
     public void updatePort(KubevirtPort port) {
-        portStore.compute(port.macAddress().toString(), (mac, existing) -> {
-            final String error = port.macAddress().toString() + ERR_NOT_FOUND;
-            checkArgument(existing != null, error);
-            return port;
-        });
+        String mac = port.macAddress().toString();
+        Versioned<KubevirtPort> result = portStore.computeIfPresent(mac, (k, existing) -> port);
+        if (result == null) {
+            throw new IllegalArgumentException(mac + ERR_NOT_FOUND);
+        }
     }
 
     @Override
