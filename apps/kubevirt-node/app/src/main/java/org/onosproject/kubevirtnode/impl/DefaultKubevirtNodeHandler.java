@@ -24,6 +24,7 @@ import org.onosproject.cluster.LeadershipService;
 import org.onosproject.cluster.NodeId;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
+import org.onosproject.kubevirtnode.api.KubevirtApiConfig;
 import org.onosproject.kubevirtnode.api.KubevirtApiConfigService;
 import org.onosproject.kubevirtnode.api.KubevirtNode;
 import org.onosproject.kubevirtnode.api.KubevirtNodeAdminService;
@@ -120,8 +121,6 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
     private final Logger log = getLogger(getClass());
 
     private static final String DEFAULT_OF_PROTO = "tcp";
-
-    private static final String OF_PREFIX = "of:";
 
     private static final int DEFAULT_OFPORT = 6653;
     private static final int DPID_BEGIN = 3;
@@ -277,7 +276,7 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                 createGeneveTunnelInterface(node);
             }
         } catch (Exception e) {
-            log.error("Exception occurred because of {}", e);
+            log.error("Exception occurred while processing DEVICE_CREATED state", e);
         }
     }
 
@@ -335,8 +334,15 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
     private void createBridge(KubevirtNode node, String bridgeName, DeviceId devId) {
         Device device = deviceService.getDevice(node.ovsdb());
 
-        IpAddress controllerIp = apiConfigService.apiConfig().controllerIp();
-        String serviceFqdn = apiConfigService.apiConfig().serviceFqdn();
+        KubevirtApiConfig apiConfig = apiConfigService.apiConfig();
+        if (apiConfig == null) {
+            log.warn("API config is not ready yet, skipping bridge {} creation for {}",
+                    bridgeName, node.hostname());
+            return;
+        }
+
+        IpAddress controllerIp = apiConfig.controllerIp();
+        String serviceFqdn = apiConfig.serviceFqdn();
         IpAddress serviceIp = null;
 
         if (controllerIp == null) {
@@ -347,7 +353,7 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
             if (serviceIp != null) {
                 controllerIp = serviceIp;
             } else {
-                controllerIp = apiConfigService.apiConfig().ipAddress();
+                controllerIp = apiConfig.ipAddress();
             }
         }
 
@@ -477,16 +483,19 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
      * @param node kubevirt node
      */
     private void bootstrapNode(KubevirtNode node) {
+        // Always act on the freshest store copy, never on the (possibly stale)
+        // event snapshot: acting on a stale snapshot can re-write outdated
+        // fields via setState -> updateNode and process the wrong state.
         KubevirtNode current = nodeAdminService.node(node.hostname());
         if (current == null) {
             return;
         }
 
-        if (isCurrentStateDone(node)) {
-            setState(node, node.state().nextState());
+        if (isCurrentStateDone(current)) {
+            setState(current, current.state().nextState());
         } else {
-            log.trace("Processing {} state for {}", node.state(), node.hostname());
-            node.state().process(this, node);
+            log.trace("Processing {} state for {}", current.state(), current.hostname());
+            current.state().process(this, current);
         }
     }
 
@@ -496,15 +505,19 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
      * @param node kubevirt node
      */
     private void removeNode(KubevirtNode node) {
-        OvsdbClientService client = getOvsdbClient(node, ovsdbPortNum, ovsdbController);
-        if (client == null) {
-            log.info("Failed to get ovsdb client");
-            return;
-        }
-
-        // purges all the flow rules installed on the node
+        // purges all the flow rules installed on the node; this only touches
+        // the flow store, so it must happen even when the OVSDB connection to
+        // the (possibly dead) host is gone - otherwise stale rules for the
+        // removed node linger in the store forever
         flowRuleService.purgeFlowRules(node.intgBridge());
         flowRuleService.purgeFlowRules(node.tunBridge());
+
+        OvsdbClientService client = getOvsdbClient(node, ovsdbPortNum, ovsdbController);
+        if (client == null) {
+            log.warn("Failed to get ovsdb client for {}, " +
+                    "skipping bridge cleanup", node.hostname());
+            return;
+        }
 
         // unprovision physical interfaces from the node
         // this procedure includes detaching physical port from physical bridge,
@@ -552,7 +565,9 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
             // creation requires some time
             sleep(SLEEP_SHORT_MS);
         } catch (InterruptedException e) {
-            log.error("Exception caused during init state checking...");
+            log.warn("Interrupted during INIT state checking", e);
+            Thread.currentThread().interrupt();
+            return false;
         }
 
         cleanPhysicalInterfaces(node);
@@ -578,7 +593,9 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
             // creation requires some time
             sleep(SLEEP_MID_MS);
         } catch (InterruptedException e) {
-            log.error("Exception caused during init state checking...");
+            log.warn("Interrupted during DEVICE_CREATED state checking", e);
+            Thread.currentThread().interrupt();
+            return false;
         }
 
         if (node.dataIp() != null && !isIntfEnabled(node, VXLAN) && !node.vxlanInUse()) {
@@ -603,11 +620,13 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
             }
 
             try {
-                // we need to wait a while, in case tunneling ports
+                // we need to wait a while, in case physical bridges and ports
                 // creation requires some time
                 sleep(SLEEP_LONG_MS);
             } catch (InterruptedException e) {
-                log.error("Exception caused during init state checking...");
+                log.warn("Interrupted during DEVICE_CREATED state checking", e);
+                Thread.currentThread().interrupt();
+                return false;
             }
 
             String patchPortName = structurePortName(
@@ -625,11 +644,13 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                 //In case node type is GATEWAY, we create physical bridges connected to the controller.
                 //By doing so, ONOS immediately recognizes the status of physical interface and performs RM procedures.
                 Port phyIntfPort = deviceService.getPorts(phyIntf.physBridge()).stream()
-                        .filter(port -> port.annotations().value(PORT_NAME).equals(phyIntf.intf()))
+                        .filter(port -> phyIntf.intf().equals(
+                                port.annotations().value(PORT_NAME)))
                         .findAny().orElse(null);
                 if (phyIntfPort == null) {
                     log.warn("There's no connected physical port {} on physical device {}",
                             phyIntf.intf(), phyIntf.physBridge());
+                    return false;
                 }
 
                 if (!(deviceService.isAvailable(phyIntf.physBridge()) &&
@@ -742,6 +763,21 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                 continue;
             }
 
+            // gateway/external-LB bridges belong to this node but are not
+            // physnet bridges; same for bridges without the physnet prefix,
+            // which are owned by the operator or another CNI - never touch them
+            if (brName.equals(node.gatewayBridgeName())) {
+                continue;
+            }
+            if (node.kubernetesExternalLbInterface() != null &&
+                    brName.equals(node.kubernetesExternalLbInterface()
+                            .externalLbBridgeName())) {
+                continue;
+            }
+            if (!brName.startsWith(BRIDGE_PREFIX)) {
+                continue;
+            }
+
             if (!phyNetworkNames.contains(brName)) {
                 removePhysicalPatchPorts(node, brName.substring(NETWORK_BEGIN));
                 removePhysicalBridge(node, brName.substring(NETWORK_BEGIN));
@@ -808,8 +844,15 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
         Device device = deviceService.getDevice(osNode.ovsdb());
         String bridgeName = BRIDGE_PREFIX + phyInterface.network();
 
-        IpAddress controllerIp = apiConfigService.apiConfig().controllerIp();
-        String serviceFqdn = apiConfigService.apiConfig().serviceFqdn();
+        KubevirtApiConfig apiConfig = apiConfigService.apiConfig();
+        if (apiConfig == null) {
+            log.warn("API config is not ready yet, skipping bridge {} creation for {}",
+                    bridgeName, osNode.hostname());
+            return;
+        }
+
+        IpAddress controllerIp = apiConfig.controllerIp();
+        String serviceFqdn = apiConfig.serviceFqdn();
         IpAddress serviceIp = null;
 
         if (controllerIp == null) {
@@ -820,7 +863,7 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
             if (serviceIp != null) {
                 controllerIp = serviceIp;
             } else {
-                controllerIp = apiConfigService.apiConfig().ipAddress();
+                controllerIp = apiConfig.ipAddress();
             }
         }
 
@@ -1058,7 +1101,12 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                     break;
                 case PORT_REMOVED:
                     dispatchExecutor.execute(() -> {
-                        KubevirtNode node = nodeAdminService.node(device.id());
+                        // the ports acted on here (VXLAN/GRE/GENEVE) live on
+                        // the TUNNEL bridge, which node(DeviceId) does not
+                        // resolve - it only matches intg bridge and ovsdb ids,
+                        // so the tunnel-bridge aware lookup must be used or
+                        // tunnel port removals are never detected
+                        KubevirtNode node = nodeByTunOrPhyBridge(device.id());
                         if (node == null) {
                             return;
                         }
@@ -1137,12 +1185,25 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
 
             //When the physical port up again, we set the node state to INIT
             //so that respective handlers do their related jobs.
-            if ((node.state() == INCOMPLETE || node.state() == DEVICE_CREATED)
+            if (node.state() == INCOMPLETE
                     && node.type().equals(GATEWAY) && port.isEnabled()) {
                 node.phyIntfs().stream()
                         .filter(pi -> pi.intf().equals(portName))
                         .findAny()
                         .ifPresent(pi -> setState(node, INIT));
+            }
+
+            //A phy port coming up while the node is mid-bootstrap
+            //(DEVICE_CREATED) must NOT reset the state machine to INIT - the
+            //port events emitted by the bootstrap itself would then loop the
+            //node between INIT and DEVICE_CREATED. Re-evaluating the current
+            //state is enough for the bootstrap to make progress.
+            if (node.state() == DEVICE_CREATED
+                    && node.type().equals(GATEWAY) && port.isEnabled()) {
+                node.phyIntfs().stream()
+                        .filter(pi -> pi.intf().equals(portName))
+                        .findAny()
+                        .ifPresent(pi -> bootstrapNode(node));
             }
         }
 
@@ -1195,7 +1256,7 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                         if (latest.state() == COMPLETE) {
                             return;
                         }
-                        bootstrapNode(event.subject());
+                        bootstrapNode(latest);
                     });
                     break;
                 case KUBEVIRT_NODE_REMOVED:
