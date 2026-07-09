@@ -13,6 +13,13 @@ def generate_grpc():
         urls = ["https://github.com/opennetworkinglab/grpc-java/archive/v%s-fix-host_javabase.zip" % GRPC_JAVA_VERSION],
         sha256 = GRPC_SHA,
         strip_prefix = "grpc-java-%s-fix-host_javabase" % GRPC_JAVA_VERSION,
+        # Bazel 7 requires any rule that calls java_common.compile to explicitly
+        # declare the Java toolchain type (see bazelbuild/bazel#18970). grpc-java
+        # 1.22.1 predates that requirement, so inject the toolchains attribute
+        # into the java(_lite)_grpc_library rule definitions.
+        patch_cmds = [
+            "sed -i.bak 's|fragments = \\[\"java\"\\],|fragments = [\"java\"],\\n    toolchains = [\"@bazel_tools//tools/jdk:toolchain_type\"],|g' java_grpc_library.bzl && rm -f java_grpc_library.bzl.bak",
+        ],
     )
 
     # Google APIs protos (status.proto, etc.)

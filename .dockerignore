@@ -16,4 +16,9 @@ web/gui/src/main/webapp/node_modules
 bazel-*
 target
 
+# Bazel 7 may auto-generate these in the working tree; the build runs with
+# --noenable_bzlmod (WORKSPACE path), so keep them out of the image context.
+MODULE.bazel
+MODULE.bazel.lock
+
 

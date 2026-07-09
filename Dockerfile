@@ -29,7 +29,7 @@ RUN apt-get update && apt-get install git-review -y ${BUILD_DEPS}
 # Install Bazelisk, which will download the version of bazel specified in
 # .bazelversion
 ARG TARGETOS TARGETARCH
-RUN curl -L -o bazelisk https://github.com/bazelbuild/bazelisk/releases/download/v1.20.0/bazelisk-linux-${TARGETARCH}
+RUN curl -L -o bazelisk https://github.com/bazelbuild/bazelisk/releases/download/v1.29.0/bazelisk-linux-${TARGETARCH}
 RUN chmod +x bazelisk && mv bazelisk /usr/bin
 
 # Copy in the source

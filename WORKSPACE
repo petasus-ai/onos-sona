@@ -1,9 +1,5 @@
 workspace(
     name = "org_onosproject_onos",
-    managed_directories = {
-        "@gui1_npm": ["tools/gui/node_modules"],
-        "@npm": ["web/gui2/node_modules"],
-    },
 )
 
 load("//tools/build/bazel:bazel_version.bzl", "check_bazel_version")
@@ -12,13 +8,12 @@ check_bazel_version()
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
-# It is necessary to explicitly load this version of bazel-skylib for the
-# GUI build with native bazel e.g. ts_web_test_suite or ts_library. If not specified
-# here an older version is pulled in by something else. It may be possible to update
-# this once other tools are updated
-BAZEL_SKYLIB_VERSION = "1.0.2"
+# bazel-skylib pinned to a Bazel 7-compatible release. The old 1.0.2 pin
+# registered a unittest toolchain that referenced the @bazel_tools//platforms
+# package removed in Bazel 7, breaking toolchain resolution for the whole build.
+BAZEL_SKYLIB_VERSION = "1.5.0"
 
-BAZEL_SKYLIB_SHA256 = "97e70364e9249702246c0e9444bccdc4b847bed1eb03c5a3ece4f83dfe6abc44"
+BAZEL_SKYLIB_SHA256 = "cd55a062e763b9349921f0f5db8c3933288dc8ba4f76dd9416aac68acee3cb94"
 
 http_archive(
     name = "bazel_skylib",
@@ -31,6 +26,26 @@ http_archive(
 load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
 
 bazel_skylib_workspace()
+
+# rules_java pinned to the same release Bazel 7.6.1 bundles as
+# @rules_java_builtin. Without this pin, protobuf_deps() below installs a 2019
+# snapshot of rules_java that predates the toolchains/ package. That breaks the
+# Docker build: local_java_repository() (appended there via WORKSPACE-docker)
+# generates a @dockerjdk repository whose BUILD file loads
+# "@rules_java//toolchains:local_java_repository.bzl". The pin must precede
+# protobuf_deps() — the first fetch of a repository during WORKSPACE evaluation
+# freezes it, so a later (re)definition would not take effect.
+RULES_JAVA_VERSION = "7.6.5"
+
+RULES_JAVA_SHA256 = "8afd053dd2a7b85a4f033584f30a7f1666c5492c56c76e04eec4428bdb2a86cf"
+
+http_archive(
+    name = "rules_java",
+    sha256 = RULES_JAVA_SHA256,
+    urls = [
+        "https://github.com/bazelbuild/rules_java/releases/download/%s/rules_java-%s.tar.gz" % (RULES_JAVA_VERSION, RULES_JAVA_VERSION),
+    ],
+)
 
 load("//tools/build/bazel:local_jar.bzl", "local_atomix", "local_jar", "local_yang_tools")
 
@@ -134,6 +149,22 @@ generate_topo_device()
 
 http_archive(
     name = "build_bazel_rules_nodejs",
+    # Bazel 7 removed the @bazel_tools//platforms package; its constraint values
+    # now live in @platforms//os and @platforms//cpu. rules_nodejs 2.3.2 still
+    # references the old labels in its node toolchain definitions, which breaks
+    # toolchain resolution for every build. Rewrite them to the @platforms labels.
+    patch_cmds = [
+        """
+        f=toolchains/node/BUILD.bazel
+        sed -e 's|@bazel_tools//platforms:osx|@platforms//os:osx|g' \
+            -e 's|@bazel_tools//platforms:linux|@platforms//os:linux|g' \
+            -e 's|@bazel_tools//platforms:windows|@platforms//os:windows|g' \
+            -e 's|@bazel_tools//platforms:x86_64|@platforms//cpu:x86_64|g' \
+            -e 's|@bazel_tools//platforms:aarch64|@platforms//cpu:aarch64|g' \
+            -e 's|@bazel_tools//platforms:s390x|@platforms//cpu:s390x|g' \
+            "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+        """,
+    ],
     sha256 = RULES_NODEJS_SHA256,
     urls = [
         "https://github.com/bazelbuild/rules_nodejs/releases/download/%s/rules_nodejs-%s.tar.gz" % (RULES_NODEJS_VERSION, RULES_NODEJS_VERSION),
@@ -219,11 +250,15 @@ http_archive(
     ],
 )
 
-load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
+load("@io_bazel_rules_go//go:deps.bzl", "go_rules_dependencies")
 
 go_rules_dependencies()
 
-go_register_toolchains()
+# NOTE: go_register_toolchains() is intentionally not called. rules_go v0.19.8
+# generates a @go_sdk whose toolchains reference the @bazel_tools//platforms
+# package that Bazel 7 removed, which breaks toolchain resolution for the whole
+# build. Go is only needed by the buildifier dev tooling (not part of the ONOS
+# deploy build), so we skip registering the Go toolchains entirely.
 
 GAZELLE_VERSION = "0.18.1"
 

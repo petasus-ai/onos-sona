@@ -268,6 +268,9 @@ public class OSGiWrapper {
 
             if (analyzer.isOk()) {
                 analyzer.getJar().setManifest(manifest);
+                // Strip Bazel's binary 0xCAFE zip "extra" field that bndlib would
+                // otherwise mangle into a malformed field rejected by JDK 17/21.
+                clearResourceExtras(analyzer.getJar());
                 if (analyzer.save(new File(outputJar), true)) {
                     log("Saved!\n");
                 } else {
@@ -346,6 +349,26 @@ public class OSGiWrapper {
             }
         }
         return inputJar + "new";
+    }
+
+    // Drops the zip "extra" field from every resource of the given bnd Jar.
+    //
+    // Bazel's JavaBuilder stamps a binary 0xCAFE "extra" field on jar entries.
+    // bndlib keeps a resource's extra field as a String (Resource.getExtra()),
+    // so when it writes the bundle it re-encodes those binary bytes through a
+    // charset and turns them into U+FFFD replacement bytes with a bogus declared
+    // length. Older JDKs tolerated the malformed field, but the CEN validation
+    // backported to JDK 17/21 makes java.util.zip reject the whole jar with
+    // "Invalid CEN header (invalid extra data field size...)" as soon as a
+    // downstream tool (another bnd wrap, the YANG compiler, ...) reads it off the
+    // classpath. Clearing the extra field before saving keeps the produced bundle
+    // jars clean and readable on every JDK; the marker carries no runtime meaning.
+    private static void clearResourceExtras(Jar jar) {
+        for (Resource resource : jar.getResources().values()) {
+            if (resource.getExtra() != null) {
+                resource.setExtra(null);
+            }
+        }
     }
 
     private boolean isWab() {
