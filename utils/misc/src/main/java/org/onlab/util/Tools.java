@@ -188,7 +188,11 @@ public abstract class Tools {
      */
     public static <T> T nullIsNotFound(T item, String message) {
         if (item == null) {
-            log.error(message);
+            // Not logged at error: a missing item is a normal, transient
+            // condition for some callers (e.g. OpenFlow messages racing
+            // device registration/removal). The thrown exception carries
+            // the message; callers decide whether it is worth reporting.
+            log.debug(message);
             throw new ItemNotFoundException(message);
         }
         return item;
@@ -206,7 +210,8 @@ public abstract class Tools {
      */
     public static <T> Set<T> emptyIsNotFound(Set<T> item, String message) {
         if (item == null || item.isEmpty()) {
-            log.error(message);
+            // See nullIsNotFound: the exception is the signal, not the log.
+            log.debug(message);
             throw new ItemNotFoundException(message);
         }
         return item;
