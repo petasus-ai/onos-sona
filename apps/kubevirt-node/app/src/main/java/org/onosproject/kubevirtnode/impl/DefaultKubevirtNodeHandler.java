@@ -166,8 +166,18 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
     /** Indicates whether auto-recover kubernetes node status on switch re-conn event. */
     private boolean autoRecovery = AUTO_RECOVERY_DEFAULT;
 
-    private final ExecutorService eventExecutor = newSingleThreadExecutor(
-            groupedThreads(this.getClass().getSimpleName(), "event-handler", log));
+    // Node bootstrap involves several blocking settle waits (see
+    // isInitStateDone / isDeviceCreatedStateDone). Running every node on one
+    // shared event thread serializes those waits across the whole cluster, so
+    // bootstrap work is striped by hostname: events of the same node are still
+    // processed in order on a single thread, while different nodes bootstrap
+    // in parallel. Device events are first resolved to their node on the
+    // dispatch executor so that every event of a node lands on the same stripe.
+    private static final int BOOTSTRAP_STRIPES = 8;
+
+    private final ExecutorService dispatchExecutor = newSingleThreadExecutor(
+            groupedThreads(this.getClass().getSimpleName(), "event-dispatcher", log));
+    private final ExecutorService[] bootstrapExecutors = createBootstrapExecutors();
 
     private final DeviceListener ovsdbListener = new InternalOvsdbListener();
     private final DeviceListener bridgeListener = new InternalBridgeListener();
@@ -197,7 +207,10 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
         deviceService.removeListener(ovsdbListener);
         componentConfigService.unregisterProperties(getClass(), false);
         leadershipService.withdraw(appId.name());
-        eventExecutor.shutdown();
+        dispatchExecutor.shutdown();
+        for (ExecutorService executor : bootstrapExecutors) {
+            executor.shutdown();
+        }
 
         log.info("Stopped");
     }
@@ -909,6 +922,27 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
         addOrRemoveSystemInterface(node, physicalDeviceId, portName, deviceService, false);
     }
 
+    private ExecutorService[] createBootstrapExecutors() {
+        ExecutorService[] executors = new ExecutorService[BOOTSTRAP_STRIPES];
+        for (int i = 0; i < BOOTSTRAP_STRIPES; i++) {
+            executors[i] = newSingleThreadExecutor(groupedThreads(
+                    this.getClass().getSimpleName(), "bootstrap-" + i, log));
+        }
+        return executors;
+    }
+
+    /**
+     * Runs the given task on the bootstrap stripe of the given hostname.
+     * Tasks of the same node are serialized on a single thread; tasks of
+     * different nodes may run in parallel.
+     *
+     * @param hostname kubevirt node hostname
+     * @param task     task to run
+     */
+    private void executeByHostname(String hostname, Runnable task) {
+        bootstrapExecutors[Math.floorMod(hostname.hashCode(), BOOTSTRAP_STRIPES)].execute(task);
+    }
+
     private KubevirtNode nodeByTunOrPhyBridge(DeviceId deviceId) {
         KubevirtNode node = nodeAdminService.nodeByTunBridge(deviceId);
         if (node == null) {
@@ -943,7 +977,7 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
             switch (event.type()) {
                 case DEVICE_AVAILABILITY_CHANGED:
                 case DEVICE_ADDED:
-                    eventExecutor.execute(() -> {
+                    dispatchExecutor.execute(() -> {
 
                         if (!isRelevantHelper()) {
                             return;
@@ -955,10 +989,16 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                             return;
                         }
 
-                        if (deviceService.isAvailable(device.id())) {
-                            log.debug("OVSDB {} detected", device.id());
-                            bootstrapNode(node);
-                        }
+                        executeByHostname(node.hostname(), () -> {
+                            if (!isRelevantHelper()) {
+                                return;
+                            }
+
+                            if (deviceService.isAvailable(device.id())) {
+                                log.debug("OVSDB {} detected", device.id());
+                                bootstrapNode(node);
+                            }
+                        });
                     });
                     break;
                 case PORT_ADDED:
@@ -996,14 +1036,35 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
             switch (event.type()) {
                 case DEVICE_AVAILABILITY_CHANGED:
                 case DEVICE_ADDED:
-                    eventExecutor.execute(() -> processDeviceAddition(device));
+                    dispatchExecutor.execute(() -> {
+                        KubevirtNode node = nodeAdminService.node(device.id());
+                        if (node == null) {
+                            return;
+                        }
+                        executeByHostname(node.hostname(),
+                                () -> processDeviceAddition(device, node));
+                    });
                     break;
                 case PORT_UPDATED:
                 case PORT_ADDED:
-                    eventExecutor.execute(() -> processPortAdditionOrUpdate(device, port));
+                    dispatchExecutor.execute(() -> {
+                        KubevirtNode node = nodeByTunOrPhyBridge(device.id());
+                        if (node == null) {
+                            return;
+                        }
+                        executeByHostname(node.hostname(),
+                                () -> processPortAdditionOrUpdate(device, port, node));
+                    });
                     break;
                 case PORT_REMOVED:
-                    eventExecutor.execute(() -> processPortRemoval(device, port));
+                    dispatchExecutor.execute(() -> {
+                        KubevirtNode node = nodeAdminService.node(device.id());
+                        if (node == null) {
+                            return;
+                        }
+                        executeByHostname(node.hostname(),
+                                () -> processPortRemoval(device, port, node));
+                    });
                     break;
                 case DEVICE_REMOVED:
                 default:
@@ -1012,13 +1073,8 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
             }
         }
 
-        void processDeviceAddition(Device device) {
+        void processDeviceAddition(Device device, KubevirtNode node) {
             if (!isRelevantHelper()) {
-                return;
-            }
-
-            KubevirtNode node = nodeAdminService.node(device.id());
-            if (node == null) {
                 return;
             }
 
@@ -1050,14 +1106,8 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
             }
         }
 
-        void processPortAdditionOrUpdate(Device device, Port port) {
+        void processPortAdditionOrUpdate(Device device, Port port, KubevirtNode node) {
             if (!isRelevantHelper()) {
-                return;
-            }
-
-            KubevirtNode node = nodeByTunOrPhyBridge(device.id());
-
-            if (node == null) {
                 return;
             }
 
@@ -1096,14 +1146,8 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
             }
         }
 
-        void processPortRemoval(Device device, Port port) {
+        void processPortRemoval(Device device, Port port, KubevirtNode node) {
             if (!isRelevantHelper()) {
-                return;
-            }
-
-            KubevirtNode node = nodeAdminService.node(device.id());
-
-            if (node == null) {
                 return;
             }
 
@@ -1133,11 +1177,11 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
             switch (event.type()) {
                 case KUBEVIRT_NODE_CREATED:
                 case KUBEVIRT_NODE_UPDATED:
-                    eventExecutor.execute(() -> {
+                    if (event.subject() == null) {
+                        return;
+                    }
+                    executeByHostname(event.subject().hostname(), () -> {
                         if (!isRelevantHelper()) {
-                            return;
-                        }
-                        if (event.subject() == null) {
                             return;
                         }
                         // Re-read from the store rather than trusting the event snapshot.
@@ -1155,7 +1199,7 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                     });
                     break;
                 case KUBEVIRT_NODE_REMOVED:
-                    eventExecutor.execute(() -> {
+                    executeByHostname(event.subject().hostname(), () -> {
                         if (!isRelevantHelper()) {
                             return;
                         }

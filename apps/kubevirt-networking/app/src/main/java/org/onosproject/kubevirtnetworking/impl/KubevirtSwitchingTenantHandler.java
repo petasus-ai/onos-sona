@@ -214,60 +214,107 @@ public class KubevirtSwitchingTenantHandler {
                 continue;
             }
 
-            PortNumber patchPortNumber = tunnelToTenantPort(deviceService, remoteNode, network);
-            if (patchPortNumber == null) {
-                log.warn("Patch port of tenant {} is not ready for node {}",
-                        network.segmentId(), remoteNode.hostname());
-                continue;
-            }
-
-            PortNumber tunnelPortNumber = tunnelPort(remoteNode, network);
-            if (tunnelPortNumber == null) {
-                log.warn("Tunnel port of tenant {} is not ready for node {}",
-                        network.segmentId(), remoteNode.hostname());
-                continue;
-            }
-
-            TrafficSelector.Builder sIpBuilder = DefaultTrafficSelector.builder()
-                    .matchInPort(patchPortNumber)
-                    .matchEthType(Ethernet.TYPE_IPV4)
-                    .matchIPDst(IpPrefix.valueOf(port.ipAddress(), 32));
-
-            TrafficSelector.Builder sArpBuilder = DefaultTrafficSelector.builder()
-                    .matchInPort(patchPortNumber)
-                    .matchEthType(Ethernet.TYPE_ARP)
-                    .matchArpTpa(Ip4Address.valueOf(port.ipAddress().toString()));
-
-            TrafficTreatment.Builder tBuilder = DefaultTrafficTreatment.builder()
-                    .setTunnelId(Long.parseLong(network.segmentId()))
-                    .extension(buildExtension(
-                            deviceService,
-                            remoteNode.tunBridge(),
-                            localNode.dataIp().getIp4Address()),
-                            remoteNode.tunBridge())
-                    .setOutput(tunnelPortNumber);
-
-            flowRuleService.setRule(
-                    appId,
-                    remoteNode.tunBridge(),
-                    sIpBuilder.build(),
-                    tBuilder.build(),
-                    PRIORITY_TUNNEL_RULE,
-                    TUNNEL_DEFAULT_TABLE,
-                    install);
-
-            flowRuleService.setRule(
-                    appId,
-                    remoteNode.tunBridge(),
-                    sArpBuilder.build(),
-                    tBuilder.build(),
-                    PRIORITY_TUNNEL_RULE,
-                    TUNNEL_DEFAULT_TABLE,
-                    install);
+            setEgressRule(port, network, localNode, remoteNode, install);
         }
 
         log.debug("Set egress rules for instance {}, segment ID {}",
                 port.ipAddress(), network.segmentId());
+    }
+
+    /**
+     * Installs the egress rules for the given port on the given remote node
+     * only. Used to (re)program a single node right after it completed its
+     * bootstrap, without touching the rest of the tunnel mesh.
+     *
+     * @param port       kubevirt port to reach
+     * @param remoteNode node whose tunnel bridge is programmed
+     * @param install    installation flag
+     */
+    private void setEgressRulesOnRemote(KubevirtPort port, KubevirtNode remoteNode, boolean install) {
+        if (port.ipAddress() == null) {
+            return;
+        }
+
+        KubevirtNetwork network = kubevirtNetworkService.network(port.networkId());
+
+        if (network == null) {
+            return;
+        }
+
+        if (network.type() == FLAT || network.type() == VLAN) {
+            return;
+        }
+
+        if (network.segmentId() == null) {
+            return;
+        }
+
+        KubevirtNode localNode = kubevirtNodeService.node(port.deviceId());
+
+        if (localNode == null || localNode.type() == MASTER) {
+            return;
+        }
+
+        if (remoteNode.hostname().equals(localNode.hostname())) {
+            return;
+        }
+
+        setEgressRule(port, network, localNode, remoteNode, install);
+    }
+
+    private void setEgressRule(KubevirtPort port, KubevirtNetwork network,
+                               KubevirtNode localNode, KubevirtNode remoteNode,
+                               boolean install) {
+        PortNumber patchPortNumber = tunnelToTenantPort(deviceService, remoteNode, network);
+        if (patchPortNumber == null) {
+            log.warn("Patch port of tenant {} is not ready for node {}",
+                    network.segmentId(), remoteNode.hostname());
+            return;
+        }
+
+        PortNumber tunnelPortNumber = tunnelPort(remoteNode, network);
+        if (tunnelPortNumber == null) {
+            log.warn("Tunnel port of tenant {} is not ready for node {}",
+                    network.segmentId(), remoteNode.hostname());
+            return;
+        }
+
+        TrafficSelector.Builder sIpBuilder = DefaultTrafficSelector.builder()
+                .matchInPort(patchPortNumber)
+                .matchEthType(Ethernet.TYPE_IPV4)
+                .matchIPDst(IpPrefix.valueOf(port.ipAddress(), 32));
+
+        TrafficSelector.Builder sArpBuilder = DefaultTrafficSelector.builder()
+                .matchInPort(patchPortNumber)
+                .matchEthType(Ethernet.TYPE_ARP)
+                .matchArpTpa(Ip4Address.valueOf(port.ipAddress().toString()));
+
+        TrafficTreatment.Builder tBuilder = DefaultTrafficTreatment.builder()
+                .setTunnelId(Long.parseLong(network.segmentId()))
+                .extension(buildExtension(
+                        deviceService,
+                        remoteNode.tunBridge(),
+                        localNode.dataIp().getIp4Address()),
+                        remoteNode.tunBridge())
+                .setOutput(tunnelPortNumber);
+
+        flowRuleService.setRule(
+                appId,
+                remoteNode.tunBridge(),
+                sIpBuilder.build(),
+                tBuilder.build(),
+                PRIORITY_TUNNEL_RULE,
+                TUNNEL_DEFAULT_TABLE,
+                install);
+
+        flowRuleService.setRule(
+                appId,
+                remoteNode.tunBridge(),
+                sArpBuilder.build(),
+                tBuilder.build(),
+                PRIORITY_TUNNEL_RULE,
+                TUNNEL_DEFAULT_TABLE,
+                install);
     }
 
     private class InternalKubevirtNodeListener implements KubevirtNodeListener {
@@ -301,6 +348,18 @@ public class KubevirtSwitchingTenantHandler {
                     .forEach(port -> {
                         setEgressRules(port, true);
                     });
+
+            // Also (re)program THIS node with the egress rules of the ports
+            // hosted by other nodes. When several nodes bootstrap concurrently,
+            // this node may not have been COMPLETE yet at the moment those
+            // ports were processed, so the rules pointing at them are missing
+            // here; without this mirror pass the tunnel mesh stays partially
+            // programmed regardless of the completion order.
+            if (node.type() == WORKER) {
+                kubevirtPortService.ports().stream()
+                        .filter(port -> !node.equals(kubevirtNodeService.node(port.deviceId())))
+                        .forEach(port -> setEgressRulesOnRemote(port, node, true));
+            }
         }
     }
 

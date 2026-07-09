@@ -79,9 +79,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnetworking.api.Constants.ACL_CT_TABLE;
 import static org.onosproject.kubevirtnetworking.api.Constants.ACL_EGRESS_TABLE;
@@ -108,7 +111,6 @@ import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.VLAN;
 import static org.onosproject.kubevirtnetworking.impl.OsgiPropertyConstants.USE_SECURITY_GROUP;
 import static org.onosproject.kubevirtnetworking.impl.OsgiPropertyConstants.USE_SECURITY_GROUP_DEFAULT;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.getPropertyValueAsBoolean;
-import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.waitFor;
 import static org.onosproject.kubevirtnetworking.util.RulePopulatorUtil.buildPortRangeMatches;
 import static org.onosproject.kubevirtnetworking.util.RulePopulatorUtil.computeCtMaskFlag;
 import static org.onosproject.kubevirtnetworking.util.RulePopulatorUtil.computeCtStateFlag;
@@ -132,6 +134,7 @@ public class KubevirtSecurityGroupHandler {
     private final Logger log = getLogger(getClass());
 
     private static final int VM_IP_PREFIX = 32;
+    private static final long NODE_COMPLETE_SETTLE_WAIT_S = 5;
 
     private static final String STR_NULL = "null";
     private static final String PROTO_ICMP = "ICMP";
@@ -216,6 +219,12 @@ public class KubevirtSecurityGroupHandler {
     private final ExecutorService eventExecutor = newSingleThreadExecutor(
             groupedThreads(this.getClass().getSimpleName(), "event-handler"));
 
+    // Used to delay the node-complete processing off the event executor, so
+    // that the settle waits of concurrently completing nodes overlap instead
+    // of serializing on the single event handler thread.
+    private final ScheduledExecutorService deferredExecutor = newSingleThreadScheduledExecutor(
+            groupedThreads(this.getClass().getSimpleName(), "deferred-event-handler"));
+
     private ApplicationId appId;
     private NodeId localNodeId;
 
@@ -239,6 +248,7 @@ public class KubevirtSecurityGroupHandler {
         deviceService.removeListener(bridgeListener);
         configService.unregisterProperties(getClass(), false);
         nodeService.removeListener(nodeListener);
+        deferredExecutor.shutdown();
         eventExecutor.shutdown();
 
         log.info("Stopped");
@@ -1158,7 +1168,15 @@ public class KubevirtSecurityGroupHandler {
         public void event(KubevirtNodeEvent event) {
             switch (event.type()) {
                 case KUBEVIRT_NODE_COMPLETE:
-                    eventExecutor.execute(() -> processNodeComplete(event.subject()));
+                    // FIXME: we wait all port get its deviceId updated
+                    // The settle wait is scheduled off the event thread and the
+                    // actual work then re-enters the single-threaded event
+                    // executor: handler-wide ordering is preserved, but the
+                    // waits of concurrently completing nodes overlap instead
+                    // of queueing up 5 seconds per node.
+                    deferredExecutor.schedule(() ->
+                            eventExecutor.execute(() -> processNodeComplete(event.subject())),
+                            NODE_COMPLETE_SETTLE_WAIT_S, TimeUnit.SECONDS);
                     break;
                 default:
                     break;
@@ -1169,9 +1187,6 @@ public class KubevirtSecurityGroupHandler {
             if (!isRelevantHelper()) {
                 return;
             }
-
-            // FIXME: we wait all port get its deviceId updated
-            waitFor(5);
 
             resetSecurityGroupRulesByNode(node);
         }

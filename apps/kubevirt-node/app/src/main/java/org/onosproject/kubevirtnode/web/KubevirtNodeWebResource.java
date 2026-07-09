@@ -18,6 +18,8 @@ package org.onosproject.kubevirtnode.web;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import org.onosproject.kubevirtnode.api.KubevirtApiConfig;
@@ -32,12 +34,14 @@ import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -45,6 +49,7 @@ import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
 import java.io.InputStream;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -82,6 +87,7 @@ public class KubevirtNodeWebResource extends AbstractWebResource {
 
     private static final int SLEEP_S = 1;     // we re-check the status on every 1s
     private static final long TIMEOUT_MS = 15000;
+    private static final long TIMEOUT_PER_EXTRA_NODE_MS = 5000;
 
     private static final String HOST_NAME = "hostname";
     private static final String ERROR_MESSAGE = " cannot be null";
@@ -265,16 +271,36 @@ public class KubevirtNodeWebResource extends AbstractWebResource {
     /**
      * Synchronizes the flow rules.
      *
+     * @param batchSize number of worker nodes to re-initialize concurrently
      * @return 200 OK with sync result, 404 not found
      */
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Path("sync/rules")
-    public Response syncRules() {
+    public Response syncRules(@QueryParam("batchSize") @DefaultValue("5") int batchSize) {
 
         KubevirtNodeAdminService service = get(KubevirtNodeAdminService.class);
 
-        service.completeNodes().forEach(node -> syncRulesBase(service, node));
+        int size = Math.max(1, batchSize);
+
+        // Gateway (and other non-worker) nodes keep the conservative
+        // one-by-one re-initialization; they are few, and re-initializing
+        // them concurrently churns the gateway election of every router.
+        service.completeNodes().stream()
+                .filter(node -> node.type() != WORKER)
+                .forEach(node -> syncRulesBatch(service, ImmutableList.of(node)));
+
+        // Worker nodes are re-initialized in batches: all nodes of a batch
+        // bootstrap in parallel, and the next batch starts once every node
+        // of the current batch became COMPLETE (or timed out).
+        List<KubevirtNode> workers = service.completeNodes().stream()
+                .filter(node -> node.type() == WORKER)
+                .collect(Collectors.toList());
+
+        for (List<KubevirtNode> batch : Lists.partition(workers, size)) {
+            syncRulesBatch(service, batch);
+        }
+
         return ok(mapper().createObjectNode()).build();
     }
 
@@ -332,28 +358,35 @@ public class KubevirtNodeWebResource extends AbstractWebResource {
         return ok(jsonResult).build();
     }
 
-    private void syncRulesBase(KubevirtNodeAdminService service, KubevirtNode node) {
-        KubevirtNode updated = node.updateState(INIT);
-        service.updateNode(updated);
+    private void syncRulesBatch(KubevirtNodeAdminService service, List<KubevirtNode> batch) {
+        batch.forEach(node -> service.updateNode(node.updateState(INIT)));
 
-        boolean result = true;
-        long timeoutExpiredMs = System.currentTimeMillis() + TIMEOUT_MS;
+        Set<String> pending = batch.stream()
+                .map(KubevirtNode::hostname).collect(Collectors.toSet());
+        long timeoutExpiredMs = System.currentTimeMillis() + TIMEOUT_MS +
+                (batch.size() - 1) * TIMEOUT_PER_EXTRA_NODE_MS;
 
-        while (service.node(node.hostname()).state() != COMPLETE) {
-            long  waitMs = timeoutExpiredMs - System.currentTimeMillis();
+        while (!pending.isEmpty()) {
+            pending.removeIf(hostname -> {
+                KubevirtNode node = service.node(hostname);
+                if (node != null && node.state() == COMPLETE) {
+                    log.info("Successfully synchronize flow rules for node {}!", hostname);
+                    return true;
+                }
+                return false;
+            });
 
-            waitFor(SLEEP_S);
-
-            if (waitMs <= 0) {
-                result = false;
+            if (pending.isEmpty()) {
                 break;
             }
-        }
 
-        if (result) {
-            log.info("Successfully synchronize flow rules for node {}!", node.hostname());
-        } else {
-            log.warn("Failed to synchronize flow rules for node {}.", node.hostname());
+            if (System.currentTimeMillis() >= timeoutExpiredMs) {
+                pending.forEach(hostname ->
+                        log.warn("Failed to synchronize flow rules for node {}.", hostname));
+                break;
+            }
+
+            waitFor(SLEEP_S);
         }
     }
 
