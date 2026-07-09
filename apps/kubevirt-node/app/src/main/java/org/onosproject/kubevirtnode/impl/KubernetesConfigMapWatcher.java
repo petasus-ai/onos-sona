@@ -44,8 +44,11 @@ import org.slf4j.Logger;
 
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnode.api.KubevirtNodeService.APP_ID;
 import static org.onosproject.kubevirtnode.util.KubevirtNodeUtil.k8sClient;
@@ -91,8 +94,12 @@ public class KubernetesConfigMapWatcher {
     private ApplicationId appId;
     private NodeId localNodeId;
 
+    private static final long RECONNECT_DELAY_S = 5;
+
     private final ExecutorService eventExecutor = newSingleThreadExecutor(
-            groupedThreads(this.getClass().getSimpleName(), "event-handler"));
+            groupedThreads(this.getClass().getSimpleName(), "event-handler", log));
+    private final ScheduledExecutorService reconnectExecutor = newSingleThreadScheduledExecutor(
+            groupedThreads(this.getClass().getSimpleName(), "watch-reconnect", log));
 
     private final InternalKubevirtApiConfigListener
             configListener = new InternalKubevirtApiConfigListener();
@@ -100,12 +107,23 @@ public class KubernetesConfigMapWatcher {
     private final InternalKubernetesConfigMapWatcher
             mapWatcher = new InternalKubernetesConfigMapWatcher();
 
+    // the client owning the currently active watch; closing it terminates the
+    // watch, so keeping exactly one instance prevents both duplicated watches
+    // and client (thread/connection pool) leaks on re-instantiation
+    private KubernetesClient client;
+
     @Activate
     protected void activate() {
         appId = coreService.registerApplication(APP_ID);
         localNodeId = clusterService.getLocalNode().id();
         leadershipService.runForLeadership(appId.name());
         configService.addListener(configListener);
+
+        // a restarted instance never sees the API config UPDATED event again,
+        // so establish the watch from the current config as well; every
+        // instance keeps a watch and the leader check in the event handlers
+        // decides who processes the events, which also covers leadership moves
+        eventExecutor.execute(this::instantiateWatcher);
 
         log.info("Started");
     }
@@ -115,22 +133,53 @@ public class KubernetesConfigMapWatcher {
     protected void deactivate() {
         configService.removeListener(configListener);
         leadershipService.withdraw(appId.name());
+        reconnectExecutor.shutdown();
         eventExecutor.shutdown();
+        closeClient();
 
         log.info("Stopped");
     }
 
+    private synchronized void closeClient() {
+        if (client != null) {
+            client.close();
+            client = null;
+        }
+    }
 
-    private void instantiateWatcher() {
+    private synchronized void instantiateWatcher() {
         KubevirtApiConfig config = configService.apiConfig();
         if (config == null) {
             return;
         }
-        KubernetesClient client = k8sClient(config);
 
-        if (client != null) {
-            client.configMaps().inNamespace(KUBE_SYSTEM).withName(KUBE_VIP).watch(mapWatcher);
+        closeClient();
+        client = k8sClient(config);
+
+        if (client == null) {
+            scheduleReconnect();
+            return;
         }
+
+        try {
+            // re-list before watching so that a config map change that
+            // happened while no watch was active is replayed
+            ConfigMap existing = client.configMaps()
+                    .inNamespace(KUBE_SYSTEM).withName(KUBE_VIP).get();
+            if (existing != null) {
+                mapWatcher.eventReceived(Watcher.Action.MODIFIED, existing);
+            }
+            client.configMaps().inNamespace(KUBE_SYSTEM).withName(KUBE_VIP).watch(mapWatcher);
+        } catch (Exception e) {
+            log.error("Failed to watch kube-vip config map, retrying in {}s",
+                    RECONNECT_DELAY_S, e);
+            scheduleReconnect();
+        }
+    }
+
+    private void scheduleReconnect() {
+        reconnectExecutor.schedule(this::instantiateWatcher,
+                RECONNECT_DELAY_S, TimeUnit.SECONDS);
     }
 
     private class InternalKubernetesConfigMapWatcher implements Watcher<ConfigMap> {
@@ -165,11 +214,13 @@ public class KubernetesConfigMapWatcher {
 
         @Override
         public void onClose(WatcherException e) {
-            // due to the bugs in fabric8, configmap watcher might be closed,
-            // we will re-instantiate the configmap watcher in this case
-            // FIXME: https://github.com/fabric8io/kubernetes-client/issues/2135
-            log.info("Configmap watcher OnClose, re-instantiate the configmap watcher...");
-            instantiateWatcher();
+            // the watch dies on API server restarts, resourceVersion expiry
+            // (HTTP 410) and fabric8 bugs; re-read and re-watch after a short
+            // delay so changes missed during the gap are replayed and a down
+            // API server does not turn this into a tight reconnect loop
+            log.warn("Configmap watcher closed, re-instantiating in {}s",
+                    RECONNECT_DELAY_S, e);
+            scheduleReconnect();
         }
 
         private void processAddOrMod(ConfigMap configMap) {
@@ -235,7 +286,8 @@ public class KubernetesConfigMapWatcher {
                 }
 
             } catch (IllegalArgumentException e) {
-                log.error("Exception occurred because of {}", e.toString());
+                log.error("Failed to parse kubernetes external LB config", e);
+                return null;
             }
 
             return lbConfigBuilder.build();

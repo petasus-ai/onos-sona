@@ -35,8 +35,11 @@ import org.slf4j.Logger;
 
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnode.api.KubevirtApiConfig.State.CONNECTED;
 import static org.onosproject.kubevirtnode.api.KubevirtApiConfigService.APP_ID;
@@ -66,8 +69,12 @@ public class DefaultKubevirtApiConfigHandler {
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected KubevirtNodeAdminService nodeAdminService;
 
+    private static final long RETRY_DELAY_S = 5;
+
     private final ExecutorService eventExecutor = newSingleThreadExecutor(
             groupedThreads(this.getClass().getSimpleName(), "event-handler", log));
+    private final ScheduledExecutorService retryExecutor = newSingleThreadScheduledExecutor(
+            groupedThreads(this.getClass().getSimpleName(), "config-retry", log));
 
     private final KubevirtApiConfigListener configListener = new InternalKubevirtApiConfigListener();
 
@@ -88,6 +95,7 @@ public class DefaultKubevirtApiConfigHandler {
     protected void deactivate() {
         configAdminService.removeListener(configListener);
         leadershipService.withdraw(appId.name());
+        retryExecutor.shutdown();
         eventExecutor.shutdown();
 
         log.info("Stopped");
@@ -100,8 +108,12 @@ public class DefaultKubevirtApiConfigHandler {
      * @return validity result
      */
     private boolean checkApiServerConfig(KubevirtApiConfig config) {
-        KubernetesClient k8sClient = k8sClient(config);
-        return k8sClient != null && k8sClient.getApiVersion() != null;
+        try (KubernetesClient k8sClient = k8sClient(config)) {
+            return k8sClient != null && k8sClient.getApiVersion() != null;
+        } catch (Exception e) {
+            log.warn("Failed to reach the kubernetes API server", e);
+            return false;
+        }
     }
 
     private class InternalKubevirtApiConfigListener implements KubevirtApiConfigListener {
@@ -129,6 +141,15 @@ public class DefaultKubevirtApiConfigHandler {
             if (checkApiServerConfig(config)) {
                 KubevirtApiConfig newConfig = config.updateState(CONNECTED);
                 configAdminService.updateApiConfig(newConfig);
+            } else {
+                // the API server may be briefly unreachable right after the
+                // config is posted; without a retry the config would stay
+                // DISCONNECTED forever, the UPDATED event would never fire,
+                // and no kubernetes watcher would ever be established
+                log.warn("API server config check failed, retrying in {}s", RETRY_DELAY_S);
+                retryExecutor.schedule(() ->
+                        eventExecutor.execute(() -> processConfigCreation(config)),
+                        RETRY_DELAY_S, TimeUnit.SECONDS);
             }
         }
     }

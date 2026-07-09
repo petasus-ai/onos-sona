@@ -38,8 +38,11 @@ import org.slf4j.Logger;
 
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnetworking.api.Constants.KUBEVIRT_NETWORKING_APP_ID;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.k8sClient;
@@ -72,7 +75,17 @@ public class KubevirtPodWatcher {
     protected KubevirtApiConfigService kubevirtApiConfigService;
 
     private final ExecutorService eventExecutor = newSingleThreadExecutor(
-            groupedThreads(this.getClass().getSimpleName(), "event-handler"));
+            groupedThreads(this.getClass().getSimpleName(), "event-handler", log));
+
+    private static final long RECONNECT_DELAY_S = 5;
+
+    private final ScheduledExecutorService reconnectExecutor = newSingleThreadScheduledExecutor(
+            groupedThreads(this.getClass().getSimpleName(), "watch-reconnect", log));
+
+    // the client owning the currently active watch; closing it terminates the
+    // watch, so keeping exactly one instance prevents both duplicated watches
+    // and client (thread/connection pool) leaks on re-instantiation
+    private KubernetesClient watchClient;
     private final Watcher<Pod> internalKubevirtPodWatcher = new InternalKubevirtPodWatcher();
     private final InternalKubevirtApiConfigListener
             internalKubevirtApiConfigListener = new InternalKubevirtApiConfigListener();
@@ -87,6 +100,12 @@ public class KubevirtPodWatcher {
         leadershipService.runForLeadership(appId.name());
         kubevirtApiConfigService.addListener(internalKubevirtApiConfigListener);
 
+        // a restarted instance never sees the API config UPDATED event again,
+        // so establish the watch from the current config as well; every
+        // instance keeps a watch and the leader check in the event handlers
+        // decides who processes the events, which also covers leadership moves
+        eventExecutor.execute(this::instantiatePodWatcher);
+
         log.info("Started");
     }
 
@@ -94,17 +113,41 @@ public class KubevirtPodWatcher {
     protected void deactivate() {
         kubevirtApiConfigService.removeListener(internalKubevirtApiConfigListener);
         leadershipService.withdraw(appId.name());
+        reconnectExecutor.shutdown();
         eventExecutor.shutdown();
+        closeWatchClient();
 
         log.info("Stopped");
     }
 
-    private void instantiatePodWatcher() {
-        KubernetesClient client = k8sClient(kubevirtApiConfigService);
+    private synchronized void instantiatePodWatcher() {
+        closeWatchClient();
+        watchClient = k8sClient(kubevirtApiConfigService);
 
-        if (client != null) {
-            client.pods().inAnyNamespace().watch(internalKubevirtPodWatcher);
+        if (watchClient == null) {
+            scheduleReconnect();
+            return;
         }
+
+        try {
+            watchClient.pods().inAnyNamespace().watch(internalKubevirtPodWatcher);
+        } catch (Exception e) {
+            log.error("Failed to instantiate watcher, retrying in {}s",
+                    RECONNECT_DELAY_S, e);
+            scheduleReconnect();
+        }
+    }
+
+    private synchronized void closeWatchClient() {
+        if (watchClient != null) {
+            watchClient.close();
+            watchClient = null;
+        }
+    }
+
+    private void scheduleReconnect() {
+        reconnectExecutor.schedule(this::instantiatePodWatcher,
+                RECONNECT_DELAY_S, TimeUnit.SECONDS);
     }
 
     private class InternalKubevirtApiConfigListener implements KubevirtApiConfigListener {
@@ -161,11 +204,12 @@ public class KubevirtPodWatcher {
 
         @Override
         public void onClose(WatcherException e) {
-            // due to the bugs in fabric8, pod watcher might be closed,
-            // we will re-instantiate the pod watcher in this case
-            // FIXME: https://github.com/fabric8io/kubernetes-client/issues/2135
-            log.info("Pod watcher OnClose, re-instantiate the POD watcher...");
-            instantiatePodWatcher();
+            // the watch dies on API server restarts, resourceVersion expiry
+            // (HTTP 410) and fabric8 bugs; re-watch after a short delay so a
+            // down API server does not turn this into a tight reconnect loop
+            log.warn("Watcher closed, re-instantiating in {}s",
+                    RECONNECT_DELAY_S, e);
+            scheduleReconnect();
         }
 
         private void processAddition(Pod pod) {

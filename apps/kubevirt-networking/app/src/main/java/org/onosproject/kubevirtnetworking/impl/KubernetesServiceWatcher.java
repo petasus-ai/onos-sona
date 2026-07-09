@@ -58,8 +58,11 @@ import org.slf4j.Logger;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnetworking.api.Constants.KUBEVIRT_NETWORKING_APP_ID;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.configMapUpdated;
@@ -110,7 +113,17 @@ public class KubernetesServiceWatcher {
     private static final String DEFAULT = "default";
 
     private final ExecutorService eventExecutor = newSingleThreadExecutor(
-            groupedThreads(this.getClass().getSimpleName(), "event-handler"));
+            groupedThreads(this.getClass().getSimpleName(), "event-handler", log));
+
+    private static final long RECONNECT_DELAY_S = 5;
+
+    private final ScheduledExecutorService reconnectExecutor = newSingleThreadScheduledExecutor(
+            groupedThreads(this.getClass().getSimpleName(), "watch-reconnect", log));
+
+    // the client owning the currently active watch; closing it terminates the
+    // watch, so keeping exactly one instance prevents both duplicated watches
+    // and client (thread/connection pool) leaks on re-instantiation
+    private KubernetesClient watchClient;
 
     private final InternalKubevirtApiConfigListener
             apiConfigListener = new InternalKubevirtApiConfigListener();
@@ -138,6 +151,12 @@ public class KubernetesServiceWatcher {
         lbConfigService.addListener(lbConfigListener);
         nodeService.addListener(nodeEventListener);
 
+        // a restarted instance never sees the API config UPDATED event again,
+        // so establish the watch from the current config as well; every
+        // instance keeps a watch and the leader check in the event handlers
+        // decides who processes the events, which also covers leadership moves
+        eventExecutor.execute(this::instantiateWatcher);
+
         log.info("Started");
     }
 
@@ -150,17 +169,41 @@ public class KubernetesServiceWatcher {
         lbConfigService.removeListener(lbConfigListener);
         nodeService.removeListener(nodeEventListener);
 
+        reconnectExecutor.shutdown();
         eventExecutor.shutdown();
+        closeWatchClient();
 
         log.info("Stopped");
     }
 
-    private void instantiateWatcher() {
-        KubernetesClient client = k8sClient(apiConfigService);
+    private synchronized void instantiateWatcher() {
+        closeWatchClient();
+        watchClient = k8sClient(apiConfigService);
 
-        if (client != null) {
-            client.services().inAnyNamespace().watch(serviceWatcher);
+        if (watchClient == null) {
+            scheduleReconnect();
+            return;
         }
+
+        try {
+            watchClient.services().inAnyNamespace().watch(serviceWatcher);
+        } catch (Exception e) {
+            log.error("Failed to instantiate watcher, retrying in {}s",
+                    RECONNECT_DELAY_S, e);
+            scheduleReconnect();
+        }
+    }
+
+    private synchronized void closeWatchClient() {
+        if (watchClient != null) {
+            watchClient.close();
+            watchClient = null;
+        }
+    }
+
+    private void scheduleReconnect() {
+        reconnectExecutor.schedule(this::instantiateWatcher,
+                RECONNECT_DELAY_S, TimeUnit.SECONDS);
     }
 
     private class InternalKubernetesExternalLbConfigListener
@@ -246,11 +289,12 @@ public class KubernetesServiceWatcher {
 
         @Override
         public void onClose(WatcherException e) {
-            // due to the bugs in fabric8, service watcher might be closed,
-            // we will re-instantiate the service watcher in this case
-            // FIXME: https://github.com/fabric8io/kubernetes-client/issues/2135
-            log.info("Service watcher OnClose, re-instantiate the Service watcher...");
-            instantiateWatcher();
+            // the watch dies on API server restarts, resourceVersion expiry
+            // (HTTP 410) and fabric8 bugs; re-watch after a short delay so a
+            // down API server does not turn this into a tight reconnect loop
+            log.warn("Watcher closed, re-instantiating in {}s",
+                    RECONNECT_DELAY_S, e);
+            scheduleReconnect();
         }
 
         private void processAddOrMod(Service service) {
@@ -302,15 +346,23 @@ public class KubernetesServiceWatcher {
 
     //When api config or configmap updated, check every prerequisite and update all external load balancers
     private void addOrUpdateExternalLoadBalancers() {
-        KubernetesClient client = k8sClient(apiConfigService);
+        try (KubernetesClient client = k8sClient(apiConfigService)) {
+            if (client == null) {
+                log.warn("Failed to get the kubernetes client, " +
+                        "skipping external LB refresh");
+                return;
+            }
 
-        client.services().inNamespace(DEFAULT).list()
-                .getItems().forEach(service -> {
-                    if (addOrUpdateExternalLoadBalancer(service) &&
-                            !isLoadBalancerStatusAlreadySet(service)) {
-                        serviceStatusUpdate(service);
-                    }
-                });
+            client.services().inNamespace(DEFAULT).list()
+                    .getItems().forEach(service -> {
+                        if (addOrUpdateExternalLoadBalancer(service) &&
+                                !isLoadBalancerStatusAlreadySet(service)) {
+                            serviceStatusUpdate(service);
+                        }
+                    });
+        } catch (Exception e) {
+            log.error("Failed to refresh external load balancers", e);
+        }
     }
 
     private boolean addOrUpdateExternalLoadBalancer(Service service) {
@@ -351,21 +403,29 @@ public class KubernetesServiceWatcher {
     }
 
     private void serviceStatusUpdate(Service service) {
-        KubernetesClient client = k8sClient(apiConfigService);
-
         String lbIp = service.getSpec().getLoadBalancerIP();
         if (lbIp == null) {
             return;
         }
 
-        LoadBalancerIngress lbIngress = new LoadBalancerIngress(KUBE_VIP, lbIp, Lists.newArrayList());
+        try (KubernetesClient client = k8sClient(apiConfigService)) {
+            if (client == null) {
+                return;
+            }
 
-        service.getStatus().getLoadBalancer().setIngress(Lists.newArrayList(lbIngress));
+            LoadBalancerIngress lbIngress = new LoadBalancerIngress(KUBE_VIP, lbIp, Lists.newArrayList());
 
-        //When a service is deleted, the event MODIFED is also along with DELETED event
-        //So filter out this MODIFIED events
-        if (client.services().withName(service.getMetadata().getName()) != null) {
-            client.services().patchStatus(service);
+            service.getStatus().getLoadBalancer().setIngress(Lists.newArrayList(lbIngress));
+
+            //When a service is deleted, the event MODIFIED is also along with DELETED event
+            //So filter out this MODIFIED events; note that withName() returns a
+            //resource handle, so the actual resource must be fetched via get()
+            if (client.services().withName(service.getMetadata().getName()).get() != null) {
+                client.services().patchStatus(service);
+            }
+        } catch (Exception e) {
+            log.error("Failed to update the status of service {}",
+                    service.getMetadata().getName(), e);
         }
     }
 

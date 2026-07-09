@@ -37,11 +37,13 @@ import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.slf4j.Logger;
 
-import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnetworking.api.Constants.KUBEVIRT_NETWORKING_APP_ID;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.k8sClient;
@@ -76,7 +78,17 @@ public class NetworkAttachmentDefinitionWatcher {
     protected KubevirtApiConfigService configService;
 
     private final ExecutorService eventExecutor = newSingleThreadExecutor(
-            groupedThreads(this.getClass().getSimpleName(), "event-handler"));
+            groupedThreads(this.getClass().getSimpleName(), "event-handler", log));
+
+    private static final long RECONNECT_DELAY_S = 5;
+
+    private final ScheduledExecutorService reconnectExecutor = newSingleThreadScheduledExecutor(
+            groupedThreads(this.getClass().getSimpleName(), "watch-reconnect", log));
+
+    // the client owning the currently active watch; closing it terminates the
+    // watch, so keeping exactly one instance prevents both duplicated watches
+    // and client (thread/connection pool) leaks on re-instantiation
+    private KubernetesClient watchClient;
 
     private final InternalNetworkAttachmentDefinitionWatcher
             watcher = new InternalNetworkAttachmentDefinitionWatcher();
@@ -101,6 +113,12 @@ public class NetworkAttachmentDefinitionWatcher {
         leadershipService.runForLeadership(appId.name());
         configService.addListener(configListener);
 
+        // a restarted instance never sees the API config UPDATED event again,
+        // so establish the watch from the current config as well; every
+        // instance keeps a watch and the leader check in the event handlers
+        // decides who processes the events, which also covers leadership moves
+        eventExecutor.execute(this::instantiateWatcher);
+
         log.info("Started");
     }
 
@@ -108,21 +126,41 @@ public class NetworkAttachmentDefinitionWatcher {
     protected void deactivate() {
         configService.removeListener(configListener);
         leadershipService.withdraw(appId.name());
+        reconnectExecutor.shutdown();
         eventExecutor.shutdown();
+        closeWatchClient();
 
         log.info("Stopped");
     }
 
-    private void instantiateWatcher() {
-        KubernetesClient client = k8sClient(configService);
+    private synchronized void instantiateWatcher() {
+        closeWatchClient();
+        watchClient = k8sClient(configService);
 
-        if (client != null) {
-            try {
-                client.customResource(nadCrdCxt).watch(watcher);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        if (watchClient == null) {
+            scheduleReconnect();
+            return;
         }
+
+        try {
+            watchClient.customResource(nadCrdCxt).watch(watcher);
+        } catch (Exception e) {
+            log.error("Failed to instantiate watcher, retrying in {}s",
+                    RECONNECT_DELAY_S, e);
+            scheduleReconnect();
+        }
+    }
+
+    private synchronized void closeWatchClient() {
+        if (watchClient != null) {
+            watchClient.close();
+            watchClient = null;
+        }
+    }
+
+    private void scheduleReconnect() {
+        reconnectExecutor.schedule(this::instantiateWatcher,
+                RECONNECT_DELAY_S, TimeUnit.SECONDS);
     }
 
     private class InternalKubevirtApiConfigListener implements KubevirtApiConfigListener {
@@ -180,12 +218,12 @@ public class NetworkAttachmentDefinitionWatcher {
 
         @Override
         public void onClose(WatcherException e) {
-            // due to the bugs in fabric8, the watcher might be closed,
-            // we will re-instantiate the watcher in this case
-            // FIXME: https://github.com/fabric8io/kubernetes-client/issues/2135
-            log.info("Network-attachment-definition watcher OnClose, re-instantiate the watcher...");
-
-            instantiateWatcher();
+            // the watch dies on API server restarts, resourceVersion expiry
+            // (HTTP 410) and fabric8 bugs; re-watch after a short delay so a
+            // down API server does not turn this into a tight reconnect loop
+            log.warn("Watcher closed, re-instantiating in {}s",
+                    RECONNECT_DELAY_S, e);
+            scheduleReconnect();
         }
 
         private void processAddition(String resource) {

@@ -40,8 +40,11 @@ import org.slf4j.Logger;
 
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnode.api.KubevirtNode.Type.GATEWAY;
 import static org.onosproject.kubevirtnode.api.KubevirtNode.Type.MASTER;
@@ -78,14 +81,23 @@ public class KubevirtNodeWatcher {
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected KubevirtApiConfigService kubevirtApiConfigService;
 
+    private static final long RECONNECT_DELAY_S = 5;
+
     private final ExecutorService eventExecutor = newSingleThreadExecutor(
-            groupedThreads(this.getClass().getSimpleName(), "event-handler"));
+            groupedThreads(this.getClass().getSimpleName(), "event-handler", log));
+    private final ScheduledExecutorService reconnectExecutor = newSingleThreadScheduledExecutor(
+            groupedThreads(this.getClass().getSimpleName(), "watch-reconnect", log));
     private final Watcher<Node> internalKubevirtNodeWatcher = new InternalKubevirtNodeWatcher();
     private final InternalKubevirtApiConfigListener
             internalKubevirtApiConfigListener = new InternalKubevirtApiConfigListener();
 
     private ApplicationId appId;
     private NodeId localNodeId;
+
+    // the client owning the currently active watch; closing it terminates the
+    // watch, so keeping exactly one instance prevents both duplicated watches
+    // and client (thread/connection pool) leaks on re-instantiation
+    private KubernetesClient client;
 
     @Activate
     protected void activate() {
@@ -94,6 +106,12 @@ public class KubevirtNodeWatcher {
         leadershipService.runForLeadership(appId.name());
         kubevirtApiConfigService.addListener(internalKubevirtApiConfigListener);
 
+        // a restarted instance never sees the API config UPDATED event again,
+        // so establish the watch from the current config as well; every
+        // instance keeps a watch and the leader check in the event handlers
+        // decides who processes the events, which also covers leadership moves
+        eventExecutor.execute(this::instantiateNodeWatcher);
+
         log.info("Started");
     }
 
@@ -101,21 +119,54 @@ public class KubevirtNodeWatcher {
     protected void deactivate() {
         kubevirtApiConfigService.removeListener(internalKubevirtApiConfigListener);
         leadershipService.withdraw(appId.name());
+        reconnectExecutor.shutdown();
         eventExecutor.shutdown();
+        closeClient();
 
         log.info("Stopped");
     }
 
-    private void instantiateNodeWatcher() {
+    private synchronized void closeClient() {
+        if (client != null) {
+            client.close();
+            client = null;
+        }
+    }
+
+    private synchronized void instantiateNodeWatcher() {
         KubevirtApiConfig config = kubevirtApiConfigService.apiConfig();
         if (config == null) {
             return;
         }
-        KubernetesClient client = k8sClient(config);
 
-        if (client != null) {
-            client.nodes().watch(internalKubevirtNodeWatcher);
+        closeClient();
+        client = k8sClient(config);
+
+        if (client == null) {
+            scheduleReconnect();
+            return;
         }
+
+        try {
+            // re-list before watching: node events that occurred while no
+            // watch was active (restart, reconnect window) are replayed here;
+            // additions/updates are idempotent, missed deletions are left to
+            // the operator rather than mass-removing nodes on a bad list
+            client.nodes().list().getItems().forEach(node -> {
+                internalKubevirtNodeWatcher.eventReceived(Watcher.Action.ADDED, node);
+                internalKubevirtNodeWatcher.eventReceived(Watcher.Action.MODIFIED, node);
+            });
+            client.nodes().watch(internalKubevirtNodeWatcher);
+        } catch (Exception e) {
+            log.error("Failed to watch kubernetes nodes, retrying in {}s",
+                    RECONNECT_DELAY_S, e);
+            scheduleReconnect();
+        }
+    }
+
+    private void scheduleReconnect() {
+        reconnectExecutor.schedule(this::instantiateNodeWatcher,
+                RECONNECT_DELAY_S, TimeUnit.SECONDS);
     }
 
     private class InternalKubevirtApiConfigListener implements KubevirtApiConfigListener {
@@ -173,11 +224,13 @@ public class KubevirtNodeWatcher {
 
         @Override
         public void onClose(WatcherException e) {
-            // due to the bugs in fabric8, node watcher might be closed,
-            // we will re-instantiate the node watcher in this case
-            // FIXME: https://github.com/fabric8io/kubernetes-client/issues/2135
-            log.info("Node watcher OnClose, re-instantiate the node watcher...");
-            instantiateNodeWatcher();
+            // the watch dies on API server restarts, resourceVersion expiry
+            // (HTTP 410) and fabric8 bugs; re-list and re-watch after a short
+            // delay so events missed during the gap are replayed and a down
+            // API server does not turn this into a tight reconnect loop
+            log.warn("Node watcher closed, re-instantiating in {}s",
+                    RECONNECT_DELAY_S, e);
+            scheduleReconnect();
         }
 
         private void processAddition(Node node) {

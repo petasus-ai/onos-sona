@@ -45,8 +45,11 @@ import org.slf4j.Logger;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnetworking.api.Constants.KUBEVIRT_NETWORKING_APP_ID;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.k8sClient;
@@ -79,8 +82,18 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected KubevirtApiConfigService configService;
 
+    private static final long RECONNECT_DELAY_S = 5;
+
     private final ExecutorService eventExecutor = newSingleThreadExecutor(
-            groupedThreads(this.getClass().getSimpleName(), "event-handler"));
+            groupedThreads(this.getClass().getSimpleName(), "event-handler", log));
+    private final ScheduledExecutorService reconnectExecutor = newSingleThreadScheduledExecutor(
+            groupedThreads(this.getClass().getSimpleName(), "watch-reconnect", log));
+
+    // the clients owning the currently active watches; closing them terminates
+    // the watches, so keeping exactly one instance per watch prevents both
+    // duplicated watches and client (thread/connection pool) leaks
+    private KubernetesClient sgWatchClient;
+    private KubernetesClient sgrWatchClient;
 
     private final InternalSecurityGroupWatcher
             sgWatcher = new InternalSecurityGroupWatcher();
@@ -115,6 +128,13 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
         leadershipService.runForLeadership(appId.name());
         configService.addListener(configListener);
 
+        // a restarted instance never sees the API config UPDATED event again,
+        // so establish the watches from the current config as well; every
+        // instance keeps a watch and the leader check in the event handlers
+        // decides who processes the events, which also covers leadership moves
+        eventExecutor.execute(this::instantiateSgWatcher);
+        eventExecutor.execute(this::instantiateSgrWatcher);
+
         log.info("Started");
     }
 
@@ -122,33 +142,72 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
     protected void deactivate() {
         configService.removeListener(configListener);
         leadershipService.withdraw(appId.name());
+        reconnectExecutor.shutdown();
         eventExecutor.shutdown();
+        closeSgWatchClient();
+        closeSgrWatchClient();
 
         log.info("Stopped");
     }
 
-    private void instantiateSgWatcher() {
-        KubernetesClient client = k8sClient(configService);
+    private synchronized void instantiateSgWatcher() {
+        closeSgWatchClient();
+        sgWatchClient = k8sClient(configService);
 
-        if (client != null) {
-            try {
-                client.customResource(securityGroupCrdCxt).watch(sgWatcher);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        if (sgWatchClient == null) {
+            scheduleSgReconnect();
+            return;
+        }
+
+        try {
+            sgWatchClient.customResource(securityGroupCrdCxt).watch(sgWatcher);
+        } catch (Exception e) {
+            log.error("Failed to instantiate security group watcher, retrying in {}s",
+                    RECONNECT_DELAY_S, e);
+            scheduleSgReconnect();
         }
     }
 
-    private void instantiateSgrWatcher() {
-        KubernetesClient client = k8sClient(configService);
+    private synchronized void instantiateSgrWatcher() {
+        closeSgrWatchClient();
+        sgrWatchClient = k8sClient(configService);
 
-        if (client != null) {
-            try {
-                client.customResource(securityGroupRuleCrdCxt).watch(sgrWatcher);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        if (sgrWatchClient == null) {
+            scheduleSgrReconnect();
+            return;
         }
+
+        try {
+            sgrWatchClient.customResource(securityGroupRuleCrdCxt).watch(sgrWatcher);
+        } catch (Exception e) {
+            log.error("Failed to instantiate security group rule watcher, retrying in {}s",
+                    RECONNECT_DELAY_S, e);
+            scheduleSgrReconnect();
+        }
+    }
+
+    private synchronized void closeSgWatchClient() {
+        if (sgWatchClient != null) {
+            sgWatchClient.close();
+            sgWatchClient = null;
+        }
+    }
+
+    private synchronized void closeSgrWatchClient() {
+        if (sgrWatchClient != null) {
+            sgrWatchClient.close();
+            sgrWatchClient = null;
+        }
+    }
+
+    private void scheduleSgReconnect() {
+        reconnectExecutor.schedule(this::instantiateSgWatcher,
+                RECONNECT_DELAY_S, TimeUnit.SECONDS);
+    }
+
+    private void scheduleSgrReconnect() {
+        reconnectExecutor.schedule(this::instantiateSgrWatcher,
+                RECONNECT_DELAY_S, TimeUnit.SECONDS);
     }
 
     private KubevirtSecurityGroup parseSecurityGroup(String resource) {
@@ -230,12 +289,12 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
 
         @Override
         public void onClose(WatcherException e) {
-            // due to the bugs in fabric8, the watcher might be closed,
-            // we will re-instantiate the watcher in this case
-            // FIXME: https://github.com/fabric8io/kubernetes-client/issues/2135
-            log.info("Security Group watcher OnClose, re-instantiate the watcher...");
-
-            instantiateSgWatcher();
+            // the watch dies on API server restarts, resourceVersion expiry
+            // (HTTP 410) and fabric8 bugs; re-watch after a short delay so a
+            // down API server does not turn this into a tight reconnect loop
+            log.warn("Security group watcher closed, re-instantiating in {}s",
+                    RECONNECT_DELAY_S, e);
+            scheduleSgReconnect();
         }
 
         private void processAddition(String resource) {
@@ -311,12 +370,12 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
 
         @Override
         public void onClose(WatcherException e) {
-            // due to the bugs in fabric8, the watcher might be closed,
-            // we will re-instantiate the watcher in this case
-            // FIXME: https://github.com/fabric8io/kubernetes-client/issues/2135
-            log.warn("Security Group Rule watcher OnClose, re-instantiate the watcher...");
-
-            instantiateSgrWatcher();
+            // the watch dies on API server restarts, resourceVersion expiry
+            // (HTTP 410) and fabric8 bugs; re-watch after a short delay so a
+            // down API server does not turn this into a tight reconnect loop
+            log.warn("Security group rule watcher closed, re-instantiating in {}s",
+                    RECONNECT_DELAY_S, e);
+            scheduleSgrReconnect();
         }
 
         private void processAddition(String resource) {

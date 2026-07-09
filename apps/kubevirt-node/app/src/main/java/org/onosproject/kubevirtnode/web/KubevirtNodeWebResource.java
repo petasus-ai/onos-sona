@@ -335,22 +335,29 @@ public class KubevirtNodeWebResource extends AbstractWebResource {
             result = OK;
         }
 
-        KubernetesClient client = k8sClient(config);
-        if (client != null) {
-            Set<String> k8sNodeNames = new HashSet<>();
-            client.nodes().list().getItems().forEach(n -> {
-                if (getNodeType(n) == WORKER) {
-                    k8sNodeNames.add(n.getMetadata().getName());
+        // the client is polled by liveness/readiness probes every few seconds;
+        // it must be closed after use and an unreachable API server must map
+        // to an "error" result instead of a 500 from an uncaught exception
+        try (KubernetesClient client = k8sClient(config)) {
+            if (client != null) {
+                Set<String> k8sNodeNames = new HashSet<>();
+                client.nodes().list().getItems().forEach(n -> {
+                    if (getNodeType(n) == WORKER) {
+                        k8sNodeNames.add(n.getMetadata().getName());
+                    }
+                });
+                Set<String> nodeNames = nodeService.nodes(WORKER).stream()
+                        .map(KubevirtNode::hostname).collect(Collectors.toSet());
+                if (!k8sNodeNames.containsAll(nodeNames)) {
+                    result = ERROR;
                 }
-            });
-            Set<String> nodeNames = nodeService.nodes(WORKER).stream()
-                    .map(KubevirtNode::hostname).collect(Collectors.toSet());
-            if (!k8sNodeNames.containsAll(nodeNames)) {
-                result = ERROR;
+                if (!nodeNames.containsAll(k8sNodeNames)) {
+                    result = ERROR;
+                }
             }
-            if (!nodeNames.containsAll(k8sNodeNames)) {
-                result = ERROR;
-            }
+        } catch (Exception e) {
+            log.warn("Failed to query kubernetes API server for health check", e);
+            result = ERROR;
         }
 
         ObjectNode jsonResult = mapper().createObjectNode();
