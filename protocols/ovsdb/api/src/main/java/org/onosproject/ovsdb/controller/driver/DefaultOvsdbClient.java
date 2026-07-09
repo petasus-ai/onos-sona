@@ -1549,9 +1549,6 @@ public class DefaultOvsdbClient implements OvsdbProviderService, OvsdbClientServ
         Bridge bridge = (Bridge) TableGenerator.
                 getTable(dbSchema, bridgeRow, OvsdbTable.BRIDGE);
 
-        //FIXME remove log
-        log.warn("type of controller column", bridge.getControllerColumn()
-                .data().getClass());
         Set<Uuid> controllerUuids = (Set<Uuid>) ((OvsdbSet) bridge
                 .getControllerColumn().data()).set();
 
