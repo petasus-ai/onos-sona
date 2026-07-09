@@ -498,7 +498,7 @@ public class KubevirtSecurityGroupHandler {
             RulePopulatorUtil.NiciraConnTrackTreatmentBuilder ctTreatmentBuilder =
                     niciraConnTrackTreatmentBuilder(driverService, deviceId)
                             .commit(true)
-                            .table((short)COMMON_FORWARDING_TABLE);
+                            .table((short) COMMON_FORWARDING_TABLE);
 
             tBuilder.extension(ctTreatmentBuilder.build(), deviceId);
         }
