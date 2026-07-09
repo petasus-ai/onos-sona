@@ -27,6 +27,26 @@ load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
 
 bazel_skylib_workspace()
 
+# rules_java pinned to the same release Bazel 7.6.1 bundles as
+# @rules_java_builtin. Without this pin, protobuf_deps() below installs a 2019
+# snapshot of rules_java that predates the toolchains/ package. That breaks the
+# Docker build: local_java_repository() (appended there via WORKSPACE-docker)
+# generates a @dockerjdk repository whose BUILD file loads
+# "@rules_java//toolchains:local_java_repository.bzl". The pin must precede
+# protobuf_deps() — the first fetch of a repository during WORKSPACE evaluation
+# freezes it, so a later (re)definition would not take effect.
+RULES_JAVA_VERSION = "7.6.5"
+
+RULES_JAVA_SHA256 = "8afd053dd2a7b85a4f033584f30a7f1666c5492c56c76e04eec4428bdb2a86cf"
+
+http_archive(
+    name = "rules_java",
+    sha256 = RULES_JAVA_SHA256,
+    urls = [
+        "https://github.com/bazelbuild/rules_java/releases/download/%s/rules_java-%s.tar.gz" % (RULES_JAVA_VERSION, RULES_JAVA_VERSION),
+    ],
+)
+
 load("//tools/build/bazel:local_jar.bzl", "local_atomix", "local_jar", "local_yang_tools")
 
 # Use this to build against locally built arbitrary 3rd party artifacts
