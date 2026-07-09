@@ -43,7 +43,6 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnode.api.KubevirtApiConfigEvent.Type.KUBEVIRT_API_CONFIG_CREATED;
@@ -111,21 +110,20 @@ public class DistributedKubevirtApiConfigStore
     @Override
     public void createApiConfig(KubevirtApiConfig config) {
         String key = endpoint(config);
-        apiConfigStore.compute(key, (endpoint, existing) -> {
-            final String error = key + ERR_DUPLICATE;
-            checkArgument(existing == null, error);
-            return config;
-        });
+        Versioned<KubevirtApiConfig> existing = apiConfigStore.putIfAbsent(key, config);
+        if (existing != null && !config.equals(existing.value())) {
+            throw new IllegalArgumentException(key + ERR_DUPLICATE);
+        }
     }
 
     @Override
     public void updateApiConfig(KubevirtApiConfig config) {
         String key = endpoint(config);
-        apiConfigStore.compute(key, (endpoint, existing) -> {
-            final String error = key + ERR_NOT_FOUND;
-            checkArgument(existing != null, error);
-            return config;
-        });
+        Versioned<KubevirtApiConfig> result =
+                apiConfigStore.computeIfPresent(key, (endpoint, existing) -> config);
+        if (result == null) {
+            throw new IllegalArgumentException(key + ERR_NOT_FOUND);
+        }
     }
 
     @Override

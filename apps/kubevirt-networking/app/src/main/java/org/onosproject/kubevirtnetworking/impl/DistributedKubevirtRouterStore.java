@@ -52,7 +52,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnetworking.api.KubevirtRouterEvent.Type.KUBEVIRT_FLOATING_IP_ASSOCIATED;
@@ -156,20 +155,19 @@ public class DistributedKubevirtRouterStore
 
     @Override
     public void createRouter(KubevirtRouter router) {
-        routerStore.compute(router.id(), (id, existing) -> {
-            final String error = router.id() + ERR_DUPLICATE;
-            checkArgument(existing == null, error);
-            return router;
-        });
+        Versioned<KubevirtRouter> existing = routerStore.putIfAbsent(router.id(), router);
+        if (existing != null && !router.equals(existing.value())) {
+            throw new IllegalArgumentException(router.id() + ERR_DUPLICATE);
+        }
     }
 
     @Override
     public void updateRouter(KubevirtRouter router) {
-        routerStore.compute(router.id(), (id, existing) -> {
-            final String error = router.id() + ERR_NOT_FOUND;
-            checkArgument(existing != null, error);
-            return router;
-        });
+        Versioned<KubevirtRouter> result =
+                routerStore.computeIfPresent(router.id(), (id, existing) -> router);
+        if (result == null) {
+            throw new IllegalArgumentException(router.id() + ERR_NOT_FOUND);
+        }
     }
 
     @Override
@@ -194,20 +192,19 @@ public class DistributedKubevirtRouterStore
 
     @Override
     public void createFloatingIp(KubevirtFloatingIp floatingIp) {
-        fipStore.compute(floatingIp.id(), (id, existing) -> {
-            final String error = floatingIp.id() + ERR_DUPLICATE;
-            checkArgument(existing == null, error);
-            return floatingIp;
-        });
+        Versioned<KubevirtFloatingIp> existing = fipStore.putIfAbsent(floatingIp.id(), floatingIp);
+        if (existing != null && !floatingIp.equals(existing.value())) {
+            throw new IllegalArgumentException(floatingIp.id() + ERR_DUPLICATE);
+        }
     }
 
     @Override
     public void updateFloatingIp(KubevirtFloatingIp floatingIp) {
-        fipStore.compute(floatingIp.id(), (id, existing) -> {
-            final String error = floatingIp.id() + ERR_NOT_FOUND;
-            checkArgument(existing != null, error);
-            return floatingIp;
-        });
+        Versioned<KubevirtFloatingIp> result =
+                fipStore.computeIfPresent(floatingIp.id(), (id, existing) -> floatingIp);
+        if (result == null) {
+            throw new IllegalArgumentException(floatingIp.id() + ERR_NOT_FOUND);
+        }
     }
 
     @Override

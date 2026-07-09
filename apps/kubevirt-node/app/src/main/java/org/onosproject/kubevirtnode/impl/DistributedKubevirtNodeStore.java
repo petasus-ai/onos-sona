@@ -48,7 +48,6 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnode.api.KubevirtNodeEvent.Type.KUBEVIRT_NODE_COMPLETE;
@@ -121,20 +120,19 @@ public class DistributedKubevirtNodeStore
 
     @Override
     public void createNode(KubevirtNode node) {
-        nodeStore.compute(node.hostname(), (hostname, existing) -> {
-            final String error = node.hostname() + ERR_DUPLICATE;
-            checkArgument(existing == null, error);
-            return node;
-        });
+        Versioned<KubevirtNode> existing = nodeStore.putIfAbsent(node.hostname(), node);
+        if (existing != null && !node.equals(existing.value())) {
+            throw new IllegalArgumentException(node.hostname() + ERR_DUPLICATE);
+        }
     }
 
     @Override
     public void updateNode(KubevirtNode node) {
-        nodeStore.compute(node.hostname(), (hostname, existing) -> {
-            final String error = node.hostname() + ERR_NOT_FOUND;
-            checkArgument(existing != null, error);
-            return node;
-        });
+        Versioned<KubevirtNode> result =
+                nodeStore.computeIfPresent(node.hostname(), (hostname, existing) -> node);
+        if (result == null) {
+            throw new IllegalArgumentException(node.hostname() + ERR_NOT_FOUND);
+        }
     }
 
     @Override

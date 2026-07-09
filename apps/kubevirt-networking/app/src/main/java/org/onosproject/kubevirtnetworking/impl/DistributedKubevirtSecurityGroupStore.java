@@ -46,7 +46,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnetworking.api.KubevirtSecurityGroupEvent.Type.KUBEVIRT_SECURITY_GROUP_CREATED;
@@ -114,20 +113,19 @@ public class DistributedKubevirtSecurityGroupStore
 
     @Override
     public void createSecurityGroup(KubevirtSecurityGroup sg) {
-        sgStore.compute(sg.id(), (id, existing) -> {
-            final String error = sg.id() + ERR_DUPLICATE;
-            checkArgument(existing == null, error);
-            return sg;
-        });
+        Versioned<KubevirtSecurityGroup> existing = sgStore.putIfAbsent(sg.id(), sg);
+        if (existing != null && !sg.equals(existing.value())) {
+            throw new IllegalArgumentException(sg.id() + ERR_DUPLICATE);
+        }
     }
 
     @Override
     public void updateSecurityGroup(KubevirtSecurityGroup sg) {
-        sgStore.compute(sg.id(), (id, existing) -> {
-            final String error = sg.id() + ERR_NOT_FOUND;
-            checkArgument(existing != null, error);
-            return sg;
-        });
+        Versioned<KubevirtSecurityGroup> result =
+                sgStore.computeIfPresent(sg.id(), (id, existing) -> sg);
+        if (result == null) {
+            throw new IllegalArgumentException(sg.id() + ERR_NOT_FOUND);
+        }
     }
 
     @Override

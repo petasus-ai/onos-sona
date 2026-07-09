@@ -45,7 +45,6 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnode.api.KubernetesExternalLbConfigEvent.Type.KUBERNETES_EXTERNAL_LB_CONFIG_CREATED;
@@ -113,27 +112,27 @@ public class DistributedKubernetesExternalLbConfigStore
 
     @Override
     public void createExternalLbConfig(KubernetesExternalLbConfig lbConfig) {
-        lbConfigStore.compute(lbConfig.configName(), (configName, existing) -> {
-            final String error = lbConfig.configName() + ERR_DUPLICATE;
-            checkArgument(existing == null, error);
-            return lbConfig;
-        });
+        Versioned<KubernetesExternalLbConfig> existing =
+                lbConfigStore.putIfAbsent(lbConfig.configName(), lbConfig);
+        if (existing != null && !lbConfig.equals(existing.value())) {
+            throw new IllegalArgumentException(lbConfig.configName() + ERR_DUPLICATE);
+        }
     }
 
     @Override
     public void updateExternalLbConfig(KubernetesExternalLbConfig lbConfig) {
-        lbConfigStore.compute(lbConfig.configName(), (configName, existing) -> {
-            final String error = lbConfig.configName() + ERR_NOT_FOUND;
-            checkArgument(existing != null, error);
-
-            if (lbConfig.equals(existing) && lbConfig.loadBalancerGwMac() == null &&
-                    existing.loadBalancerGwMac() != null) {
-                return existing;
-            } else {
-                return lbConfig;
-            }
-
-        });
+        Versioned<KubernetesExternalLbConfig> result =
+                lbConfigStore.computeIfPresent(lbConfig.configName(), (configName, existing) -> {
+                    if (lbConfig.equals(existing) && lbConfig.loadBalancerGwMac() == null &&
+                            existing.loadBalancerGwMac() != null) {
+                        return existing;
+                    } else {
+                        return lbConfig;
+                    }
+                });
+        if (result == null) {
+            throw new IllegalArgumentException(lbConfig.configName() + ERR_NOT_FOUND);
+        }
     }
 
     @Override
