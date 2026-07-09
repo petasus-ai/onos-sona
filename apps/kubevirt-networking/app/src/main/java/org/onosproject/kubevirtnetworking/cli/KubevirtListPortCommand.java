@@ -31,11 +31,12 @@ import org.onosproject.kubevirtnetworking.api.KubevirtPortService;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_IP_ADDRESSES_LENGTH;
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_MAC_ADDRESS_LENGTH;
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_MARGIN_LENGTH;
-import static org.onosproject.kubevirtnetworking.api.Constants.CLI_NAME_LENGTH;
+import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.genColumnLength;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.genFormatString;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.prettyJson;
 
@@ -58,12 +59,17 @@ public class KubevirtListPortCommand extends AbstractShellCommand {
         List<KubevirtPort> ports = Lists.newArrayList(service.ports());
         ports.sort(Comparator.comparing(KubevirtPort::networkId));
 
-        String format = genFormatString(ImmutableList.of(CLI_NAME_LENGTH,
-                CLI_NAME_LENGTH, CLI_MAC_ADDRESS_LENGTH, CLI_IP_ADDRESSES_LENGTH));
-
         if (!Strings.isNullOrEmpty(networkId)) {
             ports.removeIf(port -> !port.networkId().equals(networkId));
         }
+
+        int vmNameLength = genColumnLength("VM Name", ports.stream()
+                .map(KubevirtPort::vmName).collect(Collectors.toList()));
+        int networkLength = genColumnLength("Network", ports.stream()
+                .map(KubevirtPort::networkId).collect(Collectors.toList()));
+
+        String format = genFormatString(ImmutableList.of(vmNameLength,
+                networkLength, CLI_MAC_ADDRESS_LENGTH, CLI_IP_ADDRESSES_LENGTH));
 
         if (outputJson()) {
             print("%s", json(ports));
@@ -71,10 +77,8 @@ public class KubevirtListPortCommand extends AbstractShellCommand {
             print(format, "VM Name", "Network", "MAC Address", "Fixed IPs");
             for (KubevirtPort port: ports) {
                 print(format,
-                        StringUtils.substring(port.vmName(), 0,
-                                CLI_NAME_LENGTH - CLI_MARGIN_LENGTH),
-                        StringUtils.substring(port.networkId(), 0,
-                                CLI_NAME_LENGTH - CLI_MARGIN_LENGTH),
+                        port.vmName(),
+                        port.networkId(),
                         StringUtils.substring(port.macAddress().toString(), 0,
                                 CLI_MAC_ADDRESS_LENGTH - CLI_MARGIN_LENGTH),
                         port.ipAddress() == null ? "" : port.ipAddress());

@@ -28,13 +28,14 @@ import org.onosproject.kubevirtnetworking.api.KubevirtNetworkService;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_ID_LENGTH;
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_IP_ADDRESS_LENGTH;
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_MARGIN_LENGTH;
-import static org.onosproject.kubevirtnetworking.api.Constants.CLI_NAME_LENGTH;
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_SEG_ID_LENGTH;
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_TYPE_LENGTH;
+import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.genColumnLength;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.genFormatString;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.prettyJson;
 
@@ -51,7 +52,10 @@ public class KubevirtListNetworkCommand extends AbstractShellCommand {
         List<KubevirtNetwork> networks = Lists.newArrayList(service.networks());
         networks.sort(Comparator.comparing(KubevirtNetwork::name));
 
-        String format = genFormatString(ImmutableList.of(CLI_ID_LENGTH, CLI_NAME_LENGTH,
+        int nameLength = genColumnLength("Name", networks.stream()
+                .map(KubevirtNetwork::name).collect(Collectors.toList()));
+
+        String format = genFormatString(ImmutableList.of(CLI_ID_LENGTH, nameLength,
                 CLI_TYPE_LENGTH, CLI_SEG_ID_LENGTH, CLI_IP_ADDRESS_LENGTH));
 
         if (outputJson()) {
@@ -63,8 +67,7 @@ public class KubevirtListNetworkCommand extends AbstractShellCommand {
                 print(format,
                         StringUtils.substring(net.networkId(),
                                 0, CLI_ID_LENGTH - CLI_MARGIN_LENGTH),
-                        StringUtils.substring(net.name(),
-                                0, CLI_NAME_LENGTH - CLI_MARGIN_LENGTH),
+                        net.name(),
                         net.type().toString(),
                         net.segmentId() == null ? "N/A" : net.segmentId(),
                         net.gatewayIp() == null ? "N/A" : net.gatewayIp().toString());

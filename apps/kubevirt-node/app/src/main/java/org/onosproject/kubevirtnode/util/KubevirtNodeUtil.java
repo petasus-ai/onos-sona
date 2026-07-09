@@ -55,6 +55,7 @@ import org.xbill.DNS.Address;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Collection;
 import java.util.Dictionary;
 import java.util.HashSet;
 import java.util.List;
@@ -64,6 +65,7 @@ import java.util.stream.Collectors;
 
 import static org.onlab.util.Tools.get;
 import static org.onosproject.kubevirtnode.api.Constants.CALICO_PROJECT_DOMAIN;
+import static org.onosproject.kubevirtnode.api.Constants.CLI_MARGIN_LENGTH;
 import static org.onosproject.kubevirtnode.api.Constants.SONA_PROJECT_DOMAIN;
 import static org.onosproject.kubevirtnode.api.KubevirtNode.Type.GATEWAY;
 import static org.onosproject.kubevirtnode.api.KubevirtNode.Type.MASTER;
@@ -184,6 +186,24 @@ public final class KubevirtNodeUtil {
             fsb.append("s");
         });
         return fsb.toString();
+    }
+
+    /**
+     * Generates a CLI column length based on the longest string among the
+     * given column header and values, with the CLI margin appended.
+     *
+     * @param header column header
+     * @param values column values
+     * @return column length
+     */
+    public static int genColumnLength(String header, Collection<String> values) {
+        int length = header == null ? 0 : header.length();
+        for (String value : values) {
+            if (value != null && value.length() > length) {
+                length = value.length();
+            }
+        }
+        return length + CLI_MARGIN_LENGTH;
     }
 
     /**

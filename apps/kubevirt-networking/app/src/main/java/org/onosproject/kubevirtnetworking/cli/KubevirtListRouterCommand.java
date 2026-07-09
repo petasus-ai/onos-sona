@@ -29,13 +29,14 @@ import org.onosproject.kubevirtnetworking.api.KubevirtRouterService;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_FLAG_LENGTH;
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_ID_LENGTH;
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_IP_ADDRESSES_LENGTH;
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_IP_ADDRESS_LENGTH;
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_MARGIN_LENGTH;
-import static org.onosproject.kubevirtnetworking.api.Constants.CLI_NAME_LENGTH;
+import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.genColumnLength;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.genFormatString;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.prettyJson;
 
@@ -53,8 +54,14 @@ public class KubevirtListRouterCommand extends AbstractShellCommand {
         List<KubevirtRouter> routers = Lists.newArrayList(service.routers());
         routers.sort(Comparator.comparing(KubevirtRouter::name));
 
-        String format = genFormatString(ImmutableList.of(CLI_ID_LENGTH, CLI_NAME_LENGTH,
-                CLI_FLAG_LENGTH, CLI_IP_ADDRESSES_LENGTH, CLI_IP_ADDRESS_LENGTH, CLI_NAME_LENGTH));
+        int nameLength = genColumnLength("Name", routers.stream()
+                .map(KubevirtRouter::name).collect(Collectors.toList()));
+        int gwNodeLength = genColumnLength("GatewayNode", routers.stream()
+                .map(r -> r.electedGateway() == null ? "N/A" : r.electedGateway())
+                .collect(Collectors.toList()));
+
+        String format = genFormatString(ImmutableList.of(CLI_ID_LENGTH, nameLength,
+                CLI_FLAG_LENGTH, CLI_IP_ADDRESSES_LENGTH, CLI_IP_ADDRESS_LENGTH, gwNodeLength));
 
         if (outputJson()) {
             print("%s", json(routers));
@@ -72,16 +79,14 @@ public class KubevirtListRouterCommand extends AbstractShellCommand {
 
                 print(format, StringUtils.substring(router.id(), 0,
                                 CLI_ID_LENGTH - CLI_MARGIN_LENGTH),
-                        StringUtils.substring(router.name(), 0,
-                        CLI_NAME_LENGTH - CLI_MARGIN_LENGTH),
+                        router.name(),
                         StringUtils.substring(String.valueOf(router.enableSnat()), 0,
                                 CLI_FLAG_LENGTH - CLI_MARGIN_LENGTH),
                         StringUtils.substring(internal, 0,
                                 CLI_IP_ADDRESSES_LENGTH - CLI_MARGIN_LENGTH),
                         StringUtils.substring(external, 0,
                                 CLI_IP_ADDRESS_LENGTH - CLI_MARGIN_LENGTH),
-                        StringUtils.substring(gwNode, 0,
-                                CLI_NAME_LENGTH - CLI_MARGIN_LENGTH)
+                        gwNode
                 );
             }
         }

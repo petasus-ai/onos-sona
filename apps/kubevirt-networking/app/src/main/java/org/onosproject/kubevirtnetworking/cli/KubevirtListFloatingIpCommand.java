@@ -28,10 +28,11 @@ import org.onosproject.kubevirtnetworking.api.KubevirtRouterService;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_IP_ADDRESS_LENGTH;
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_MARGIN_LENGTH;
-import static org.onosproject.kubevirtnetworking.api.Constants.CLI_NAME_LENGTH;
+import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.genColumnLength;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.genFormatString;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.prettyJson;
 
@@ -49,8 +50,17 @@ public class KubevirtListFloatingIpCommand extends AbstractShellCommand {
         List<KubevirtFloatingIp> fips = Lists.newArrayList(service.floatingIps());
         fips.sort(Comparator.comparing(KubevirtFloatingIp::networkName));
 
-        String format = genFormatString(ImmutableList.of(CLI_NAME_LENGTH,
-                CLI_IP_ADDRESS_LENGTH, CLI_NAME_LENGTH, CLI_NAME_LENGTH, CLI_IP_ADDRESS_LENGTH));
+        int networkNameLength = genColumnLength("Network Name", fips.stream()
+                .map(KubevirtFloatingIp::networkName).collect(Collectors.toList()));
+        int podNameLength = genColumnLength("POD Name", fips.stream()
+                .map(f -> f.podName() == null ? "N/A" : f.podName())
+                .collect(Collectors.toList()));
+        int vmNameLength = genColumnLength("VM Name", fips.stream()
+                .map(f -> f.vmName() == null ? "N/A" : f.vmName())
+                .collect(Collectors.toList()));
+
+        String format = genFormatString(ImmutableList.of(networkNameLength,
+                CLI_IP_ADDRESS_LENGTH, podNameLength, vmNameLength, CLI_IP_ADDRESS_LENGTH));
 
         if (outputJson()) {
             print("%s", json(fips));
@@ -62,14 +72,11 @@ public class KubevirtListFloatingIpCommand extends AbstractShellCommand {
                 String podName = fip.podName() == null ? "N/A" : fip.podName();
                 String vmName = fip.vmName() == null ? "N/A" : fip.vmName();
 
-                print(format, StringUtils.substring(fip.networkName(), 0,
-                        CLI_NAME_LENGTH - CLI_MARGIN_LENGTH),
+                print(format, fip.networkName(),
                         StringUtils.substring(fip.floatingIp().toString(), 0,
                                 CLI_IP_ADDRESS_LENGTH - CLI_MARGIN_LENGTH),
-                        StringUtils.substring(podName, 0,
-                                CLI_NAME_LENGTH - CLI_MARGIN_LENGTH),
-                        StringUtils.substring(vmName, 0,
-                                CLI_NAME_LENGTH - CLI_MARGIN_LENGTH),
+                        podName,
+                        vmName,
                         StringUtils.substring(fixedIp, 0,
                                 CLI_IP_ADDRESS_LENGTH - CLI_MARGIN_LENGTH)
                 );

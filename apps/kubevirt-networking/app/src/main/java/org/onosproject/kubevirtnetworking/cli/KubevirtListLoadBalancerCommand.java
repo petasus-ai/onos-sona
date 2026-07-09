@@ -28,12 +28,13 @@ import org.onosproject.kubevirtnetworking.api.KubevirtLoadBalancerService;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_ID_LENGTH;
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_IP_ADDRESSES_LENGTH;
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_IP_ADDRESS_LENGTH;
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_MARGIN_LENGTH;
-import static org.onosproject.kubevirtnetworking.api.Constants.CLI_NAME_LENGTH;
+import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.genColumnLength;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.genFormatString;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.prettyJson;
 
@@ -50,7 +51,12 @@ public class KubevirtListLoadBalancerCommand extends AbstractShellCommand {
         List<KubevirtLoadBalancer> lbs = Lists.newArrayList(service.loadBalancers());
         lbs.sort(Comparator.comparing(KubevirtLoadBalancer::name));
 
-        String format = genFormatString(ImmutableList.of(CLI_ID_LENGTH, CLI_NAME_LENGTH, CLI_NAME_LENGTH,
+        int nameLength = genColumnLength("Name", lbs.stream()
+                .map(KubevirtLoadBalancer::name).collect(Collectors.toList()));
+        int networkIdLength = genColumnLength("NetworkId", lbs.stream()
+                .map(KubevirtLoadBalancer::networkId).collect(Collectors.toList()));
+
+        String format = genFormatString(ImmutableList.of(CLI_ID_LENGTH, nameLength, networkIdLength,
                 CLI_IP_ADDRESS_LENGTH, CLI_IP_ADDRESSES_LENGTH));
 
         if (outputJson()) {
@@ -62,10 +68,8 @@ public class KubevirtListLoadBalancerCommand extends AbstractShellCommand {
                 print(format,
                         StringUtils.substring(lb.id(),
                                 0, CLI_ID_LENGTH - CLI_MARGIN_LENGTH),
-                        StringUtils.substring(lb.name(),
-                                0, CLI_NAME_LENGTH - CLI_MARGIN_LENGTH),
-                        StringUtils.substring(lb.networkId(),
-                                0, CLI_NAME_LENGTH - CLI_MARGIN_LENGTH),
+                        lb.name(),
+                        lb.networkId(),
                         StringUtils.substring(lb.vip().toString(),
                                 0, CLI_IP_ADDRESS_LENGTH - CLI_MARGIN_LENGTH),
                         lb.members().toString());

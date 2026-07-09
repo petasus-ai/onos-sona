@@ -25,12 +25,13 @@ import org.onosproject.kubevirtnetworking.api.KubernetesExternalLb;
 import org.onosproject.kubevirtnetworking.api.KubernetesExternalLbService;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_IP_ADDRESS_LENGTH;
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_LONG_SERVICE_PORT_LENGTH;
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_MAC_ADDRESS_LENGTH;
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_MARGIN_LENGTH;
-import static org.onosproject.kubevirtnetworking.api.Constants.CLI_NAME_LENGTH;
+import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.genColumnLength;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.genFormatString;
 
 /**
@@ -47,10 +48,18 @@ public class KubernetesListServiceCommand extends AbstractShellCommand {
 
         List<KubernetesExternalLb> elbList = Lists.newArrayList(service.loadBalancers());
 
-        String format = genFormatString(ImmutableList.of(CLI_NAME_LENGTH, CLI_IP_ADDRESS_LENGTH,
-                CLI_NAME_LENGTH, CLI_NAME_LENGTH, CLI_IP_ADDRESS_LENGTH, CLI_MAC_ADDRESS_LENGTH,
-                CLI_LONG_SERVICE_PORT_LENGTH));
+        int serviceNameLength = genColumnLength("Service Name", elbList.stream()
+                .map(KubernetesExternalLb::serviceName).collect(Collectors.toList()));
+        int gatewayLength = genColumnLength("Elected Gateway", elbList.stream()
+                .map(lb -> lb.electedGateway() == null ? "N/A" : lb.electedGateway())
+                .collect(Collectors.toList()));
+        int workerLength = genColumnLength("Elected Worker", elbList.stream()
+                .map(lb -> lb.electedWorker() == null ? "N/A" : lb.electedWorker())
+                .collect(Collectors.toList()));
 
+        String format = genFormatString(ImmutableList.of(serviceNameLength, CLI_IP_ADDRESS_LENGTH,
+                gatewayLength, workerLength, CLI_IP_ADDRESS_LENGTH, CLI_MAC_ADDRESS_LENGTH,
+                CLI_LONG_SERVICE_PORT_LENGTH));
 
         print(format, "Service Name", "Loadbalancer IP", "Elected Gateway", "Elected Worker",
                 "Loadbalancer GW IP", "Loadbalancer GW MAC", "Service Port");
@@ -63,14 +72,11 @@ public class KubernetesListServiceCommand extends AbstractShellCommand {
             String lbGwMac = elb.loadBalancerGwMac() == null ? "N/A" : elb.loadBalancerGwMac().toString();
             String lbServicePort = elb.servicePorts().isEmpty() ? "N/A" : elb.servicePorts().toString();
 
-            print(format, StringUtils.substring(elb.serviceName(), 0,
-                    CLI_NAME_LENGTH - CLI_MARGIN_LENGTH),
+            print(format, elb.serviceName(),
                     StringUtils.substring(lbIp, 0,
                             CLI_IP_ADDRESS_LENGTH - CLI_MARGIN_LENGTH),
-                    StringUtils.substring(electedGw, 0,
-                            CLI_NAME_LENGTH - CLI_MARGIN_LENGTH),
-                    StringUtils.substring(electedWorker, 0,
-                            CLI_NAME_LENGTH - CLI_MARGIN_LENGTH),
+                    electedGw,
+                    electedWorker,
                     StringUtils.substring(lbGwIp, 0,
                             CLI_IP_ADDRESS_LENGTH - CLI_MARGIN_LENGTH),
                     StringUtils.substring(lbGwMac, 0,

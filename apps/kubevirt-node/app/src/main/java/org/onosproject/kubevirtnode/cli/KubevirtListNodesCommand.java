@@ -28,7 +28,9 @@ import org.onosproject.kubevirtnode.api.KubevirtNodeService;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
+import static org.onosproject.kubevirtnode.util.KubevirtNodeUtil.genColumnLength;
 import static org.onosproject.kubevirtnode.util.KubevirtNodeUtil.genFormatString;
 import static org.onosproject.kubevirtnode.util.KubevirtNodeUtil.prettyJson;
 
@@ -40,7 +42,6 @@ import static org.onosproject.kubevirtnode.util.KubevirtNodeUtil.prettyJson;
         description = "Lists all nodes registered in KubeVirt node service")
 public class KubevirtListNodesCommand extends AbstractShellCommand {
 
-    private static final int HOSTNAME_LENGTH = 35;
     private static final int TYPE_LENGTH = 15;
     private static final int MANAGEMENT_IP_LENGTH = 25;
     private static final int DATA_IP_LENGTH = 25;
@@ -53,7 +54,10 @@ public class KubevirtListNodesCommand extends AbstractShellCommand {
         List<KubevirtNode> nodes = Lists.newArrayList(nodeService.nodes());
         nodes.sort(Comparator.comparing(KubevirtNode::hostname));
 
-        String format = genFormatString(ImmutableList.of(HOSTNAME_LENGTH,
+        int hostnameLength = genColumnLength("Hostname", nodes.stream()
+                .map(KubevirtNode::hostname).collect(Collectors.toList()));
+
+        String format = genFormatString(ImmutableList.of(hostnameLength,
                 TYPE_LENGTH, MANAGEMENT_IP_LENGTH, DATA_IP_LENGTH, STATUS));
 
         if (outputJson()) {
@@ -62,8 +66,7 @@ public class KubevirtListNodesCommand extends AbstractShellCommand {
             print(format, "Hostname", "Type", "Management IP", "Data IP", "State");
             for (KubevirtNode node : nodes) {
                 print(format,
-                        StringUtils.substring(node.hostname(), 0,
-                                HOSTNAME_LENGTH - MARGIN_LENGTH),
+                        node.hostname(),
                         node.type(),
                         StringUtils.substring(node.managementIp().toString(), 0,
                                 MANAGEMENT_IP_LENGTH - MARGIN_LENGTH),

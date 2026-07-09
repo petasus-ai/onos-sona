@@ -24,11 +24,13 @@ import org.onosproject.cli.AbstractShellCommand;
 import org.onosproject.kubevirtnode.api.KubernetesExternalLbConfig;
 import org.onosproject.kubevirtnode.api.KubernetesExternalLbConfigService;
 
+import java.util.Collections;
+
 import static org.onosproject.kubevirtnode.api.Constants.CLI_IP_ADDRESSES_LENGTH;
 import static org.onosproject.kubevirtnode.api.Constants.CLI_IP_ADDRESS_LENGTH;
 import static org.onosproject.kubevirtnode.api.Constants.CLI_MAC_ADDRESS_LENGTH;
 import static org.onosproject.kubevirtnode.api.Constants.CLI_MARGIN_LENGTH;
-import static org.onosproject.kubevirtnode.api.Constants.CLI_NAME_LENGTH;
+import static org.onosproject.kubevirtnode.util.KubevirtNodeUtil.genColumnLength;
 import static org.onosproject.kubevirtnode.util.KubevirtNodeUtil.genFormatString;
 
 /**
@@ -45,24 +47,26 @@ public class KubernetesExternalLbConfigCommand extends AbstractShellCommand {
     protected void doExecute() throws Exception {
         KubernetesExternalLbConfigService service = get(KubernetesExternalLbConfigService.class);
 
-        String format = genFormatString(ImmutableList.of(CLI_NAME_LENGTH,
-                org.onosproject.kubevirtnode.api.Constants.CLI_IP_ADDRESS_LENGTH,
-                CLI_MAC_ADDRESS_LENGTH, CLI_IP_ADDRESSES_LENGTH));
-
         KubernetesExternalLbConfig lbConfig = service.lbConfig(KUBE_VIP);
 
         if (lbConfig == null) {
             print("LB config not found!");
         } else {
+            String configName = lbConfig.configName();
+
+            int configNameLength = genColumnLength("ConfigName",
+                    Collections.singletonList(configName));
+
+            String format = genFormatString(ImmutableList.of(configNameLength,
+                    CLI_IP_ADDRESS_LENGTH, CLI_MAC_ADDRESS_LENGTH, CLI_IP_ADDRESSES_LENGTH));
+
             print(format, "ConfigName", "Gateway IP", "Gateway MAC", "Global-Range");
 
-            String configName = lbConfig.configName();
             IpAddress gatewayIp = lbConfig.loadBalancerGwIp();
             String gatewayMac = lbConfig.loadBalancerGwMac() == null ? "N/A" : lbConfig.loadBalancerGwMac().toString();
             String globalRange = lbConfig.globalIpRange() == null ? "N/A" : lbConfig.globalIpRange();
 
-            print(format, StringUtils.substring(configName, 0,
-                    CLI_NAME_LENGTH - CLI_MARGIN_LENGTH),
+            print(format, configName,
                     StringUtils.substring(gatewayIp.toString(), 0,
                            CLI_IP_ADDRESS_LENGTH - CLI_MARGIN_LENGTH),
                     StringUtils.substring(gatewayMac, 0,

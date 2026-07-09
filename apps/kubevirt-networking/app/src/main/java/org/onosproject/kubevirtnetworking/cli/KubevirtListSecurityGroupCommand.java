@@ -28,11 +28,12 @@ import org.onosproject.kubevirtnetworking.api.KubevirtSecurityGroupService;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_ID_LENGTH;
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_MARGIN_LENGTH;
-import static org.onosproject.kubevirtnetworking.api.Constants.CLI_NAME_LENGTH;
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_NUMBER_LENGTH;
+import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.genColumnLength;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.genFormatString;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.prettyJson;
 
@@ -49,8 +50,11 @@ public class KubevirtListSecurityGroupCommand extends AbstractShellCommand {
         List<KubevirtSecurityGroup> sgs = Lists.newArrayList(service.securityGroups());
         sgs.sort(Comparator.comparing(KubevirtSecurityGroup::name));
 
+        int nameLength = genColumnLength("Name", sgs.stream()
+                .map(KubevirtSecurityGroup::name).collect(Collectors.toList()));
+
         String format = genFormatString(ImmutableList.of(CLI_ID_LENGTH,
-                CLI_NAME_LENGTH, CLI_NUMBER_LENGTH));
+                nameLength, CLI_NUMBER_LENGTH));
 
         if (outputJson()) {
             print("%s", json(sgs));
@@ -60,8 +64,7 @@ public class KubevirtListSecurityGroupCommand extends AbstractShellCommand {
             for (KubevirtSecurityGroup sg : sgs) {
                 print(format, StringUtils.substring(sg.id(), 0,
                         CLI_ID_LENGTH - CLI_MARGIN_LENGTH),
-                        StringUtils.substring(sg.name(), 0,
-                                CLI_NAME_LENGTH - CLI_MARGIN_LENGTH),
+                        sg.name(),
                         StringUtils.substring(String.valueOf(sg.rules().size()), 0,
                                 CLI_NUMBER_LENGTH - CLI_MARGIN_LENGTH)
                 );
