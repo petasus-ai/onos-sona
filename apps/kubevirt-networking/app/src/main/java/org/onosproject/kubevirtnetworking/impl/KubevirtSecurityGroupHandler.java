@@ -217,7 +217,7 @@ public class KubevirtSecurityGroupHandler {
     private final DeviceListener bridgeListener = new InternalBridgeListener();
 
     private final ExecutorService eventExecutor = newSingleThreadExecutor(
-            groupedThreads(this.getClass().getSimpleName(), "event-handler"));
+            groupedThreads(this.getClass().getSimpleName(), "event-handler", log));
 
     // Used to delay the node-complete processing off the event executor, so
     // that the settle waits of concurrently completing nodes overlap instead
@@ -394,6 +394,15 @@ public class KubevirtSecurityGroupHandler {
                                          KubevirtSecurityGroupRule sgRule, boolean install) {
 
         if (port == null || sgRule == null) {
+            return;
+        }
+
+        if (port.ipAddress() == null) {
+            // the port exists but its IP has not been learned yet; the rule
+            // will be installed by the SECURITY_GROUP/IP update events once
+            // the IP annotation arrives
+            log.warn("Skipping security group rule {} for port {}: no IP learned yet",
+                    sgRule.id(), port.macAddress());
             return;
         }
 
@@ -620,7 +629,8 @@ public class KubevirtSecurityGroupHandler {
     private Set<KubevirtPort> getRemotePorts(KubevirtPort srcPort, String sgId) {
         return portService.ports().stream()
                 .filter(port -> !port.macAddress().equals(srcPort.macAddress()))
-                .filter(port -> port.securityGroups().contains(sgId))
+                .filter(port -> port.securityGroups() != null &&
+                        port.securityGroups().contains(sgId))
                 .filter(port -> port.ipAddress() != null)
                 .collect(Collectors.toSet());
     }
@@ -900,21 +910,36 @@ public class KubevirtSecurityGroupHandler {
 
     private void securityGroupRuleAdded(KubevirtSecurityGroupRule sgRule) {
         portService.ports().stream()
-                .filter(port -> port.securityGroups().contains(sgRule.securityGroupId()))
+                .filter(port -> port.securityGroups() != null &&
+                        port.securityGroups().contains(sgRule.securityGroupId()))
                 .forEach(port -> {
-                    updateSecurityGroupRule(port, sgRule, true);
-                    log.info("Applied security group rule {} to port {}",
-                            sgRule.id(), port.macAddress());
+                    // one broken port (e.g. no IP learned yet) must never
+                    // abort the surrounding loop - that would silently skip
+                    // the rules of every remaining port and security group
+                    try {
+                        updateSecurityGroupRule(port, sgRule, true);
+                        log.info("Applied security group rule {} to port {}",
+                                sgRule.id(), port.macAddress());
+                    } catch (Exception e) {
+                        log.error("Failed to apply security group rule {} to port {}",
+                                sgRule.id(), port.macAddress(), e);
+                    }
                 });
     }
 
     private void securityGroupRuleRemoved(KubevirtSecurityGroupRule sgRule) {
         portService.ports().stream()
-                .filter(port -> port.securityGroups().contains(sgRule.securityGroupId()))
+                .filter(port -> port.securityGroups() != null &&
+                        port.securityGroups().contains(sgRule.securityGroupId()))
                 .forEach(port -> {
-                    updateSecurityGroupRule(port, sgRule, false);
-                    log.info("Removed security group rule {} from port {}",
-                            sgRule.id(), port.macAddress());
+                    try {
+                        updateSecurityGroupRule(port, sgRule, false);
+                        log.info("Removed security group rule {} from port {}",
+                                sgRule.id(), port.macAddress());
+                    } catch (Exception e) {
+                        log.error("Failed to remove security group rule {} from port {}",
+                                sgRule.id(), port.macAddress(), e);
+                    }
                 });
     }
 
