@@ -162,6 +162,7 @@ public class KubernetesExternalLbArpHandler {
                 case KUBERNETES_EXTERNAL_LB_CONFIG_CREATED:
                 case KUBERNETES_EXTERNAL_LB_CONFIG_UPDATED:
                     eventExecutor.execute(() -> processConfigCreatedOrUpdated(event.subject()));
+                    break;
                 case KUBERNETES_EXTERNAL_LB_CONFIG_REMOVED:
                 default:
                     //do nothing
