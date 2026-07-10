@@ -39,6 +39,7 @@ import java.util.List;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.VXLAN;
 import static org.onosproject.kubevirtnetworking.api.KubevirtNetworkEvent.Type.KUBEVIRT_NETWORK_CREATED;
 import static org.onosproject.kubevirtnetworking.api.KubevirtNetworkEvent.Type.KUBEVIRT_NETWORK_REMOVED;
@@ -181,12 +182,23 @@ public class KubevirtNetworkManagerTest {
     }
 
     /**
-     * Tests if creating a duplicate network fails with an exception.
+     * Tests that creating the same network twice is idempotent (no exception),
+     * matching the Atomix-safe create contract.
      */
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void testCreateDuplicateNetwork() {
         target.createNetwork(NETWORK);
         target.createNetwork(NETWORK);
+        assertEquals("Number of networks did not match", 1, target.networks().size());
+    }
+
+    /**
+     * Tests that creating a different network reusing an existing id fails.
+     */
+    @Test(expected = IllegalArgumentException.class)
+    public void testCreateConflictingNetwork() {
+        target.createNetwork(NETWORK);
+        target.createNetwork(NETWORK_UPDATED);
     }
 
     /**
@@ -203,6 +215,25 @@ public class KubevirtNetworkManagerTest {
     @Test(expected = IllegalArgumentException.class)
     public void testUpdateUnregisteredNetwork() {
         target.updateNetwork(NETWORK);
+    }
+
+    /**
+     * Tests that an allocated IP is recorded in the pool and survives a
+     * wholesale network update (spec refresh), rather than being reset.
+     */
+    @Test
+    public void testAllocateIpPersistsAcrossUpdate() {
+        target.createNetwork(NETWORK);
+
+        IpAddress allocated = target.allocateIp(NETWORK_ID);
+        assertNotNull("IP was not allocated", allocated);
+        assertTrue("Allocation was not recorded",
+                target.network(NETWORK_ID).ipPool().allocatedIps().contains(allocated));
+
+        // a spec refresh carrying a fresh (empty) pool must not reset the IPAM
+        target.updateNetwork(NETWORK_UPDATED);
+        assertTrue("Allocation was lost on network update",
+                target.network(NETWORK_ID).ipPool().allocatedIps().contains(allocated));
     }
 
     private void createBasicNetworks() {

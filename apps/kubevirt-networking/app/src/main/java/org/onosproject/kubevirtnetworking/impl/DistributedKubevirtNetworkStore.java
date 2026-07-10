@@ -16,6 +16,7 @@
 package org.onosproject.kubevirtnetworking.impl;
 
 import com.google.common.collect.ImmutableSet;
+import org.onlab.packet.IpAddress;
 import org.onlab.util.KryoNamespace;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
@@ -44,6 +45,8 @@ import org.slf4j.Logger;
 import java.util.Collection;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static org.onlab.util.Tools.groupedThreads;
@@ -119,11 +122,88 @@ public class DistributedKubevirtNetworkStore
 
     @Override
     public void updateNetwork(KubevirtNetwork network) {
-        Versioned<KubevirtNetwork> result =
-                networkStore.computeIfPresent(network.networkId(), (networkId, existing) -> network);
+        Versioned<KubevirtNetwork> result = networkStore.computeIfPresent(network.networkId(),
+                (networkId, existing) -> preserveIpAllocations(existing, network));
         if (result == null) {
             throw new IllegalArgumentException(network.networkId() + ERR_NOT_FOUND);
         }
+    }
+
+    @Override
+    public IpAddress allocateIp(String networkId) {
+        AtomicReference<IpAddress> allocated = new AtomicReference<>();
+        networkStore.compute(networkId, (id, existing) -> {
+            allocated.set(null);
+            if (existing == null || existing.ipPool() == null) {
+                return existing;
+            }
+            KubevirtIpPool pool = copyOf(existing.ipPool());
+            try {
+                allocated.set(pool.allocateIp());
+                return existing.updateIpPool(pool);
+            } catch (Exception e) {
+                log.warn("Failed to allocate IP for network {}", id, e);
+                return existing;
+            }
+        });
+        return allocated.get();
+    }
+
+    @Override
+    public boolean reserveIp(String networkId, IpAddress ip) {
+        AtomicBoolean reserved = new AtomicBoolean(false);
+        networkStore.compute(networkId, (id, existing) -> {
+            reserved.set(false);
+            if (existing == null || existing.ipPool() == null) {
+                return existing;
+            }
+            KubevirtIpPool pool = copyOf(existing.ipPool());
+            if (pool.reserveIp(ip)) {
+                reserved.set(true);
+                return existing.updateIpPool(pool);
+            }
+            return existing;
+        });
+        return reserved.get();
+    }
+
+    @Override
+    public void releaseIp(String networkId, IpAddress ip) {
+        networkStore.compute(networkId, (id, existing) -> {
+            if (existing == null || existing.ipPool() == null) {
+                return existing;
+            }
+            KubevirtIpPool pool = copyOf(existing.ipPool());
+            try {
+                pool.releaseIp(ip);
+                return existing.updateIpPool(pool);
+            } catch (Exception e) {
+                log.warn("Failed to release IP {} for network {}", ip, id, e);
+                return existing;
+            }
+        });
+    }
+
+    // returns a mutable copy of the pool so the allocation runs on a throwaway
+    // object and the returned network differs from the stored one (otherwise the
+    // consistent-map compute would treat it as a no-op and drop the allocation)
+    private static KubevirtIpPool copyOf(KubevirtIpPool pool) {
+        return new KubevirtIpPool(pool.start(), pool.end(), pool.allocatedIps());
+    }
+
+    // carries the stored pool's allocation state across a wholesale spec update
+    // (NAD refresh, REST PUT, sync) so IPAM state is not reset; allocation goes
+    // through the dedicated compute paths above, never through updateNetwork
+    private static KubevirtNetwork preserveIpAllocations(KubevirtNetwork existing,
+                                                         KubevirtNetwork incoming) {
+        KubevirtIpPool existingPool = existing.ipPool();
+        KubevirtIpPool incomingPool = incoming.ipPool();
+        if (existingPool == null || incomingPool == null ||
+                existingPool.allocatedIps().isEmpty()) {
+            return incoming;
+        }
+        return incoming.updateIpPool(new KubevirtIpPool(
+                incomingPool.start(), incomingPool.end(), existingPool.allocatedIps()));
     }
 
     @Override

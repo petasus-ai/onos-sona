@@ -135,6 +135,14 @@ public interface KubevirtNetwork {
     KubevirtIpPool ipPool();
 
     /**
+     * Returns a copy of this network with the given IP pool.
+     *
+     * @param ipPool IP pool
+     * @return updated kubevirt network
+     */
+    KubevirtNetwork updateIpPool(KubevirtIpPool ipPool);
+
+    /**
      * Returns a set of DNS.
      *
      * @return a set of DNS

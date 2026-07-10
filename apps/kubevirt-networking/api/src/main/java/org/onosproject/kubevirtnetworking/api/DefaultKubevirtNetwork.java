@@ -155,6 +155,12 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
     }
 
     @Override
+    public KubevirtNetwork updateIpPool(KubevirtIpPool updatedIpPool) {
+        return new DefaultKubevirtNetwork(networkId, type, name, mtu, segmentId,
+                physnetName, gatewayIp, defaultRoute, cidr, hostRoutes, updatedIpPool, dnses);
+    }
+
+    @Override
     public Set<IpAddress> dnses() {
         if (dnses == null || dnses.size() == 0) {
             return ImmutableSet.of();

@@ -156,15 +156,13 @@ public class KubevirtNetworkManager
     public IpAddress allocateIp(String networkId) {
         checkArgument(!Strings.isNullOrEmpty(networkId), ERR_NULL_NETWORK_ID);
 
-        try {
-            KubevirtNetwork network = networkStore.network(networkId);
-            IpAddress ip = network.ipPool().allocateIp();
-            networkStore.updateNetwork(network);
-            return ip;
-        } catch (Exception e) {
-            log.error("Failed to allocate IP address", e);
+        // the allocation is applied atomically inside the store so competing
+        // allocations across the cluster cannot hand out the same address
+        IpAddress ip = networkStore.allocateIp(networkId);
+        if (ip == null) {
+            log.warn("Failed to allocate IP address for network {}", networkId);
         }
-        return null;
+        return ip;
     }
 
     @Override
@@ -172,14 +170,10 @@ public class KubevirtNetworkManager
         checkArgument(!Strings.isNullOrEmpty(networkId), ERR_NULL_NETWORK_ID);
         checkArgument(ip != null, ERR_NULL_IP);
 
-        KubevirtNetwork network = networkStore.network(networkId);
-        boolean result = network.ipPool().reserveIp(ip);
-        if (result) {
-            networkStore.updateNetwork(network);
-        } else {
-            log.warn("Failed to reserve IP address");
+        boolean result = networkStore.reserveIp(networkId, ip);
+        if (!result) {
+            log.warn("Failed to reserve IP address {} for network {}", ip, networkId);
         }
-
         return result;
     }
 
@@ -188,13 +182,7 @@ public class KubevirtNetworkManager
         checkArgument(!Strings.isNullOrEmpty(networkId), ERR_NULL_NETWORK_ID);
         checkArgument(ip != null, ERR_NULL_IP);
 
-        try {
-            KubevirtNetwork network = networkStore.network(networkId);
-            network.ipPool().releaseIp(ip);
-            networkStore.updateNetwork(network);
-        } catch (Exception e) {
-            log.error("Failed to allocate IP address");
-        }
+        networkStore.releaseIp(networkId, ip);
     }
 
     @Override

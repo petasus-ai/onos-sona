@@ -15,6 +15,7 @@
  */
 package org.onosproject.kubevirtnetworking.api;
 
+import org.onlab.packet.IpAddress;
 import org.onosproject.store.Store;
 
 import java.util.Set;
@@ -61,6 +62,33 @@ public interface KubevirtNetworkStore
      * @return set of kubevirt networks
      */
     Set<KubevirtNetwork> networks();
+
+    /**
+     * Atomically allocates the lowest available address of the network's IP
+     * pool. The allocation is applied inside a single store update so competing
+     * allocations across the cluster cannot hand out the same address.
+     *
+     * @param networkId network identifier
+     * @return allocated IP address, or null if none was available
+     */
+    IpAddress allocateIp(String networkId);
+
+    /**
+     * Atomically reserves the given address in the network's IP pool.
+     *
+     * @param networkId network identifier
+     * @param ip        IP address to reserve
+     * @return true if the address was reserved, false otherwise
+     */
+    boolean reserveIp(String networkId, IpAddress ip);
+
+    /**
+     * Atomically releases the given address back to the network's IP pool.
+     *
+     * @param networkId network identifier
+     * @param ip        IP address to release
+     */
+    void releaseIp(String networkId, IpAddress ip);
 
     /**
      * Removes all kubevirt networks.

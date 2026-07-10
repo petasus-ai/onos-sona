@@ -47,6 +47,22 @@ public class KubevirtIpPool {
      * @param end               end address of IP pool
      */
     public KubevirtIpPool(IpAddress start, IpAddress end) {
+        this(start, end, null);
+    }
+
+    /**
+     * Constructor carrying an existing allocation state forward.
+     * <p>
+     * Only the allocations that still fall inside {@code [start, end]} are
+     * carried over, so a range change (or a spec refresh) never resurrects
+     * out-of-range addresses. This lets a stored pool survive a wholesale
+     * network update without resetting its IPAM state.
+     *
+     * @param start             start address of IP pool
+     * @param end               end address of IP pool
+     * @param allocatedIps      addresses already handed out (may be null/empty)
+     */
+    public KubevirtIpPool(IpAddress start, IpAddress end, Set<IpAddress> allocatedIps) {
         this.start = start;
         this.end = end;
         this.allocatedIps = new HashSet<>();
@@ -55,6 +71,13 @@ public class KubevirtIpPool {
             this.availableIps.addAll(getRangedIps(start.toString(), end.toString()));
         } catch (AddressStringException e) {
             e.printStackTrace();
+        }
+        if (allocatedIps != null) {
+            for (IpAddress ip : allocatedIps) {
+                if (availableIps.remove(ip)) {
+                    this.allocatedIps.add(ip);
+                }
+            }
         }
     }
 
@@ -161,12 +184,16 @@ public class KubevirtIpPool {
             return false;
         }
         KubevirtIpPool that = (KubevirtIpPool) o;
-        return start.equals(that.start) && end.equals(that.end);
+        // availableIps is derived from (start, end, allocatedIps), so comparing
+        // the allocation state is enough to tell two pools apart - and it is
+        // what makes an allocation visible to store update detection
+        return start.equals(that.start) && end.equals(that.end) &&
+                allocatedIps.equals(that.allocatedIps);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(start, end);
+        return Objects.hash(start, end, allocatedIps);
     }
 
     @Override
