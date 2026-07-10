@@ -78,6 +78,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -401,6 +402,30 @@ public final class KubevirtNetworkingUtil {
     public static Set<String> liveResourceKeys(KubernetesClient client,
                                                CustomResourceDefinitionContext context,
                                                Function<String, String> keyFn) {
+        return liveResourceKeySets(client, context, resource -> {
+            String key = keyFn.apply(resource);
+            return key == null ? null : Collections.singleton(key);
+        });
+    }
+
+    /**
+     * Variant of {@link #liveResourceKeys} for resources that map to more than
+     * one store key (e.g. a VM whose several interfaces each back a port). The
+     * per-item function returns the set of store keys for that item, or null
+     * when it cannot be parsed; the union of all sets is returned, or null if
+     * the listing or any single item was incomplete so the caller skips pruning
+     * rather than delete live state.
+     *
+     * @param client kubernetes client owning the live connection
+     * @param context custom resource definition context to list
+     * @param keysFn maps a raw resource JSON string to its store keys, or null
+     *               when the item cannot be parsed
+     * @return the union of live store keys, or null if the listing/parsing was
+     *         incomplete and pruning must be skipped this round
+     */
+    public static Set<String> liveResourceKeySets(KubernetesClient client,
+                                                  CustomResourceDefinitionContext context,
+                                                  Function<String, Set<String>> keysFn) {
         if (client == null) {
             return null;
         }
@@ -418,13 +443,13 @@ public final class KubevirtNetworkingUtil {
             ObjectMapper mapper = new ObjectMapper();
             Set<String> keys = new HashSet<>();
             for (Object item : (List<?>) itemsObj) {
-                String key = keyFn.apply(mapper.writeValueAsString(item));
-                if (key == null) {
-                    // an unparseable item hides its key; refuse to prune this
+                Set<String> itemKeys = keysFn.apply(mapper.writeValueAsString(item));
+                if (itemKeys == null) {
+                    // an unparseable item hides its keys; refuse to prune this
                     // round rather than risk removing live state
                     return null;
                 }
-                keys.add(key);
+                keys.addAll(itemKeys);
             }
             return keys;
         } catch (Exception e) {

@@ -38,9 +38,11 @@ import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.slf4j.Logger;
 
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
@@ -82,6 +84,12 @@ public class KubevirtPodWatcher {
 
     private final ScheduledExecutorService reconnectExecutor = newSingleThreadScheduledExecutor(
             groupedThreads(this.getClass().getSimpleName(), "watch-reconnect", log));
+
+    // the store resync (list + prune) makes a blocking API-server call, so it
+    // runs off both the event and reconnect threads to avoid stalling event
+    // processing or delaying a pending re-watch
+    private final ExecutorService resyncExecutor = newSingleThreadExecutor(
+            groupedThreads(this.getClass().getSimpleName(), "store-resync", log));
 
     // the client owning the currently active watch; closing it terminates the
     // watch, so keeping exactly one instance prevents both duplicated watches
@@ -126,6 +134,7 @@ public class KubevirtPodWatcher {
         kubevirtApiConfigService.removeListener(internalKubevirtApiConfigListener);
         leadershipService.withdraw(appId.name());
         reconnectExecutor.shutdown();
+        resyncExecutor.shutdown();
         eventExecutor.shutdown();
         closeWatch();
         closeWatchClient();
@@ -136,20 +145,28 @@ public class KubevirtPodWatcher {
     private synchronized void instantiatePodWatcher() {
         closeWatch();
         closeWatchClient();
-        watchClient = k8sClient(kubevirtApiConfigService);
+        KubernetesClient client = k8sClient(kubevirtApiConfigService);
+        watchClient = client;
 
-        if (watchClient == null) {
+        if (client == null) {
             scheduleReconnect();
             return;
         }
 
         try {
-            watch = watchClient.pods().inAnyNamespace().watch(internalKubevirtPodWatcher);
+            watch = client.pods().inAnyNamespace().watch(internalKubevirtPodWatcher);
         } catch (Exception e) {
             log.error("Failed to instantiate watcher, retrying in {}s",
                     RECONNECT_DELAY_S, e);
             scheduleReconnect();
+            return;
         }
+
+        // the watch above carries no resourceVersion, so the API server replays
+        // every current pod as ADDED; it never reports pods deleted while the
+        // watch was down, so reconcile the store against a fresh listing to
+        // prune those strays
+        resyncExecutor.execute(() -> resyncStore(client));
     }
 
     private synchronized void closeWatch() {
@@ -176,6 +193,53 @@ public class KubevirtPodWatcher {
     private void scheduleReconnect() {
         reconnectExecutor.schedule(this::instantiatePodWatcher,
                 RECONNECT_DELAY_S, TimeUnit.SECONDS);
+    }
+
+    private boolean isLeader() {
+        return Objects.equals(localNodeId, leadershipService.getLeader(appId.name()));
+    }
+
+    /**
+     * Reconciles the pod store against the API server, removing pods deleted
+     * while this watch was down. Only default-namespace pods are stored, so the
+     * live set is listed from that namespace. Runs only on the leader; a failed
+     * listing skips the prune rather than delete live state. Removal is keyed by
+     * uid, so it never touches the pod store's Kryo serialization.
+     *
+     * @param client the client whose watch triggered this resync
+     */
+    private void resyncStore(KubernetesClient client) {
+        if (!isLeader()) {
+            return;
+        }
+
+        // snapshot the store keys before listing: a pod whose ADDED is still in
+        // flight must not be mistaken for a stray
+        Set<String> storedUids = kubevirtPodAdminService.pods().stream()
+                .map(pod -> pod.getMetadata().getUid())
+                .collect(Collectors.toSet());
+
+        Set<String> liveUids;
+        try {
+            liveUids = client.pods().inNamespace("default").list().getItems().stream()
+                    .map(pod -> pod.getMetadata().getUid())
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+        } catch (Exception e) {
+            log.warn("Skipping pod resync: failed to list pods", e);
+            return;
+        }
+
+        storedUids.stream()
+                .filter(uid -> !liveUids.contains(uid))
+                .forEach(uid -> {
+                    log.info("Pruning stale pod {} absent from API server", uid);
+                    try {
+                        kubevirtPodAdminService.removePod(uid);
+                    } catch (Exception e) {
+                        log.warn("Failed to prune stale pod {}", uid, e);
+                    }
+                });
     }
 
     private class InternalKubevirtApiConfigListener implements KubevirtApiConfigListener {

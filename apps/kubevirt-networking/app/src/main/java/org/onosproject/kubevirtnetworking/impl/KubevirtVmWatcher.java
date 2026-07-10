@@ -57,12 +57,14 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnetworking.api.Constants.KUBEVIRT_NETWORKING_APP_ID;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.k8sClient;
+import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.liveResourceKeySets;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**
@@ -124,6 +126,12 @@ public class KubevirtVmWatcher {
     private final ScheduledExecutorService reconnectExecutor = newSingleThreadScheduledExecutor(
             groupedThreads(this.getClass().getSimpleName(), "watch-reconnect", log));
 
+    // the store resync (list + prune) makes a blocking API-server call, so it
+    // runs off both the event and reconnect threads to avoid stalling event
+    // processing or delaying a pending re-watch
+    private final ExecutorService resyncExecutor = newSingleThreadExecutor(
+            groupedThreads(this.getClass().getSimpleName(), "store-resync", log));
+
     // the client owning the currently active watch; closing it terminates the
     // watch, so keeping exactly one instance prevents both duplicated watches
     // and client (thread/connection pool) leaks on re-instantiation
@@ -176,6 +184,7 @@ public class KubevirtVmWatcher {
         configService.removeListener(configListener);
         leadershipService.withdraw(appId.name());
         reconnectExecutor.shutdown();
+        resyncExecutor.shutdown();
         eventExecutor.shutdown();
         closeWatch();
         closeWatchClient();
@@ -186,20 +195,28 @@ public class KubevirtVmWatcher {
     private synchronized void instantiateWatcher() {
         closeWatch();
         closeWatchClient();
-        watchClient = k8sClient(configService);
+        KubernetesClient client = k8sClient(configService);
+        watchClient = client;
 
-        if (watchClient == null) {
+        if (client == null) {
             scheduleReconnect();
             return;
         }
 
         try {
-            watch = watchClient.customResource(vmCrdCxt).watch(watcher);
+            watch = client.customResource(vmCrdCxt).watch(watcher);
         } catch (Exception e) {
             log.error("Failed to instantiate watcher, retrying in {}s",
                     RECONNECT_DELAY_S, e);
             scheduleReconnect();
+            return;
         }
+
+        // the watch above carries no resourceVersion, so the API server replays
+        // every current VM as ADDED; it never reports VMs deleted while the
+        // watch was down, so reconcile the port store against a fresh listing to
+        // prune the ports of VMs that are gone
+        resyncExecutor.execute(() -> resyncStore(client));
     }
 
     private synchronized void closeWatch() {
@@ -226,6 +243,85 @@ public class KubevirtVmWatcher {
     private void scheduleReconnect() {
         reconnectExecutor.schedule(this::instantiateWatcher,
                 RECONNECT_DELAY_S, TimeUnit.SECONDS);
+    }
+
+    private boolean isLeader() {
+        return Objects.equals(localNodeId, leadershipService.getLeader(appId.name()));
+    }
+
+    /**
+     * Reconciles the port store against the API server, removing the ports of
+     * VMs deleted while this watch was down. Ports are created only from VM
+     * interfaces, so a port whose MAC is backed by no live VM is a stray.
+     * Runs only on the leader and only when the full listing parses cleanly, so
+     * a partial view can never delete live state.
+     *
+     * @param client the client whose watch triggered this resync
+     */
+    private void resyncStore(KubernetesClient client) {
+        if (!isLeader()) {
+            return;
+        }
+
+        // snapshot the port keys before listing: a port whose VM ADDED is still
+        // in flight must not be mistaken for a stray
+        Set<MacAddress> storedMacs = portAdminService.ports().stream()
+                .map(KubevirtPort::macAddress)
+                .collect(Collectors.toSet());
+
+        Set<String> liveMacs = liveResourceKeySets(client, vmCrdCxt, this::parseMacsForResync);
+        if (liveMacs == null) {
+            log.debug("Skipping VM port resync: incomplete listing");
+            return;
+        }
+
+        storedMacs.stream()
+                .filter(mac -> !liveMacs.contains(mac.toString()))
+                .forEach(mac -> {
+                    log.info("Pruning stale port {} whose VM is absent from API server", mac);
+                    try {
+                        portAdminService.removePort(mac);
+                    } catch (Exception e) {
+                        log.warn("Failed to prune stale port {}", mac, e);
+                    }
+                });
+    }
+
+    /**
+     * Derives the MAC store keys of a VM resource for resync, mirroring the
+     * filter of {@code parseMacAddresses} (skip the default interface, require a
+     * MAC, skip SR-IOV). Returns the MAC strings, an empty set for a VM with no
+     * eligible interface, or null if the resource cannot be parsed so the caller
+     * skips pruning rather than delete live ports.
+     *
+     * @param resource raw VM resource JSON
+     * @return the MAC store keys, or null when the resource cannot be parsed
+     */
+    private Set<String> parseMacsForResync(String resource) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode json = mapper.readTree(resource);
+            JsonNode spec = json.get(SPEC).get(TEMPLATE).get(SPEC);
+            ArrayNode interfaces = (ArrayNode) spec.get(DOMAIN).get(DEVICES).get(INTERFACES);
+            if (interfaces == null) {
+                // a VM with no network backs no port
+                return new HashSet<>();
+            }
+
+            Set<String> macs = new HashSet<>();
+            for (JsonNode intf : interfaces) {
+                String intfName = intf.get(NAME).asText();
+                JsonNode macJson = intf.get(MAC);
+                JsonNode sriov = intf.get(SRIOV);
+                if (!StringUtils.equals(DEFAULT, intfName) && macJson != null && sriov == null) {
+                    macs.add(MacAddress.valueOf(macJson.asText()).toString());
+                }
+            }
+            return macs;
+        } catch (Exception e) {
+            log.warn("Failed to parse VM MAC addresses for resync", e);
+            return null;
+        }
     }
 
     private class InternalKubevirtApiConfigListener implements KubevirtApiConfigListener {

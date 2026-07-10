@@ -61,6 +61,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
@@ -120,6 +121,12 @@ public class KubernetesServiceWatcher {
 
     private final ScheduledExecutorService reconnectExecutor = newSingleThreadScheduledExecutor(
             groupedThreads(this.getClass().getSimpleName(), "watch-reconnect", log));
+
+    // the store resync (list + prune) makes a blocking API-server call, so it
+    // runs off both the event and reconnect threads to avoid stalling event
+    // processing or delaying a pending re-watch
+    private final ExecutorService resyncExecutor = newSingleThreadExecutor(
+            groupedThreads(this.getClass().getSimpleName(), "store-resync", log));
 
     // the client owning the currently active watch; closing it terminates the
     // watch, so keeping exactly one instance prevents both duplicated watches
@@ -182,6 +189,7 @@ public class KubernetesServiceWatcher {
         nodeService.removeListener(nodeEventListener);
 
         reconnectExecutor.shutdown();
+        resyncExecutor.shutdown();
         eventExecutor.shutdown();
         closeWatch();
         closeWatchClient();
@@ -192,20 +200,28 @@ public class KubernetesServiceWatcher {
     private synchronized void instantiateWatcher() {
         closeWatch();
         closeWatchClient();
-        watchClient = k8sClient(apiConfigService);
+        KubernetesClient client = k8sClient(apiConfigService);
+        watchClient = client;
 
-        if (watchClient == null) {
+        if (client == null) {
             scheduleReconnect();
             return;
         }
 
         try {
-            watch = watchClient.services().inAnyNamespace().watch(serviceWatcher);
+            watch = client.services().inAnyNamespace().watch(serviceWatcher);
         } catch (Exception e) {
             log.error("Failed to instantiate watcher, retrying in {}s",
                     RECONNECT_DELAY_S, e);
             scheduleReconnect();
+            return;
         }
+
+        // the watch replay upserts current services (addOrUpdateExternalLoadBalancer),
+        // but the API server never reports services deleted while the watch was
+        // down, so reconcile the external LB store against a fresh listing to
+        // prune the strays
+        resyncExecutor.execute(() -> resyncStore(client));
     }
 
     private synchronized void closeWatch() {
@@ -232,6 +248,56 @@ public class KubernetesServiceWatcher {
     private void scheduleReconnect() {
         reconnectExecutor.schedule(this::instantiateWatcher,
                 RECONNECT_DELAY_S, TimeUnit.SECONDS);
+    }
+
+    private boolean isLeader() {
+        return Objects.equals(localNodeId, leadershipService.getLeader(appId.name()));
+    }
+
+    /**
+     * Reconciles the external LB store against the API server, removing entries
+     * whose service was deleted (or is no longer an eligible load balancer)
+     * while this watch was down. The store holds an entry per default-namespace
+     * LoadBalancer service carrying the kube-vip label, so the live set applies
+     * the same predicates. Runs only on the leader; a failed listing skips the
+     * prune rather than delete live state.
+     *
+     * @param client the client whose watch triggered this resync
+     */
+    private void resyncStore(KubernetesClient client) {
+        if (!isLeader()) {
+            return;
+        }
+
+        // snapshot the store keys before listing: an entry whose service ADDED
+        // is still in flight must not be mistaken for a stray
+        Set<String> storedNames = adminService.loadBalancers().stream()
+                .map(KubernetesExternalLb::serviceName)
+                .collect(Collectors.toSet());
+
+        Set<String> liveNames;
+        try {
+            liveNames = client.services().inNamespace(DEFAULT).list().getItems().stream()
+                    .filter(this::isLoadBalancerType)
+                    .filter(this::isKubeVipCloudProviderLabelIsSet)
+                    .map(service -> service.getMetadata().getName())
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+        } catch (Exception e) {
+            log.warn("Skipping external LB resync: failed to list services", e);
+            return;
+        }
+
+        storedNames.stream()
+                .filter(name -> !liveNames.contains(name))
+                .forEach(name -> {
+                    log.info("Pruning stale external LB {} absent from API server", name);
+                    try {
+                        adminService.removeExternalLb(name);
+                    } catch (Exception e) {
+                        log.warn("Failed to prune stale external LB {}", name, e);
+                    }
+                });
     }
 
     private class InternalKubernetesExternalLbConfigListener
