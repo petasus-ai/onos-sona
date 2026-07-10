@@ -31,6 +31,7 @@ import io.fabric8.kubernetes.api.model.Taint;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.dsl.base.CustomResourceDefinitionContext;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.net.util.SubnetUtils;
 import org.onlab.packet.ARP;
@@ -84,6 +85,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_MARGIN_LENGTH;
@@ -372,6 +374,63 @@ public final class KubevirtNetworkingUtil {
         }
 
         return client;
+    }
+
+    /**
+     * Lists the resources currently defined for a custom resource and returns
+     * the set of store keys derived from them by the supplied parser.
+     * <p>
+     * This is the pruning half of a list-then-watch resync: a resourceVersion
+     * -less watch replays every existing object as {@code ADDED}, but the API
+     * server never reports objects deleted while the watch was down, so the
+     * caller must diff the live set against its store and drop the strays.
+     * <p>
+     * The keys are derived exactly as the {@code ADDED} path derives its store
+     * key (parse the raw item, take its id), so the comparison never depends on
+     * {@code metadata.name} matching the spec id. If the list call fails or any
+     * single item cannot be parsed, {@code null} is returned so the caller
+     * refuses to prune on incomplete information rather than delete live state.
+     *
+     * @param client kubernetes client owning the live connection
+     * @param context custom resource definition context to list
+     * @param keyFn maps a raw resource JSON string to its store key, or null
+     *              when the item cannot be parsed
+     * @return the set of live store keys, or null if the listing/parsing was
+     *         incomplete and pruning must be skipped this round
+     */
+    public static Set<String> liveResourceKeys(KubernetesClient client,
+                                               CustomResourceDefinitionContext context,
+                                               Function<String, String> keyFn) {
+        if (client == null) {
+            return null;
+        }
+
+        try {
+            Map<String, Object> result = client.customResource(context).list();
+            if (result == null) {
+                return null;
+            }
+            Object itemsObj = result.get("items");
+            if (!(itemsObj instanceof List)) {
+                return null;
+            }
+
+            ObjectMapper mapper = new ObjectMapper();
+            Set<String> keys = new HashSet<>();
+            for (Object item : (List<?>) itemsObj) {
+                String key = keyFn.apply(mapper.writeValueAsString(item));
+                if (key == null) {
+                    // an unparseable item hides its key; refuse to prune this
+                    // round rather than risk removing live state
+                    return null;
+                }
+                keys.add(key);
+            }
+            return keys;
+        } catch (Exception e) {
+            log.warn("Failed to list custom resources for resync", e);
+            return null;
+        }
     }
 
     /**

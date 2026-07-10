@@ -45,15 +45,18 @@ import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnetworking.api.Constants.KUBEVIRT_NETWORKING_APP_ID;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.k8sClient;
+import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.liveResourceKeys;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.waitFor;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -89,6 +92,12 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
             groupedThreads(this.getClass().getSimpleName(), "event-handler", log));
     private final ScheduledExecutorService reconnectExecutor = newSingleThreadScheduledExecutor(
             groupedThreads(this.getClass().getSimpleName(), "watch-reconnect", log));
+
+    // the store resync (list + prune) makes a blocking API-server call, so it
+    // runs off both the event and reconnect threads to avoid stalling event
+    // processing or delaying a pending re-watch
+    private final ExecutorService resyncExecutor = newSingleThreadExecutor(
+            groupedThreads(this.getClass().getSimpleName(), "store-resync", log));
 
     // the clients owning the currently active watches; closing them terminates
     // the watches, so keeping exactly one instance per watch prevents both
@@ -157,6 +166,7 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
         configService.removeListener(configListener);
         leadershipService.withdraw(appId.name());
         reconnectExecutor.shutdown();
+        resyncExecutor.shutdown();
         eventExecutor.shutdown();
         closeSgWatch();
         closeSgrWatch();
@@ -169,39 +179,54 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
     private synchronized void instantiateSgWatcher() {
         closeSgWatch();
         closeSgWatchClient();
-        sgWatchClient = k8sClient(configService);
+        KubernetesClient client = k8sClient(configService);
+        sgWatchClient = client;
 
-        if (sgWatchClient == null) {
+        if (client == null) {
             scheduleSgReconnect();
             return;
         }
 
         try {
-            sgWatch = sgWatchClient.customResource(securityGroupCrdCxt).watch(sgWatcher);
+            sgWatch = client.customResource(securityGroupCrdCxt).watch(sgWatcher);
         } catch (Exception e) {
             log.error("Failed to instantiate security group watcher, retrying in {}s",
                     RECONNECT_DELAY_S, e);
             scheduleSgReconnect();
+            return;
         }
+
+        // the watch above carries no resourceVersion, so the API server replays
+        // every current security group as ADDED (processed as a rule-preserving
+        // upsert); it never reports groups deleted while the watch was down, so
+        // reconcile the store against a fresh listing to prune those strays
+        resyncExecutor.execute(() -> resyncSecurityGroups(client));
     }
 
     private synchronized void instantiateSgrWatcher() {
         closeSgrWatch();
         closeSgrWatchClient();
-        sgrWatchClient = k8sClient(configService);
+        KubernetesClient client = k8sClient(configService);
+        sgrWatchClient = client;
 
-        if (sgrWatchClient == null) {
+        if (client == null) {
             scheduleSgrReconnect();
             return;
         }
 
         try {
-            sgrWatch = sgrWatchClient.customResource(securityGroupRuleCrdCxt).watch(sgrWatcher);
+            sgrWatch = client.customResource(securityGroupRuleCrdCxt).watch(sgrWatcher);
         } catch (Exception e) {
             log.error("Failed to instantiate security group rule watcher, retrying in {}s",
                     RECONNECT_DELAY_S, e);
             scheduleSgrReconnect();
+            return;
         }
+
+        // prune security group rules deleted while the watch was down; a stale
+        // rule kept in the store is an ACL that keeps being enforced after the
+        // operator removed it
+        resyncExecutor.execute(() -> resyncSecurityGroupRules(client));
     }
 
     private synchronized void closeSgWatch() {
@@ -254,6 +279,89 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
     private void scheduleSgrReconnect() {
         reconnectExecutor.schedule(this::instantiateSgrWatcher,
                 RECONNECT_DELAY_S, TimeUnit.SECONDS);
+    }
+
+    /**
+     * Reconciles the security group store against the API server, removing
+     * groups deleted while the watch was down. Runs only on the leader and only
+     * when the full listing parses cleanly, so a partial view can never delete
+     * live state.
+     *
+     * @param client the client whose watch triggered this resync
+     */
+    private void resyncSecurityGroups(KubernetesClient client) {
+        if (!isMaster()) {
+            return;
+        }
+
+        // snapshot the store keys before listing: a group created between the
+        // snapshot and the list carries a still-in-flight ADDED and must not be
+        // mistaken for a stray
+        Set<String> storedIds = adminService.securityGroups().stream()
+                .map(KubevirtSecurityGroup::id)
+                .collect(Collectors.toSet());
+
+        Set<String> liveIds = liveResourceKeys(client, securityGroupCrdCxt, resource -> {
+            KubevirtSecurityGroup sg = parseSecurityGroup(resource);
+            return sg == null ? null : sg.id();
+        });
+
+        if (liveIds == null) {
+            log.debug("Skipping security group resync: incomplete listing");
+            return;
+        }
+
+        storedIds.stream()
+                .filter(id -> !liveIds.contains(id))
+                .forEach(id -> {
+                    log.info("Pruning stale security group {} absent from API server", id);
+                    try {
+                        adminService.removeSecurityGroup(id);
+                    } catch (Exception e) {
+                        log.warn("Failed to prune stale security group {}", id, e);
+                    }
+                });
+    }
+
+    /**
+     * Reconciles the security group rules against the API server, removing
+     * rules deleted while the watch was down (a stale rule is an ACL that keeps
+     * being enforced). Rules live embedded in their parent group, so the store
+     * keys are gathered by flattening every group's rule set. Runs only on the
+     * leader and only when the full listing parses cleanly.
+     *
+     * @param client the client whose watch triggered this resync
+     */
+    private void resyncSecurityGroupRules(KubernetesClient client) {
+        if (!isMaster()) {
+            return;
+        }
+
+        Set<String> storedIds = adminService.securityGroups().stream()
+                .flatMap(sg -> sg.rules().stream())
+                .map(KubevirtSecurityGroupRule::id)
+                .collect(Collectors.toSet());
+
+        Set<String> liveIds = liveResourceKeys(client, securityGroupRuleCrdCxt, resource -> {
+            KubevirtSecurityGroupRule sgr = parseSecurityGroupRule(resource);
+            return sgr == null ? null : sgr.id();
+        });
+
+        if (liveIds == null) {
+            log.debug("Skipping security group rule resync: incomplete listing");
+            return;
+        }
+
+        storedIds.stream()
+                .filter(id -> !liveIds.contains(id))
+                .forEach(id -> {
+                    log.info("Pruning stale security group rule {} absent from API server", id);
+                    try {
+                        adminService.removeSecurityGroupRule(id);
+                    } catch (Exception e) {
+                        log.warn("Failed to prune stale security group rule {}", id, e);
+                    }
+                });
     }
 
     private KubevirtSecurityGroup parseSecurityGroup(String resource) {
@@ -365,8 +473,15 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
             if (sg != null) {
                 log.trace("Process Security Group {} creating event from API server.", sg.name());
 
-                if (adminService.securityGroup(sg.id()) == null) {
+                KubevirtSecurityGroup orig = adminService.securityGroup(sg.id());
+                if (orig == null) {
                     adminService.createSecurityGroup(sg);
+                } else {
+                    // on a resync the API server re-delivers existing groups as
+                    // ADDED; upsert so a group changed while the watch was down
+                    // is not kept stale. The group CRD carries no rules, so keep
+                    // the ones already reconciled from the rule CRD
+                    adminService.updateSecurityGroup(sg.updateRules(orig.rules()));
                 }
             }
         }

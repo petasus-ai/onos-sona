@@ -44,15 +44,18 @@ import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnetworking.api.Constants.KUBEVIRT_NETWORKING_APP_ID;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.k8sClient;
+import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.liveResourceKeys;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**
@@ -88,6 +91,12 @@ public class KubevirtFloatingIpWatcher extends AbstractWatcher {
 
     private final ScheduledExecutorService reconnectExecutor = newSingleThreadScheduledExecutor(
             groupedThreads(this.getClass().getSimpleName(), "watch-reconnect", log));
+
+    // the store resync (list + prune) makes a blocking API-server call, so it
+    // runs off both the event and reconnect threads to avoid stalling event
+    // processing or delaying a pending re-watch
+    private final ExecutorService resyncExecutor = newSingleThreadExecutor(
+            groupedThreads(this.getClass().getSimpleName(), "store-resync", log));
 
     // the client owning the currently active watch; closing it terminates the
     // watch, so keeping exactly one instance prevents both duplicated watches
@@ -141,6 +150,7 @@ public class KubevirtFloatingIpWatcher extends AbstractWatcher {
         configService.removeListener(configListener);
         leadershipService.withdraw(appId.name());
         reconnectExecutor.shutdown();
+        resyncExecutor.shutdown();
         eventExecutor.shutdown();
         closeWatch();
         closeWatchClient();
@@ -151,20 +161,28 @@ public class KubevirtFloatingIpWatcher extends AbstractWatcher {
     private synchronized void instantiateWatcher() {
         closeWatch();
         closeWatchClient();
-        watchClient = k8sClient(configService);
+        KubernetesClient client = k8sClient(configService);
+        watchClient = client;
 
-        if (watchClient == null) {
+        if (client == null) {
             scheduleReconnect();
             return;
         }
 
         try {
-            watch = watchClient.customResource(fipCrdCxt).watch(watcher);
+            watch = client.customResource(fipCrdCxt).watch(watcher);
         } catch (Exception e) {
             log.error("Failed to instantiate watcher, retrying in {}s",
                     RECONNECT_DELAY_S, e);
             scheduleReconnect();
+            return;
         }
+
+        // the watch above carries no resourceVersion, so the API server replays
+        // every current floating IP as ADDED (processed as an upsert); it never
+        // reports floating IPs deleted while the watch was down, so reconcile
+        // the store against a fresh listing to prune those strays
+        resyncExecutor.execute(() -> resyncStore(client));
     }
 
     private synchronized void closeWatch() {
@@ -191,6 +209,52 @@ public class KubevirtFloatingIpWatcher extends AbstractWatcher {
     private void scheduleReconnect() {
         reconnectExecutor.schedule(this::instantiateWatcher,
                 RECONNECT_DELAY_S, TimeUnit.SECONDS);
+    }
+
+    private boolean isLeader() {
+        return Objects.equals(localNodeId, leadershipService.getLeader(appId.name()));
+    }
+
+    /**
+     * Reconciles the floating IP store against the API server, removing
+     * floating IPs that were deleted while this watch was down. Runs only on
+     * the leader and only when the full listing parses cleanly, so a partial
+     * view can never delete live state.
+     *
+     * @param client the client whose watch triggered this resync
+     */
+    private void resyncStore(KubernetesClient client) {
+        if (!isLeader()) {
+            return;
+        }
+
+        // snapshot the store keys before listing: a floating IP created between
+        // the snapshot and the list carries a still-in-flight ADDED and must
+        // not be mistaken for a stray
+        Set<String> storedIds = adminService.floatingIps().stream()
+                .map(KubevirtFloatingIp::id)
+                .collect(Collectors.toSet());
+
+        Set<String> liveIds = liveResourceKeys(client, fipCrdCxt, resource -> {
+            KubevirtFloatingIp fip = parseKubevirtFloatingIp(resource);
+            return fip == null ? null : fip.id();
+        });
+
+        if (liveIds == null) {
+            log.debug("Skipping floating IP resync: incomplete listing");
+            return;
+        }
+
+        storedIds.stream()
+                .filter(id -> !liveIds.contains(id))
+                .forEach(id -> {
+                    log.info("Pruning stale floating IP {} absent from API server", id);
+                    try {
+                        adminService.removeFloatingIp(id);
+                    } catch (Exception e) {
+                        log.warn("Failed to prune stale floating IP {}", id, e);
+                    }
+                });
     }
 
     private KubevirtFloatingIp parseKubevirtFloatingIp(String resource) {
@@ -293,6 +357,11 @@ public class KubevirtFloatingIpWatcher extends AbstractWatcher {
 
                 if (adminService.floatingIp(fip.id()) == null) {
                     adminService.createFloatingIp(fip);
+                } else {
+                    // on a resync the API server re-delivers existing floating
+                    // IPs as ADDED; upsert so one changed while the watch was
+                    // down is not silently kept stale
+                    adminService.updateFloatingIp(fip);
                 }
             }
         }
