@@ -40,7 +40,6 @@ import org.onosproject.net.DeviceId;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -48,7 +47,6 @@ import static org.easymock.EasyMock.createMock;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.replay;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.onosproject.kubevirtnode.codec.KubevirtNodeJsonMatcher.matchesKubevirtNode;

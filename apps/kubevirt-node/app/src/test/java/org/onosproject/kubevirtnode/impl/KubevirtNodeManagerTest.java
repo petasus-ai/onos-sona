@@ -166,12 +166,25 @@ public class KubevirtNodeManagerTest extends KubevirtNodeTest {
     }
 
     /**
-     * Checks if creating a duplicated node fails with proper exception.
+     * Checks that creating the same node twice is idempotent (no exception),
+     * matching the Atomix-safe create contract.
      */
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void testCreateDuplicateNode() {
         target.createNode(WORKER_1);
         target.createNode(WORKER_1);
+        assertEquals(ERR_SIZE, 3, target.nodes().size());
+    }
+
+    /**
+     * Checks that reusing an existing hostname for a different node fails.
+     */
+    @Test(expected = IllegalArgumentException.class)
+    public void testCreateConflictingNode() {
+        target.createNode(WORKER_1);
+        target.createNode(createNode(WORKER_1_HOSTNAME, WORKER,
+                WORKER_1_INTG_DEVICE, IpAddress.valueOf("10.100.0.9"),
+                KubevirtNodeState.INIT));
     }
 
     /**
