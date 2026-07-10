@@ -1126,6 +1126,15 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                 return;
             }
 
+            // Re-read the freshest store copy; this task may have queued behind a
+            // multi-second bootstrap on the hostname's stripe, so the event
+            // snapshot can be stale. Acting on it evaluates the wrong state and
+            // clobbers newer config via setState -> updateNode.
+            KubevirtNode current = nodeAdminService.node(node.hostname());
+            if (current == null) {
+                return;
+            }
+
             if (deviceService.isAvailable(device.id())) {
                 // Auto-recovery must only re-initialize nodes that have actually
                 // fallen back to INCOMPLETE. DEVICE_CREATED is a transient state of
@@ -1133,23 +1142,23 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                 // so it must never be forced back to INIT here. Otherwise the bridge
                 // and port events emitted during bootstrap can reset an in-progress
                 // node and create a self-sustaining COMPLETE/INIT/DEVICE_CREATED loop.
-                if (autoRecovery && node.state() == INCOMPLETE) {
+                if (autoRecovery && current.state() == INCOMPLETE) {
                     log.info("Device {} reconnected, re-initializing node {}",
-                            device.id(), node.hostname());
-                    setState(node, INIT);
+                            device.id(), current.hostname());
+                    setState(current, INIT);
                     return;
                 }
 
-                log.debug("Bridge available on {}", node.hostname());
-                bootstrapNode(node);
+                log.debug("Bridge available on {}", current.hostname());
+                bootstrapNode(current);
             } else {
                 // The device is no longer available. If the node was operating
                 // normally (COMPLETE), only mark it INCOMPLETE here. Do not promote
                 // it to INIT directly; recovery is handled when the device
                 // reconnects (the branch above), using a fresh state read.
-                if (node.state() == COMPLETE) {
+                if (current.state() == COMPLETE) {
                     log.info("Device {} disconnected", device.id());
-                    setState(node, INCOMPLETE);
+                    setState(current, INCOMPLETE);
                 }
             }
         }
@@ -1159,38 +1168,47 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                 return;
             }
 
+            // Re-read the freshest store copy; this task may have queued behind a
+            // multi-second bootstrap on the hostname's stripe, so the event
+            // snapshot can be stale. Acting on it evaluates the wrong state and
+            // clobbers newer config via setState -> updateNode.
+            KubevirtNode current = nodeAdminService.node(node.hostname());
+            if (current == null) {
+                return;
+            }
+
             String portName = port.annotations().value(PORT_NAME);
-            if (node.state() == DEVICE_CREATED && (
+            if (current.state() == DEVICE_CREATED && (
                     Objects.equals(portName, VXLAN) ||
                             Objects.equals(portName, GRE) ||
                             Objects.equals(portName, GENEVE))) {
                 log.info("Interface {} added or updated to {}",
                         portName, device.id());
-                bootstrapNode(node);
+                bootstrapNode(current);
             }
 
             //When the physical port is down, in the middle of normal operation, we set the node state to INCOMPLTE
             //so that respective handlers do their related jobs.
-            if (node.state() == COMPLETE && node.type().equals(GATEWAY) && !port.isEnabled()) {
-                node.phyIntfs().stream()
+            if (current.state() == COMPLETE && current.type().equals(GATEWAY) && !port.isEnabled()) {
+                current.phyIntfs().stream()
                         .filter(pi -> pi.intf().equals(portName))
                         .findAny()
                         .ifPresent(pi -> {
                             log.info("Interface {} is down so set node {}'s state to INCOMPLETE",
                                     pi.intf(),
-                                    node.hostname());
-                            setState(node, INCOMPLETE);
+                                    current.hostname());
+                            setState(current, INCOMPLETE);
                         });
             }
 
             //When the physical port up again, we set the node state to INIT
             //so that respective handlers do their related jobs.
-            if (node.state() == INCOMPLETE
-                    && node.type().equals(GATEWAY) && port.isEnabled()) {
-                node.phyIntfs().stream()
+            if (current.state() == INCOMPLETE
+                    && current.type().equals(GATEWAY) && port.isEnabled()) {
+                current.phyIntfs().stream()
                         .filter(pi -> pi.intf().equals(portName))
                         .findAny()
-                        .ifPresent(pi -> setState(node, INIT));
+                        .ifPresent(pi -> setState(current, INIT));
             }
 
             //A phy port coming up while the node is mid-bootstrap
@@ -1198,12 +1216,12 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
             //port events emitted by the bootstrap itself would then loop the
             //node between INIT and DEVICE_CREATED. Re-evaluating the current
             //state is enough for the bootstrap to make progress.
-            if (node.state() == DEVICE_CREATED
-                    && node.type().equals(GATEWAY) && port.isEnabled()) {
-                node.phyIntfs().stream()
+            if (current.state() == DEVICE_CREATED
+                    && current.type().equals(GATEWAY) && port.isEnabled()) {
+                current.phyIntfs().stream()
                         .filter(pi -> pi.intf().equals(portName))
                         .findAny()
-                        .ifPresent(pi -> bootstrapNode(node));
+                        .ifPresent(pi -> bootstrapNode(current));
             }
         }
 
@@ -1212,13 +1230,22 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                 return;
             }
 
+            // Re-read the freshest store copy; this task may have queued behind a
+            // multi-second bootstrap on the hostname's stripe, so the event
+            // snapshot can be stale. Acting on it evaluates the wrong state and
+            // clobbers newer config via setState -> updateNode.
+            KubevirtNode current = nodeAdminService.node(node.hostname());
+            if (current == null) {
+                return;
+            }
+
             String portName = port.annotations().value(PORT_NAME);
-            if (node.state() == COMPLETE && (
+            if (current.state() == COMPLETE && (
                     Objects.equals(portName, VXLAN) ||
                             Objects.equals(portName, GRE) ||
                             Objects.equals(portName, GENEVE))) {
                 log.warn("Interface {} removed from {}", portName, device.id());
-                setState(node, INCOMPLETE);
+                setState(current, INCOMPLETE);
             }
         }
     }
