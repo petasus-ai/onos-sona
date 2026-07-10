@@ -172,12 +172,23 @@ public class KubevirtPortManagerTest {
     }
 
     /**
-     * Tests if creating a duplicate port fails with an exception.
+     * Tests that creating the same port twice is idempotent (no exception),
+     * matching the Atomix-safe create contract.
      */
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void createDuplicatePort() {
         target.createPort(PORT);
         target.createPort(PORT);
+        assertEquals("Number of port did not match", 1, target.ports().size());
+    }
+
+    /**
+     * Tests that creating a different port reusing an existing MAC fails.
+     */
+    @Test(expected = IllegalArgumentException.class)
+    public void createConflictingPort() {
+        target.createPort(PORT);
+        target.createPort(PORT_UPDATED);
     }
 
     /**

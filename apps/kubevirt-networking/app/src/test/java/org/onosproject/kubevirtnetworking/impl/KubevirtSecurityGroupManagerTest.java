@@ -238,12 +238,29 @@ public class KubevirtSecurityGroupManagerTest {
     }
 
     /**
-     * Tests if creating a duplicated security group fails with an exception.
+     * Tests that creating the same security group twice is idempotent
+     * (no exception), matching the Atomix-safe create contract.
      */
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void testCreateDuplicateSecurityGroup() {
         target.createSecurityGroup(sg1);
         target.createSecurityGroup(sg1);
+        assertEquals("Number of security group did not match",
+                1, target.securityGroups().size());
+    }
+
+    /**
+     * Tests that creating a different security group reusing an existing id
+     * fails.
+     */
+    @Test(expected = IllegalArgumentException.class)
+    public void testCreateConflictingSecurityGroup() {
+        target.createSecurityGroup(sg1);
+        target.createSecurityGroup(DefaultKubevirtSecurityGroup.builder()
+                .id(SECURITY_GROUP_ID_1)
+                .name(SECURITY_GROUP_NAME_2)
+                .description(SECURITY_GROUP_DESCRIPTION_2)
+                .build());
     }
 
     /**
