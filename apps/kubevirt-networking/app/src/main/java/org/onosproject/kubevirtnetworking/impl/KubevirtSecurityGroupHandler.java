@@ -486,8 +486,18 @@ public class KubevirtSecurityGroupHandler {
             return;
         }
 
-        // if the device is not available we do not perform any action
-        if (deviceId == null || !deviceService.isAvailable(deviceId)) {
+        // a rule dropped here is not retried by any event, so leave a trace
+        // instead of skipping without a word; the device (re)connect replay
+        // in the bridge listener is what eventually heals these
+        if (deviceId == null) {
+            log.warn("Skipping security group rule {} for port {}: " +
+                    "ACL device unresolved", sgRule.id(), port.macAddress());
+            return;
+        }
+
+        if (!deviceService.isAvailable(deviceId)) {
+            log.warn("Skipping security group rule {} for port {}: " +
+                    "device {} not available", sgRule.id(), port.macAddress(), deviceId);
             return;
         }
 
@@ -495,8 +505,9 @@ public class KubevirtSecurityGroupHandler {
 
         KubevirtNetwork net = networkService.network(port.networkId());
 
-        // if the network is not found we do not perform any action
         if (net == null) {
+            log.warn("Skipping security group rule {} for port {}: " +
+                    "network {} not found", sgRule.id(), port.macAddress(), port.networkId());
             return;
         }
 
@@ -949,6 +960,33 @@ public class KubevirtSecurityGroupHandler {
                 (install ? "with" : "without") + " Security Group");
     }
 
+    /**
+     * Reinstalls the security group flows whose ACL pipeline lives on the
+     * given device. Rules pushed while the device was unreachable are dropped
+     * with no retry, so the moment the device (re)connects is the only
+     * reliable point to replay them.
+     *
+     * @param deviceId device hosting the ACL tables to replay
+     */
+    private void reinstallRulesByDevice(DeviceId deviceId) {
+        securityGroupService.securityGroups().forEach(securityGroup ->
+                securityGroup.rules().forEach(sgRule ->
+                        portService.ports().stream()
+                                .filter(port -> port.securityGroups() != null &&
+                                        port.securityGroups().contains(sgRule.securityGroupId()))
+                                .filter(port -> deviceId.equals(aclDeviceId(port)))
+                                .forEach(port -> {
+                                    try {
+                                        updateSecurityGroupRule(port, sgRule, true);
+                                        log.info("Replayed security group rule {} for port {} " +
+                                                "on device {}", sgRule.id(), port.macAddress(), deviceId);
+                                    } catch (Exception e) {
+                                        log.error("Failed to replay security group rule {} " +
+                                                "for port {}", sgRule.id(), port.macAddress(), e);
+                                    }
+                                })));
+    }
+
     private void securityGroupRuleAdded(KubevirtSecurityGroupRule sgRule) {
         portService.ports().stream()
                 .filter(port -> port.securityGroups() != null &&
@@ -1175,6 +1213,27 @@ public class KubevirtSecurityGroupHandler {
                         initializeTenantTable(device, port);
                         initializeFlatTable(device, port);
                     });
+                    break;
+                case DEVICE_ADDED:
+                case DEVICE_AVAILABILITY_CHANGED:
+                    // a (re)connected device still carries whatever flows OVS
+                    // kept, but everything pushed while it was unreachable was
+                    // silently dropped, and KUBEVIRT_NODE_COMPLETE does not
+                    // re-fire for a node that is already COMPLETE; the
+                    // connection itself is the only reliable trigger to replay
+                    // the per-port ACL rules hosted on this device
+                    if (!deviceService.isAvailable(device.id())) {
+                        break;
+                    }
+                    deferredExecutor.schedule(() -> eventExecutor.execute(() -> {
+                        if (!isRelevantHelper()) {
+                            return;
+                        }
+                        if (!getUseSecurityGroupFlag()) {
+                            return;
+                        }
+                        reinstallRulesByDevice(device.id());
+                    }), NODE_COMPLETE_SETTLE_WAIT_S, TimeUnit.SECONDS);
                     break;
                 case PORT_REMOVED:
                     break;
