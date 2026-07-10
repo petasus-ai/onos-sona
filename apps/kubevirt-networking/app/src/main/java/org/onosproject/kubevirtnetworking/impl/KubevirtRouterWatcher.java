@@ -107,7 +107,7 @@ public class KubevirtRouterWatcher extends AbstractWatcher {
     // the client owning the currently active watch; closing it terminates the
     // watch, so keeping exactly one instance prevents both duplicated watches
     // and client (thread/connection pool) leaks on re-instantiation
-    private KubernetesClient watchClient;
+    private volatile KubernetesClient watchClient;
 
     // the handle of the active watch; it MUST be closed before its client,
     // otherwise the fabric8 watch manager keeps re-running its reconnect
@@ -232,6 +232,14 @@ public class KubevirtRouterWatcher extends AbstractWatcher {
      */
     private void resyncStore(KubernetesClient client) {
         if (!isLeader()) {
+            return;
+        }
+
+        // a newer (re)connect may have already superseded and closed this
+        // client; listing on a closed client just throws "Canceled". The
+        // replacement connection queues its own resync, so skip rather than
+        // log a spurious failure.
+        if (client != watchClient) {
             return;
         }
 

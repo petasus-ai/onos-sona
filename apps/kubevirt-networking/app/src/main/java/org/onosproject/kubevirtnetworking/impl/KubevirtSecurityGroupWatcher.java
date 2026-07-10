@@ -102,8 +102,8 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
     // the clients owning the currently active watches; closing them terminates
     // the watches, so keeping exactly one instance per watch prevents both
     // duplicated watches and client (thread/connection pool) leaks
-    private KubernetesClient sgWatchClient;
-    private KubernetesClient sgrWatchClient;
+    private volatile KubernetesClient sgWatchClient;
+    private volatile KubernetesClient sgrWatchClient;
 
     // the handles of the active watches; they MUST be closed before their
     // clients, otherwise the fabric8 watch manager keeps re-running its
@@ -294,6 +294,14 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
             return;
         }
 
+        // a newer (re)connect may have already superseded and closed this
+        // client; listing on a closed client just throws "Canceled". The
+        // replacement connection queues its own resync, so skip rather than
+        // log a spurious failure.
+        if (client != sgWatchClient) {
+            return;
+        }
+
         // snapshot the store keys before listing: a group created between the
         // snapshot and the list carries a still-in-flight ADDED and must not be
         // mistaken for a stray
@@ -334,6 +342,14 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
      */
     private void resyncSecurityGroupRules(KubernetesClient client) {
         if (!isMaster()) {
+            return;
+        }
+
+        // a newer (re)connect may have already superseded and closed this
+        // client; listing on a closed client just throws "Canceled". The
+        // replacement connection queues its own resync, so skip rather than
+        // log a spurious failure.
+        if (client != sgrWatchClient) {
             return;
         }
 
