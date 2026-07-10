@@ -15,6 +15,7 @@
  */
 package org.onosproject.kubevirtnode.impl;
 
+import com.google.common.collect.ImmutableSet;
 import io.fabric8.kubernetes.api.model.Node;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.Watch;
@@ -315,8 +316,29 @@ public class KubevirtNodeWatcher {
                 // if the updated node has different phyInts and data IP
                 // this means we assume that the node's hostname, type and mgmt IP
                 // are immutable
-                if (!original.phyIntfs().equals(existing.phyIntfs()) ||
-                        !original.dataIp().equals(existing.dataIp())) {
+                //
+                // phyIntfs() may be a HashSet on the annotation-derived side and an
+                // ArrayList on the REST/codec-decoded side, so compare by content;
+                // a raw Collection.equals() is List-vs-Set unequal and would trigger
+                // a spurious re-INIT on every heartbeat. dataIp may be null on a
+                // REST-only node, so compare null-safely.
+                boolean phyIntfsChanged = !ImmutableSet.copyOf(original.phyIntfs())
+                        .equals(ImmutableSet.copyOf(existing.phyIntfs()));
+                boolean dataIpChanged = !Objects.equals(original.dataIp(), existing.dataIp());
+
+                // a MODIFIED event whose node object carries no physnet annotation
+                // yields an empty phyIntfs; never let that wipe a node that already
+                // has physical interfaces, since the forced INIT tears down its
+                // physnet bridges and causes a data-plane outage
+                if (phyIntfsChanged && original.phyIntfs().isEmpty()
+                        && !existing.phyIntfs().isEmpty()) {
+                    log.warn("Skipping update for node {} that would clear its " +
+                            "physical interfaces; the API node object carries no " +
+                            "physnet annotation", original.hostname());
+                    return;
+                }
+
+                if (phyIntfsChanged || dataIpChanged) {
                     kubevirtNodeAdminService.updateNode(original.updateState(INIT));
                 }
             }
