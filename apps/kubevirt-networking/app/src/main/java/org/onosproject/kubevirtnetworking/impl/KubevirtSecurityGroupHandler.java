@@ -420,11 +420,25 @@ public class KubevirtSecurityGroupHandler {
                                 rPort.ipAddress().toIpPrefix(), install);
                         populateSecurityGroupRule(rSgRule, rPort,
                                 port.ipAddress().toIpPrefix(), install);
+
+                        // the remote port also receives ingress ACL entries, so
+                        // it needs its shared inbound redirect present too
+                        if (install) {
+                            setInboundAclRedirectRule(rPort, true);
+                        }
                     });
         } else {
             populateSecurityGroupRule(sgRule, port,
                     sgRule.remoteIpPrefix() == null ? IP_PREFIX_ANY :
                             sgRule.remoteIpPrefix(), install);
+        }
+
+        // install (idempotently) the port's shared inbound redirect whenever a
+        // rule is applied; its removal is driven by the port's security-group
+        // lifecycle (port removed / last security group detached), never by an
+        // individual rule removal
+        if (install) {
+            setInboundAclRedirectRule(port, true);
         }
     }
 
@@ -461,15 +475,7 @@ public class KubevirtSecurityGroupHandler {
             return;
         }
 
-        DeviceId deviceId;
-
-        if (port.isTenant()) {
-            deviceId = port.tenantDeviceId();
-        } else if (port.isFlat()) {
-            deviceId = port.physnetDeviceId();
-        } else {
-            deviceId = port.deviceId();
-        }
+        DeviceId deviceId = aclDeviceId(port);
 
         Set<TrafficSelector> ctSelectors = buildSelectors(
                 sgRule,
@@ -531,6 +537,48 @@ public class KubevirtSecurityGroupHandler {
                     finalAclTable,
                     install);
         });
+    }
+
+    /**
+     * Returns the device that carries the ACL pipeline for the given port.
+     *
+     * @param port kubevirt port
+     * @return device id hosting the port's ACL tables, or null if unknown
+     */
+    private DeviceId aclDeviceId(KubevirtPort port) {
+        if (port.isTenant()) {
+            return port.tenantDeviceId();
+        } else if (port.isFlat()) {
+            return port.physnetDeviceId();
+        } else {
+            return port.deviceId();
+        }
+    }
+
+    /**
+     * Installs or removes the port's inbound redirect that steers traffic
+     * destined to the VM from the ACL recirculation table into the ingress
+     * ACL table.
+     * <p>
+     * This flow is shared by every security group rule of the port, so its
+     * lifecycle must be tied to the port having at least one security group
+     * attached - never to an individual rule. Removing it while other rules
+     * still reference the port lets VM-bound traffic fall through to the
+     * recirculation table-miss (ct-commit + deliver), bypassing the ingress
+     * ACL entirely.
+     *
+     * @param port    kubevirt port
+     * @param install true to install, false to remove
+     */
+    private void setInboundAclRedirectRule(KubevirtPort port, boolean install) {
+        if (port.ipAddress() == null) {
+            return;
+        }
+
+        DeviceId deviceId = aclDeviceId(port);
+        if (deviceId == null) {
+            return;
+        }
 
         TrafficSelector tSelector = DefaultTrafficSelector.builder()
                 .matchEthType(Ethernet.TYPE_IPV4)
@@ -1017,6 +1065,12 @@ public class KubevirtSecurityGroupHandler {
             sg.rules().forEach(sgRule -> {
                 updateSecurityGroupRule(port, sgRule, false);
             });
+
+            // the event subject already reflects the detachment; drop the
+            // shared inbound redirect only when no security group is left
+            if (port.securityGroups() == null || port.securityGroups().isEmpty()) {
+                setInboundAclRedirectRule(port, false);
+            }
             log.info("Removed security group {} from port {}",
                     event.securityGroupId(), event.subject().macAddress());
         }
@@ -1044,6 +1098,9 @@ public class KubevirtSecurityGroupHandler {
                 log.info("Removed security group {} from port {}",
                         sgStr, event.subject().macAddress());
             }
+
+            // the port is gone; tear down its shared inbound redirect
+            setInboundAclRedirectRule(port, false);
         }
 
         private void processOldPortRemove(KubevirtPortEvent event) {
@@ -1066,6 +1123,9 @@ public class KubevirtSecurityGroupHandler {
                 log.info("Removed security group {} from port {}",
                         sgStr, event.subject().macAddress());
             }
+
+            // the port left this device; tear down its shared inbound redirect
+            setInboundAclRedirectRule(oldPort, false);
         }
 
         private void processPortDeviceAdded(KubevirtPortEvent event) {
