@@ -27,7 +27,6 @@ import org.onosproject.core.CoreService;
 import org.onosproject.kubevirtnetworking.api.KubevirtFlowRuleService;
 import org.onosproject.kubevirtnetworking.api.KubevirtNetwork;
 import org.onosproject.kubevirtnetworking.api.KubevirtNetworkService;
-import org.onosproject.kubevirtnetworking.api.KubevirtPodService;
 import org.onosproject.kubevirtnetworking.api.KubevirtPort;
 import org.onosproject.kubevirtnetworking.api.KubevirtPortEvent;
 import org.onosproject.kubevirtnetworking.api.KubevirtPortListener;
@@ -103,8 +102,6 @@ public class KubevirtSwitchingTenantHandler {
     protected KubevirtNetworkService kubevirtNetworkService;
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected KubevirtPortService kubevirtPortService;
-    @Reference(cardinality = ReferenceCardinality.MANDATORY)
-    protected KubevirtPodService kubevirtPodService;
 
     private final ExecutorService eventExecutor = newSingleThreadExecutor(
             groupedThreads(this.getClass().getSimpleName(), "event-handler"));
