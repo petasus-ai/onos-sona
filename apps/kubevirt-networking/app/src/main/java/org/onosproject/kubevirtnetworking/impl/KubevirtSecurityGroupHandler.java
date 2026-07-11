@@ -1053,6 +1053,16 @@ public class KubevirtSecurityGroupHandler {
                 case KUBEVIRT_PORT_REMOVED:
                     eventExecutor.execute(() -> processPortRemove(event));
                     break;
+                case KUBEVIRT_PORT_CREATED:
+                    // a port inserted with its device ID and security groups
+                    // already set (initial sync into a rebuilt store) fires no
+                    // derived DEVICE_ADDED/SECURITY_GROUP_ADDED events - the
+                    // insert itself is the only trigger to program its rules;
+                    // ports still lacking a device ID are skipped here and
+                    // handled by the DEVICE_ADDED path once the VMI watcher
+                    // fills the device in
+                    eventExecutor.execute(() -> processPortDeviceAdded(event));
+                    break;
                 case KUBEVIRT_PORT_DEVICE_ADDED:
                     eventExecutor.execute(() -> processPortDeviceAdded(event));
                     break;

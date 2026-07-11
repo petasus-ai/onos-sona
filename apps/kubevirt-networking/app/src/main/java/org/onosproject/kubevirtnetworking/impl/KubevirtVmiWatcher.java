@@ -33,7 +33,6 @@ import org.onosproject.kubevirtnetworking.api.KubevirtPortAdminService;
 import org.onosproject.kubevirtnode.api.KubevirtApiConfigEvent;
 import org.onosproject.kubevirtnode.api.KubevirtApiConfigListener;
 import org.onosproject.kubevirtnode.api.KubevirtApiConfigService;
-import org.onosproject.kubevirtnode.api.KubevirtNode;
 import org.onosproject.kubevirtnode.api.KubevirtNodeService;
 import org.onosproject.mastership.MastershipService;
 import org.osgi.service.component.annotations.Activate;
@@ -56,7 +55,6 @@ import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnetworking.api.Constants.KUBEVIRT_NETWORKING_APP_ID;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.getPorts;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.k8sClient;
-import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.waitFor;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**
@@ -100,6 +98,9 @@ public class KubevirtVmiWatcher {
             groupedThreads(this.getClass().getSimpleName(), "event-handler", log));
 
     private static final long RECONNECT_DELAY_S = 5;
+
+    private static final int DEVICE_ID_RETRY_LIMIT = 10;
+    private static final long DEVICE_ID_RETRY_DELAY_S = 3;
 
     private final ScheduledExecutorService reconnectExecutor = newSingleThreadScheduledExecutor(
             groupedThreads(this.getClass().getSimpleName(), "watch-reconnect", log));
@@ -278,6 +279,17 @@ public class KubevirtVmiWatcher {
         }
 
         private void processAddition(String resource) {
+            processAddition(resource, 0);
+        }
+
+        // The initial watch replay races the other watchers: the node,
+        // network or port this VMI refers to may not have reached its store
+        // yet. This event is the only carrier of the port's device ID, so a
+        // one-shot drop here leaves the port device-less forever and every
+        // per-port flow (ACL redirects, SG entries, ...) silently unprogrammed.
+        // Retry with a bounded schedule instead of skipping or sleeping on the
+        // shared event executor.
+        private void processAddition(String resource, int attempt) {
             if (!isMaster()) {
                 return;
             }
@@ -289,34 +301,63 @@ public class KubevirtVmiWatcher {
                 return;
             }
 
-            KubevirtNode node = nodeService.node(nodeName);
-
-            if (node == null) {
-                log.warn("VMI {} scheduled on node {} is not ready, " +
-                                "we wait for a while...", vmiName, nodeName);
-                waitFor(2);
+            if (nodeService.node(nodeName) == null) {
+                retryAddition(resource, vmiName, attempt,
+                        "node " + nodeName + " is not synced yet");
+                return;
             }
 
             Set<KubevirtPort> ports = getPorts(nodeService,
                                         networkAdminService.networks(), resource);
 
             if (ports.size() == 0) {
+                // either the network store is not synced yet, or the VMI has
+                // no SONA-managed NIC at all; the latter just lets the bounded
+                // retries expire without any effect
+                retryAddition(resource, vmiName, attempt,
+                        "no interface matches a known network");
                 return;
             }
 
-            ports.forEach(port -> {
+            boolean portMissing = false;
+
+            for (KubevirtPort port : ports) {
                 KubevirtPort existing = portAdminService.port(port.macAddress());
 
-                if (existing != null) {
-                    if (port.deviceId() != null) {
-                        if (existing.deviceId() == null || !existing.deviceId().equals(port.deviceId())) {
-                            KubevirtPort updated = existing.updateDeviceId(port.deviceId());
-                            // internally we update device ID of kubevirt port
-                            portAdminService.updatePort(updated);
-                        }
+                if (existing == null) {
+                    // the VM watcher has not created the port yet
+                    portMissing = true;
+                    continue;
+                }
+
+                if (port.deviceId() != null) {
+                    if (existing.deviceId() == null || !existing.deviceId().equals(port.deviceId())) {
+                        KubevirtPort updated = existing.updateDeviceId(port.deviceId());
+                        // internally we update device ID of kubevirt port
+                        portAdminService.updatePort(updated);
                     }
                 }
-            });
+            }
+
+            if (portMissing) {
+                retryAddition(resource, vmiName, attempt,
+                        "port not created by the VM watcher yet");
+            }
+        }
+
+        private void retryAddition(String resource, String vmiName,
+                                   int attempt, String reason) {
+            if (attempt >= DEVICE_ID_RETRY_LIMIT) {
+                log.warn("Giving up the device ID update of VMI {} after {} " +
+                        "attempts: {}", vmiName, attempt, reason);
+                return;
+            }
+
+            log.debug("Retrying the device ID update of VMI {} in {}s: {}",
+                    vmiName, DEVICE_ID_RETRY_DELAY_S, reason);
+            reconnectExecutor.schedule(() -> eventExecutor.execute(() ->
+                    processAddition(resource, attempt + 1)),
+                    DEVICE_ID_RETRY_DELAY_S, TimeUnit.SECONDS);
         }
 
         private boolean isMaster() {
