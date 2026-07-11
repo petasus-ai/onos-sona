@@ -345,10 +345,24 @@ public final class KubevirtNetworkingUtil {
         ConfigBuilder configBuilder = new ConfigBuilder().withMasterUrl(endpoint);
 
         if (config.scheme() == KubevirtApiConfig.Scheme.HTTPS) {
-            configBuilder.withTrustCerts(true)
-                    .withCaCertData(config.caCertData())
-                    .withClientCertData(config.clientCertData())
+            // trustCerts short-circuits fabric8's trust manager to accept any
+            // server certificate, so it must stay off for the configured CA
+            // bundle to actually take part in server verification
+            if (StringUtils.isNotEmpty(config.caCertData())) {
+                configBuilder.withTrustCerts(false)
+                        .withCaCertData(config.caCertData());
+            } else {
+                log.warn("No CA cert data configured for endpoint {}; " +
+                        "skipping API server certificate validation.", endpoint);
+                configBuilder.withTrustCerts(true);
+            }
+
+            configBuilder.withClientCertData(config.clientCertData())
                     .withClientKeyData(config.clientKeyData());
+
+            if (StringUtils.isNotEmpty(config.token())) {
+                configBuilder.withOauthToken(config.token());
+            }
         }
 
         return new DefaultKubernetesClient(configBuilder.build());
