@@ -75,6 +75,7 @@ import org.xbill.DNS.Address;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Collection;
@@ -86,6 +87,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -467,9 +469,47 @@ public final class KubevirtNetworkingUtil {
             }
             return keys;
         } catch (Exception e) {
-            log.warn("Failed to list custom resources for resync", e);
+            if (isClientShutdown(e)) {
+                // the watch was re-instantiated while this resync was still in
+                // flight and closing the superseded client cancelled our list()
+                // call; the new client runs its own resync, so skip quietly
+                // instead of alarming with a stack trace
+                log.debug("Resync list cancelled by watch client re-instantiation", e);
+            } else {
+                log.warn("Failed to list custom resources for resync", e);
+            }
             return null;
         }
+    }
+
+    /**
+     * Tells whether the given failure is the signature of our own client being
+     * closed underneath an in-flight call (okhttp cancels the call and closes
+     * its socket locally) rather than an API server or network problem. A peer
+     * failure surfaces differently (connection refused/reset, timeouts, TLS
+     * errors), so matching these local-shutdown signatures does not hide real
+     * connectivity issues.
+     *
+     * @param t failure thrown by a kubernetes client call
+     * @return true if the failure was caused by the client shutdown
+     */
+    private static boolean isClientShutdown(Throwable t) {
+        int depth = 0;
+        for (Throwable cause = t; cause != null && depth < 10;
+                cause = cause.getCause(), depth++) {
+            if (cause instanceof RejectedExecutionException) {
+                return true;
+            }
+            if (cause instanceof SocketException &&
+                    StringUtils.contains(cause.getMessage(), "Socket closed")) {
+                return true;
+            }
+            if (cause instanceof IOException &&
+                    StringUtils.equals(cause.getMessage(), "Canceled")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
