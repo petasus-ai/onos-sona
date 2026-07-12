@@ -791,8 +791,13 @@ public class KubevirtRoutingSnatHandler {
                     eventExecutor.execute(() -> processPortDeletion(event.subject()));
                     break;
                 case KUBEVIRT_PORT_MIGRATED:
+                    // all downstream SNAT rules for a port sit on the gateway
+                    // node and their selectors do not change across a
+                    // migration, so reinstalling with the new port overwrites
+                    // them in place (same flow ID); tearing down the old port
+                    // afterwards would build those same flow IDs and delete
+                    // the rules just installed
                     eventExecutor.execute(() -> processPortCreation(event.subject()));
-                    eventExecutor.execute(() -> processPortDeletion(event.oldSubject()));
                     break;
                 default:
                     //do nothing

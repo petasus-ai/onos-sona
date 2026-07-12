@@ -468,8 +468,8 @@ public class KubevirtSwitchingTenantHandler {
                     eventExecutor.execute(() -> processPortRemoval(event.subject()));
                     break;
                 case KUBEVIRT_PORT_MIGRATED:
-                    eventExecutor.execute(() -> processPortUpdate(event.subject()));
-                    eventExecutor.execute(() -> processPortRemoval(event.oldSubject()));
+                    eventExecutor.execute(() ->
+                            processPortMigration(event.subject(), event.oldSubject()));
                     break;
                 default:
                     // do nothing
@@ -491,6 +491,26 @@ public class KubevirtSwitchingTenantHandler {
             }
 
             setEgressRules(port, false);
+        }
+
+        private void processPortMigration(KubevirtPort port, KubevirtPort oldPort) {
+            if (!isRelevantHelper()) {
+                return;
+            }
+
+            // egress rules for a port live on every worker except its host
+            // and keep the same flow ID across a migration, so reinstalling
+            // for the new host rewrites their tunnel destination in place; a
+            // full teardown of the old port would delete the rules just
+            // installed. The only stale entry left behind is the one on the
+            // new host itself (still pointing at the old host), which the
+            // install pass skips - remove that one explicitly.
+            setEgressRules(port, true);
+
+            KubevirtNode newNode = kubevirtNodeService.node(port.deviceId());
+            if (newNode != null) {
+                setEgressRulesOnRemote(oldPort, newNode, false);
+            }
         }
     }
 }

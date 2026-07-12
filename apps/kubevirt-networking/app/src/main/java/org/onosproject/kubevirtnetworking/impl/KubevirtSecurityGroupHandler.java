@@ -442,6 +442,49 @@ public class KubevirtSecurityGroupHandler {
         }
     }
 
+    /**
+     * Same as {@link #updateSecurityGroupRule} but only touches the flows
+     * that live on the port's own (ACL) device, leaving the pair rules a
+     * remote-group rule installs on the other members' hosts alone. Used for
+     * the old-port teardown of a migration, where those pair rules keep
+     * their flow ID (device, selector and IP are unchanged) and have just
+     * been refreshed for the new port.
+     *
+     * @param port    kubevirt port whose host-side flows are updated
+     * @param sgRule  security group rule to apply or remove
+     * @param install installation flag
+     */
+    private void updateSecurityGroupRuleOnPortDevice(KubevirtPort port,
+                                                     KubevirtSecurityGroupRule sgRule,
+                                                     boolean install) {
+        if (port == null || sgRule == null) {
+            return;
+        }
+
+        if (port.ipAddress() == null) {
+            log.warn("Skipping security group rule {} for port {}: no IP learned yet",
+                    sgRule.id(), port.macAddress());
+            return;
+        }
+
+        if (sgRule.remoteGroupId() != null && !sgRule.remoteGroupId().isEmpty()) {
+            getRemotePorts(port, sgRule.remoteGroupId())
+                    .forEach(rPort -> {
+                        populateSecurityGroupRule(sgRule, port,
+                                rPort.ipAddress().toIpPrefix(), install);
+
+                        KubevirtSecurityGroupRule rSgRule = sgRule.updateDirection(
+                                sgRule.direction().equalsIgnoreCase(EGRESS) ? INGRESS : EGRESS);
+                        populateSecurityGroupRule(rSgRule, port,
+                                rPort.ipAddress().toIpPrefix(), install);
+                    });
+        } else {
+            populateSecurityGroupRule(sgRule, port,
+                    sgRule.remoteIpPrefix() == null ? IP_PREFIX_ANY :
+                            sgRule.remoteIpPrefix(), install);
+        }
+    }
+
     private boolean checkProtocol(String protocol) {
         if (protocol == null) {
             log.debug("No protocol was specified, use default IP(v4/v6) protocol.");
@@ -1067,7 +1110,19 @@ public class KubevirtSecurityGroupHandler {
                     eventExecutor.execute(() -> processPortDeviceAdded(event));
                     break;
                 case KUBEVIRT_PORT_MIGRATED:
+                    // a migration keeps the port's IP, so the pair rules a
+                    // remote-group rule installs on the OTHER members' hosts
+                    // keep their device, selector and thus flow ID - a full
+                    // old-port teardown would delete the entries the install
+                    // pass just refreshed. Only the rules on the old host
+                    // (whose device did change) need removing.
+                    eventExecutor.execute(() -> processPortDeviceAdded(event));
+                    eventExecutor.execute(() -> processOldPortHostRemove(event));
+                    break;
                 case KUBEVIRT_PORT_IP_UPDATED:
+                    // an IP change rewrites the selectors, so old and new
+                    // flow IDs differ everywhere and a full teardown of the
+                    // old port is both safe and required
                     eventExecutor.execute(() -> processPortDeviceAdded(event));
                     eventExecutor.execute(() -> processOldPortRemove(event));
                     break;
@@ -1173,6 +1228,32 @@ public class KubevirtSecurityGroupHandler {
             }
 
             // the port left this device; tear down its shared inbound redirect
+            setInboundAclRedirectRule(oldPort, false);
+        }
+
+        private void processOldPortHostRemove(KubevirtPortEvent event) {
+            if (!isRelevantHelper(event)) {
+                return;
+            }
+
+            KubevirtPort oldPort = event.oldSubject();
+            if (oldPort.securityGroups() == null) {
+                return;
+            }
+            for (String sgStr : oldPort.securityGroups()) {
+                KubevirtSecurityGroup sg = securityGroupService.securityGroup(sgStr);
+                if (sg == null) {
+                    continue;
+                }
+                sg.rules().forEach(sgRule -> {
+                    updateSecurityGroupRuleOnPortDevice(oldPort, sgRule, false);
+                });
+                log.info("Removed security group {} from port {} on its old host",
+                        sgStr, oldPort.macAddress());
+            }
+
+            // the port left its old host; tear down the shared inbound
+            // redirect there (the install pass recreated it on the new host)
             setInboundAclRedirectRule(oldPort, false);
         }
 
