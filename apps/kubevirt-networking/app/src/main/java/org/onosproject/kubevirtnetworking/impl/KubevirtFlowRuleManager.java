@@ -130,7 +130,16 @@ public class KubevirtFlowRuleManager implements KubevirtFlowRuleService {
         nodeService.addListener(internalNodeListener);
         localNodeId = clusterService.getLocalNode().id();
         leadershipService.runForLeadership(appId.name());
-        nodeService.completeNodes(WORKER).forEach(this::initializeGatewayNodePipeline);
+        // replay for nodes that reached COMPLETE while this app was down;
+        // the node listener covers everything after this point. Workers must
+        // get the worker pipeline - the gateway pipeline's table-0 entry
+        // shares its flow ID and would steer every packet into the gateway
+        // tables, blackholing all VM traffic on the node. Leader-only, like
+        // the listener path, so N instances do not push concurrently.
+        if (Objects.equals(localNodeId, leadershipService.getLeader(appId.name()))) {
+            nodeService.completeNodes(WORKER).forEach(this::initializeWorkerNodePipeline);
+            nodeService.completeNodes(GATEWAY).forEach(this::initializeGatewayNodePipeline);
+        }
         log.info("Started");
     }
 
