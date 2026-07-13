@@ -158,6 +158,7 @@ public class KubevirtNetworkHandler {
     private static final int DEFAULT_OFPORT = 6653;
     private static final int DPID_BEGIN = 3;
     private static final int DEFAULT_TTL = 0xff;
+    private static final int TENANT_BRIDGE_WAIT_MAX_ATTEMPTS = 3;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected CoreService coreService;
@@ -451,11 +452,23 @@ public class KubevirtNetworkHandler {
         }
     }
 
-    private void setDefaultRulesForTenantNetwork(KubevirtNode node,
-                                                 KubevirtNetwork network) {
+    private boolean setDefaultRulesForTenantNetwork(KubevirtNode node,
+                                                    KubevirtNetwork network) {
         DeviceId deviceId = network.tenantDeviceId(node.hostname());
 
+        // this runs on the shared event executor, so waiting for the bridge
+        // indefinitely would stall every network/router/node event
+        // cluster-wide; after the bounded grace period give up - the bridge
+        // device listener replays this setup once the device connects
+        int attempts = 0;
         while (!deviceService.isAvailable(deviceId)) {
+            if (++attempts > TENANT_BRIDGE_WAIT_MAX_ATTEMPTS) {
+                log.error("Tenant bridge {} of network {} on node {} is not " +
+                        "available; deferring its default rule installation " +
+                        "to the device event path", network.tenantBridgeName(),
+                        network.networkId(), node.hostname());
+                return false;
+            }
             log.warn("Device {} is not ready for installing rules", deviceId);
             waitFor(3);
         }
@@ -487,6 +500,7 @@ public class KubevirtNetworkHandler {
         }
 
         log.info("Install default flow rules for tenant bridge {}", network.tenantBridgeName());
+        return true;
     }
 
     private void setDhcpRule(DeviceId deviceId, boolean install) {
@@ -1399,10 +1413,14 @@ public class KubevirtNetworkHandler {
                         case GENEVE:
                             createBridge(node, network);
                             createPatchTenantInterface(node, network);
-                            setDefaultRulesForTenantNetwork(node, network);
-                            setGatewayArpRulesForTenantNetwork(node, network);
-                            setGatewayIcmpRulesForTenantNetwork(node, network);
-                            setGatewayRuleToWorkerNodeWhenNodeCreated(node, network);
+                            // the gateway rules below target the same tenant
+                            // bridge; when it is not up yet the whole block is
+                            // replayed by the bridge device listener instead
+                            if (setDefaultRulesForTenantNetwork(node, network)) {
+                                setGatewayArpRulesForTenantNetwork(node, network);
+                                setGatewayIcmpRulesForTenantNetwork(node, network);
+                                setGatewayRuleToWorkerNodeWhenNodeCreated(node, network);
+                            }
                             break;
                         case FLAT:
                         case VLAN:
@@ -1541,10 +1559,48 @@ public class KubevirtNetworkHandler {
                         processPortAddition(device, port);
                     });
                     break;
+                case DEVICE_ADDED:
+                case DEVICE_AVAILABILITY_CHANGED:
+                    eventExecutor.execute(() -> {
+                        if (!isRelevantHelper()) {
+                            return;
+                        }
+                        if (deviceService.isAvailable(device.id())) {
+                            processDeviceAddition(device);
+                        }
+                    });
+                    break;
                 case PORT_REMOVED:
                 default:
                     // do nothing
                     break;
+            }
+        }
+
+        private void processDeviceAddition(Device device) {
+            // if the device is a tenant bridge that connected after the
+            // bounded wait in setDefaultRulesForTenantNetwork gave up,
+            // replay the deferred setup; for bridges programmed in time
+            // this is an idempotent re-install
+            for (KubevirtNetwork network : networkService.tenantNetworks()) {
+                if (network.segmentId() == null) {
+                    continue;
+                }
+
+                KubevirtNode node = nodeService.completeNodes(WORKER).stream()
+                        .filter(n -> network.tenantDeviceId(n.hostname()).equals(device.id()))
+                        .findAny().orElse(null);
+                if (node == null) {
+                    continue;
+                }
+
+                createPatchTenantInterface(node, network);
+                if (setDefaultRulesForTenantNetwork(node, network)) {
+                    setGatewayArpRulesForTenantNetwork(node, network);
+                    setGatewayIcmpRulesForTenantNetwork(node, network);
+                    setGatewayRuleToWorkerNodeWhenNodeCreated(node, network);
+                }
+                return;
             }
         }
 
