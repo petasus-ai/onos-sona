@@ -44,8 +44,11 @@ import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -57,7 +60,6 @@ import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnetworking.api.Constants.KUBEVIRT_NETWORKING_APP_ID;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.k8sClient;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.liveResourceKeys;
-import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.waitFor;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**
@@ -87,6 +89,8 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
     protected KubevirtApiConfigService configService;
 
     private static final long RECONNECT_DELAY_S = 5;
+    private static final int ORPHAN_RULE_RETRY_LIMIT = 10;
+    private static final long ORPHAN_RULE_RETRY_DELAY_S = 3;
 
     private final ExecutorService eventExecutor = newSingleThreadExecutor(
             groupedThreads(this.getClass().getSimpleName(), "event-handler", log));
@@ -117,6 +121,14 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
     // another re-instantiation, or the watch would flap forever
     private volatile boolean closingSgWatch;
     private volatile boolean closingSgrWatch;
+
+    // rules whose parent group has not reached the store yet, keyed by rule
+    // id; groups and rules arrive on separate watches with no ordering
+    // guarantee, so a rule showing up first is normal (typical on the initial
+    // sync replay). Entries leave the map when the group watcher flushes
+    // them, when the rule is deleted, or when the bounded retries expire.
+    private final Map<String, KubevirtSecurityGroupRule> pendingRules =
+            new ConcurrentHashMap<>();
 
     private final InternalSecurityGroupWatcher
             sgWatcher = new InternalSecurityGroupWatcher();
@@ -406,6 +418,77 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
         return null;
     }
 
+    private void createOrParkSecurityGroupRule(KubevirtSecurityGroupRule sgr) {
+        createOrParkSecurityGroupRule(sgr, 0);
+    }
+
+    /**
+     * Creates the rule if its parent group is in the store; otherwise parks it
+     * until the group watcher flushes it. A bounded retry backs the flush up
+     * for groups that arrive through other paths (REST, sync CLI). Never sleep
+     * here instead: this runs on the shared event executor, so a sleep also
+     * stalls the very group ADDED event it would be waiting for, and the
+     * manager then throws IllegalStateException which kills the runnable and
+     * loses the rule until the next watch reconnect.
+     *
+     * @param sgr     security group rule to create
+     * @param attempt number of creation attempts made so far
+     */
+    private void createOrParkSecurityGroupRule(KubevirtSecurityGroupRule sgr, int attempt) {
+        if (!isMaster()) {
+            // leadership moved while the rule was parked; the new leader's
+            // own watch replay covers it
+            pendingRules.remove(sgr.id());
+            return;
+        }
+
+        if (adminService.securityGroupRule(sgr.id()) != null) {
+            pendingRules.remove(sgr.id());
+            return;
+        }
+
+        if (adminService.securityGroup(sgr.securityGroupId()) != null) {
+            pendingRules.remove(sgr.id());
+            try {
+                adminService.createSecurityGroupRule(sgr);
+                return;
+            } catch (IllegalStateException e) {
+                // the store resync may prune the group from another thread
+                // between the check and the create; park and retry below
+                log.debug("Creating security group rule {} failed: {}",
+                        sgr.id(), e.getMessage());
+            }
+        }
+
+        if (attempt >= ORPHAN_RULE_RETRY_LIMIT) {
+            pendingRules.remove(sgr.id());
+            log.warn("Giving up creating security group rule {} after {} " +
+                    "attempts: security group {} never arrived",
+                    sgr.id(), attempt, sgr.securityGroupId());
+            return;
+        }
+
+        pendingRules.put(sgr.id(), sgr);
+        log.debug("Parking security group rule {} until security group {} " +
+                "arrives (attempt {})", sgr.id(), sgr.securityGroupId(), attempt);
+        reconnectExecutor.schedule(() -> eventExecutor.execute(() -> {
+            KubevirtSecurityGroupRule pending = pendingRules.get(sgr.id());
+            if (pending == null) {
+                // flushed by the group watcher or deleted in the meantime
+                return;
+            }
+            createOrParkSecurityGroupRule(pending, attempt + 1);
+        }), ORPHAN_RULE_RETRY_DELAY_S, TimeUnit.SECONDS);
+    }
+
+    private void flushPendingRules(String sgId) {
+        // copy first: the creation mutates the map while we iterate
+        List<KubevirtSecurityGroupRule> parked = pendingRules.values().stream()
+                .filter(sgr -> Objects.equals(sgr.securityGroupId(), sgId))
+                .collect(Collectors.toList());
+        parked.forEach(this::createOrParkSecurityGroupRule);
+    }
+
     private class InternalKubevirtApiConfigListener implements KubevirtApiConfigListener {
 
         private boolean isRelevantHelper() {
@@ -499,6 +582,10 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
                     // the ones already reconciled from the rule CRD
                     adminService.updateSecurityGroup(sg.updateRules(orig.rules()));
                 }
+
+                // rules that arrived ahead of this group are parked; create
+                // them now that the group is in the store
+                flushPendingRules(sg.id());
             }
         }
 
@@ -589,16 +676,7 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
             if (sgr != null) {
                 log.trace("Process Security Group Rule {} creating event from API server.", sgr.id());
 
-                KubevirtSecurityGroup sg = adminService.securityGroup(sgr.securityGroupId());
-                if (sg == null) {
-                    log.warn("Security Group {} is not found, we wait 5 seconds until " +
-                             "the group to be installed.", sgr.securityGroupId());
-                    waitFor(5);
-                }
-
-                if (adminService.securityGroupRule(sgr.id()) == null) {
-                    adminService.createSecurityGroupRule(sgr);
-                }
+                createOrParkSecurityGroupRule(sgr);
             }
         }
 
@@ -621,7 +699,15 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
             if (sgr != null) {
                 log.trace("Process Security Group Rule {} removal event from API server.", sgr.id());
 
-                adminService.removeSecurityGroupRule(sgr.id());
+                // drop any parked copy first, or a later flush would
+                // resurrect the deleted rule as a stale ACL
+                pendingRules.remove(sgr.id());
+
+                // a rule deleted while parked never reached the store, and
+                // removing an absent rule throws
+                if (adminService.securityGroupRule(sgr.id()) != null) {
+                    adminService.removeSecurityGroupRule(sgr.id());
+                }
             }
         }
     }
