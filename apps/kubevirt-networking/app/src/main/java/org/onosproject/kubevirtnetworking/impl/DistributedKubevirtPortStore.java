@@ -43,7 +43,6 @@ import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.slf4j.Logger;
 
 import java.util.Collection;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
@@ -170,12 +169,25 @@ public class DistributedKubevirtPortStore
                     break;
                 case UPDATE:
                     log.debug("Kubevirt port updated");
-                    eventExecutor.execute(() ->
-                            notifyDelegate(new KubevirtPortEvent(
-                                    KUBEVIRT_PORT_UPDATED, event.newValue().value())));
-                    processSecurityGroupEvent(event.oldValue().value(), event.newValue().value());
-                    processDeviceEvent(event.oldValue().value(), event.newValue().value());
-                    processPortEvent(event.oldValue().value(), event.newValue().value());
+                    // publish the derived events (security group, device, IP)
+                    // on the same single-thread executor as CREATED/UPDATED;
+                    // publishing them synchronously from the Atomix map-event
+                    // thread put them on a separate lane, so a DEVICE_ADDED
+                    // could overtake the CREATED it derives from (typical on
+                    // a resync replay of ports that already carry a device).
+                    // UPDATED goes last: handlers were written against the
+                    // prevailing delivery order (e.g. MIGRATED first, then
+                    // the UPDATED reinstall)
+                    eventExecutor.execute(() -> {
+                        processSecurityGroupEvent(
+                                event.oldValue().value(), event.newValue().value());
+                        processDeviceEvent(
+                                event.oldValue().value(), event.newValue().value());
+                        processPortEvent(
+                                event.oldValue().value(), event.newValue().value());
+                        notifyDelegate(new KubevirtPortEvent(
+                                KUBEVIRT_PORT_UPDATED, event.newValue().value()));
+                    });
                     break;
                 case REMOVE:
                     log.debug("Kubevirt port removed");
@@ -200,14 +212,13 @@ public class DistributedKubevirtPortStore
                     ImmutableSet.of() : newPort.securityGroups();
 
             oldSecurityGroups.stream()
-                    .filter(sgId -> !Objects.requireNonNull(
-                            newPort.securityGroups()).contains(sgId))
+                    .filter(sgId -> !newSecurityGroups.contains(sgId))
                     .forEach(sgId -> notifyDelegate(new KubevirtPortEvent(
                             KUBEVIRT_PORT_SECURITY_GROUP_REMOVED, newPort, sgId
                     )));
 
             newSecurityGroups.stream()
-                    .filter(sgId -> !oldPort.securityGroups().contains(sgId))
+                    .filter(sgId -> !oldSecurityGroups.contains(sgId))
                     .forEach(sgId -> notifyDelegate(new KubevirtPortEvent(
                             KUBEVIRT_PORT_SECURITY_GROUP_ADDED, newPort, sgId
                     )));
