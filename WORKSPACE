@@ -198,7 +198,14 @@ node_repositories(
         "10.16.0-windows_amd64": ("node-v10.16.0-win-x64.zip", "node-v10.16.0-win-x64", "aa22cb357f0fb54ccbc06b19b60e37eefea5d7dd9940912675d3ed988bf9a059"),
     },
     node_version = "10.16.0",
-    node_urls = ["https://mirrors.cloud.tencent.com/nodejs-release/v{version}/{filename}"],
+    # Bazel tries these in order, so a single mirror timing out no longer
+    # fails the build; the pinned sha256 above guards integrity on all of
+    # them. The bazel mirror lacks the linux-arm64 tarball, hence last.
+    node_urls = [
+        "https://nodejs.org/dist/v{version}/{filename}",
+        "https://mirrors.cloud.tencent.com/nodejs-release/v{version}/{filename}",
+        "https://mirror.bazel.build/nodejs.org/dist/v{version}/{filename}",
+    ],
 )
 
 # TODO give this a name like `gui2_npm` once the @bazel/karma tools can tolerate a name other than `npm`
