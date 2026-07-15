@@ -102,15 +102,15 @@ public class KubevirtPrometheusAssuranceManager implements KubevirtPrometheusAss
     private StatsCollector collector;
     private ScheduledFuture result;
 
-    private Gauge byteFIPTx;
-    private Gauge pktFIPTx;
-    private Gauge byteFIPRx;
-    private Gauge pktFIPRx;
+    private Gauge byteFipTx;
+    private Gauge pktFipTx;
+    private Gauge byteFipRx;
+    private Gauge pktFipRx;
 
-    private Gauge byteSNATTx;
-    private Gauge pktSNATTx;
-    private Gauge byteSNATRx;
-    private Gauge pktSNATRx;
+    private Gauge byteSnatTx;
+    private Gauge pktSnatTx;
+    private Gauge byteSnatRx;
+    private Gauge pktSnatRx;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected CoreService coreService;
@@ -145,43 +145,43 @@ public class KubevirtPrometheusAssuranceManager implements KubevirtPrometheusAss
     }
 
     private void registerMetrics() {
-        byteFIPTx = Gauge.build()
+        byteFipTx = Gauge.build()
                 .name("fip_tx_byte")
                 .help("fip_tx_byte")
                 .labelNames(FIP_LABEL_TAGS)
                 .register();
-        pktFIPTx = Gauge.build()
+        pktFipTx = Gauge.build()
                 .name("fip_tx_pkts")
                 .help("fip_tx_pkts")
                 .labelNames(FIP_LABEL_TAGS)
                 .register();
-        byteFIPRx = Gauge.build()
+        byteFipRx = Gauge.build()
                 .name("fip_rx_byte")
                 .help("fip_rx_byte")
                 .labelNames(FIP_LABEL_TAGS)
                 .register();
-        pktFIPRx = Gauge.build()
+        pktFipRx = Gauge.build()
                 .name("fip_rx_pkts")
                 .help("fip_rx_pkts")
                 .labelNames(FIP_LABEL_TAGS)
                 .register();
 
-        byteSNATTx = Gauge.build()
+        byteSnatTx = Gauge.build()
                 .name("snat_tx_byte")
                 .help("snat_rx_pkts")
                 .labelNames(SNAT_LABEL_TAGS)
                 .register();
-        pktSNATTx = Gauge.build()
+        pktSnatTx = Gauge.build()
                 .name("snat_tx_pkts")
                 .help("snat_tx_pkts")
                 .labelNames(SNAT_LABEL_TAGS)
                 .register();
-        byteSNATRx = Gauge.build()
+        byteSnatRx = Gauge.build()
                 .name("snat_rx_byte")
                 .help("snat_rx_byte")
                 .labelNames(SNAT_LABEL_TAGS)
                 .register();
-        pktSNATRx = Gauge.build()
+        pktSnatRx = Gauge.build()
                 .name("snat_rx_pkts")
                 .help("snat_rx_pkts")
                 .labelNames(SNAT_LABEL_TAGS)
@@ -189,14 +189,14 @@ public class KubevirtPrometheusAssuranceManager implements KubevirtPrometheusAss
     }
 
     private void unregisterMetrics() {
-        unregister(byteFIPTx);
-        unregister(pktFIPTx);
-        unregister(byteFIPRx);
-        unregister(pktFIPRx);
-        unregister(byteSNATTx);
-        unregister(pktSNATTx);
-        unregister(byteSNATRx);
-        unregister(pktSNATRx);
+        unregister(byteFipTx);
+        unregister(pktFipTx);
+        unregister(byteFipRx);
+        unregister(pktFipRx);
+        unregister(byteSnatTx);
+        unregister(pktSnatTx);
+        unregister(byteSnatRx);
+        unregister(pktSnatRx);
     }
 
     private void unregister(Collector collector) {
@@ -279,8 +279,8 @@ public class KubevirtPrometheusAssuranceManager implements KubevirtPrometheusAss
                     fipLabelValues[3] = floatingIp.vmName();
                     fipLabelValues[4] = floatingIp.networkName();
 
-                    pktFIPTx.labels(fipLabelValues).set(flowEntry.packets());
-                    byteFIPTx.labels(fipLabelValues).set(flowEntry.bytes());
+                    pktFipTx.labels(fipLabelValues).set(flowEntry.packets());
+                    byteFipTx.labels(fipLabelValues).set(flowEntry.bytes());
 
                 } else if (((IndexTableId) flowEntry.table()).id() == GW_ENTRY_TABLE &&
                         flowEntry.priority() == PRIORITY_FLOATING_IP_DOWNSTREAM_RULE) {
@@ -297,8 +297,8 @@ public class KubevirtPrometheusAssuranceManager implements KubevirtPrometheusAss
                     fipLabelValues[3] = floatingIp.vmName();
                     fipLabelValues[4] = floatingIp.networkName();
 
-                    pktFIPRx.labels(fipLabelValues).set(flowEntry.packets());
-                    byteFIPRx.labels(fipLabelValues).set(flowEntry.bytes());
+                    pktFipRx.labels(fipLabelValues).set(flowEntry.packets());
+                    byteFipRx.labels(fipLabelValues).set(flowEntry.bytes());
                 }
             });
         });
@@ -338,16 +338,16 @@ public class KubevirtPrometheusAssuranceManager implements KubevirtPrometheusAss
                                 snatLabelValues[0] = router.name();
                                 snatLabelValues[1] = routerSnatIp;
                                 snatLabelValues[2] = gateway.hostname();
-                                pktSNATTx.labels(snatLabelValues).set(flowEntry.packets());
-                                byteSNATTx.labels(snatLabelValues).set(flowEntry.bytes());
+                                pktSnatTx.labels(snatLabelValues).set(flowEntry.packets());
+                                byteSnatTx.labels(snatLabelValues).set(flowEntry.bytes());
 
                             } else if (isSnatDownstreamFlorEntryForRouter(routerSnatIp, flowEntry)) {
                                 String[] snatLabelValues = new String[3];
                                 snatLabelValues[0] = router.name();
                                 snatLabelValues[1] = routerSnatIp;
                                 snatLabelValues[2] = gateway.hostname();
-                                pktSNATRx.labels(snatLabelValues).set(flowEntry.packets());
-                                byteSNATRx.labels(snatLabelValues).set(flowEntry.bytes());
+                                pktSnatRx.labels(snatLabelValues).set(flowEntry.packets());
+                                byteSnatRx.labels(snatLabelValues).set(flowEntry.bytes());
                             }
                         }
                     });
