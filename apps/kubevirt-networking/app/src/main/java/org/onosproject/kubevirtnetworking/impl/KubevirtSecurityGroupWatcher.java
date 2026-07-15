@@ -579,8 +579,14 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
                     // on a resync the API server re-delivers existing groups as
                     // ADDED; upsert so a group changed while the watch was down
                     // is not kept stale. The group CRD carries no rules, so keep
-                    // the ones already reconciled from the rule CRD
-                    adminService.updateSecurityGroup(sg.updateRules(orig.rules()));
+                    // the ones already reconciled from the rule CRD. Skip the
+                    // write when nothing changed: every reconnect replays every
+                    // group, and writing identical content just churns the
+                    // store and the log
+                    KubevirtSecurityGroup updated = sg.updateRules(orig.rules());
+                    if (!updated.equals(orig)) {
+                        adminService.updateSecurityGroup(updated);
+                    }
                 }
 
                 // rules that arrived ahead of this group are parked; create
@@ -600,11 +606,15 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
                 log.trace("Process Security Group {} updating event from API server.", sg.name());
 
                 // since Security Group CRD does not contains any rules information,
-                // we need to manually add all rules from original to the updated one
+                // we need to manually add all rules from original to the updated one.
+                // MODIFIED also fires for metadata/status-only changes that leave
+                // the spec untouched, so skip the write when nothing changed
                 KubevirtSecurityGroup orig = adminService.securityGroup(sg.id());
                 if (orig != null) {
                     KubevirtSecurityGroup updated = sg.updateRules(orig.rules());
-                    adminService.updateSecurityGroup(updated);
+                    if (!updated.equals(orig)) {
+                        adminService.updateSecurityGroup(updated);
+                    }
                 }
             }
         }
