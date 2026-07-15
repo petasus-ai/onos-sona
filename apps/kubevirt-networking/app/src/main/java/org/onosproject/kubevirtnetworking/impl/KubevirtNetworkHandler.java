@@ -1447,15 +1447,23 @@ public class KubevirtNetworkHandler {
             if (node.type().equals(GATEWAY)) {
                 kubevirtRouterService.routers()
                         .stream()
-                        .filter(router -> router.electedGateway().equals(node.hostname()))
+                        .filter(router -> Objects.equals(router.electedGateway(), node.hostname()))
                         .forEach(router -> {
-                            router.internal().forEach(networkName -> {
-                                KubevirtNetwork network = networkService.network(networkName);
+                            // a failure purging one router's rules must not
+                            // prevent the remaining routers from being purged
+                            // and re-elected below
+                            try {
+                                router.internal().forEach(networkName -> {
+                                    KubevirtNetwork network = networkService.network(networkName);
 
-                                if (network != null) {
-                                    initGatewayNodeForInternalNetwork(network, router, node, false);
-                                }
-                            });
+                                    if (network != null) {
+                                        initGatewayNodeForInternalNetwork(network, router, node, false);
+                                    }
+                                });
+                            } catch (Exception e) {
+                                log.warn("Failed to purge gateway rules of router {} " +
+                                        "from gateway {}", router.name(), node.hostname(), e);
+                            }
                         });
                 updateGatewayNodeForRouter();
             }
