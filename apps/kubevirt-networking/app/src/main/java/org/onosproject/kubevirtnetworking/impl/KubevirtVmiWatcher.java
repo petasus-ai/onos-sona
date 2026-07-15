@@ -69,6 +69,9 @@ public class KubevirtVmiWatcher {
     private static final String NODE_NAME = "nodeName";
     private static final String METADATA = "metadata";
     private static final String NAME = "name";
+    private static final String INTERFACES = "interfaces";
+    private static final String MAC = "mac";
+    private static final String DEFAULT = "default";
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected CoreService coreService;
@@ -311,8 +314,19 @@ public class KubevirtVmiWatcher {
                                         networkAdminService.networks(), resource);
 
             if (ports.size() == 0) {
-                // either the network store is not synced yet, or the VMI has
-                // no SONA-managed NIC at all; the latter just lets the bounded
+                if (!hasUsableInterface(resource)) {
+                    // virt-handler fills status.interfaces only after the
+                    // domain is up, and the retries re-parse this frozen
+                    // event snapshot, so waiting can never make the entries
+                    // appear; the MODIFIED event that carries the interfaces
+                    // re-enters this handler and completes the update
+                    log.debug("Skipping the device ID update of VMI {}: " +
+                            "status carries no usable interface yet", vmiName);
+                    return;
+                }
+                // the interfaces are present but match no known network:
+                // either the network store is not synced yet, or the NIC is
+                // not SONA-managed at all; the latter just lets the bounded
                 // retries expire without any effect
                 retryAddition(resource, vmiName, attempt,
                         "no interface matches a known network");
@@ -362,6 +376,33 @@ public class KubevirtVmiWatcher {
 
         private boolean isMaster() {
             return Objects.equals(localNodeId, leadershipService.getLeader(appId.name()));
+        }
+
+        // tells whether the VMI snapshot carries at least one interface entry
+        // that getPorts() can turn into a port: a non-default name plus a MAC;
+        // before the domain is up the status has no such entry, and retrying
+        // on the frozen snapshot can never change that
+        private boolean hasUsableInterface(String resource) {
+            try {
+                ObjectMapper mapper = new ObjectMapper();
+                JsonNode json = mapper.readTree(resource);
+                JsonNode statusJson = json.get(STATUS);
+                JsonNode interfacesJson = statusJson == null ?
+                        null : statusJson.get(INTERFACES);
+                if (interfacesJson == null) {
+                    return false;
+                }
+                for (JsonNode intf : interfacesJson) {
+                    JsonNode nameJson = intf.get(NAME);
+                    if (nameJson != null && !DEFAULT.equals(nameJson.asText())
+                            && intf.get(MAC) != null) {
+                        return true;
+                    }
+                }
+            } catch (IOException e) {
+                log.error("Failed to parse kubevirt VMI interfaces");
+            }
+            return false;
         }
 
         private String parseVmiName(String resource) {
