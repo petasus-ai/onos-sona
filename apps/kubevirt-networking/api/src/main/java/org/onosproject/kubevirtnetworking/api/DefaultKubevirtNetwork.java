@@ -219,6 +219,8 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
         DefaultKubevirtNetwork that = (DefaultKubevirtNetwork) o;
         return networkId.equals(that.networkId) && type == that.type &&
                 name.equals(that.name) && mtu.equals(that.mtu) &&
+                Objects.equals(segmentId, that.segmentId) &&
+                Objects.equals(physnetName, that.physnetName) &&
                 gatewayIp.equals(that.gatewayIp) && defaultRoute == that.defaultRoute &&
                 cidr.equals(that.cidr) && hostRoutes.equals(that.hostRoutes) &&
                 ipPool.equals(that.ipPool) &&

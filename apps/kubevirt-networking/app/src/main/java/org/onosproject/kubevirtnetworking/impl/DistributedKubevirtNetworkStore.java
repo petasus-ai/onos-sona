@@ -123,7 +123,13 @@ public class DistributedKubevirtNetworkStore
     @Override
     public void updateNetwork(KubevirtNetwork network) {
         Versioned<KubevirtNetwork> result = networkStore.computeIfPresent(network.networkId(),
-                (networkId, existing) -> preserveIpAllocations(existing, network));
+                (networkId, existing) -> {
+                    KubevirtNetwork merged = preserveIpAllocations(existing, network);
+                    // hand the stored value back when the merge changed nothing
+                    // so the consistent map treats it as a no-op instead of
+                    // rewriting identical content on every watch replay
+                    return merged.equals(existing) ? existing : merged;
+                });
         if (result == null) {
             throw new IllegalArgumentException(network.networkId() + ERR_NOT_FOUND);
         }
@@ -193,9 +199,11 @@ public class DistributedKubevirtNetworkStore
 
     // carries the stored pool's allocation state across a wholesale spec update
     // (NAD refresh, REST PUT, sync) so IPAM state is not reset; allocation goes
-    // through the dedicated compute paths above, never through updateNetwork
-    private static KubevirtNetwork preserveIpAllocations(KubevirtNetwork existing,
-                                                         KubevirtNetwork incoming) {
+    // through the dedicated compute paths above, never through updateNetwork.
+    // Package-visible so the NAD watcher can predict whether an update would
+    // be a no-op and skip it altogether
+    static KubevirtNetwork preserveIpAllocations(KubevirtNetwork existing,
+                                                 KubevirtNetwork incoming) {
         KubevirtIpPool existingPool = existing.ipPool();
         KubevirtIpPool incomingPool = incoming.ipPool();
         if (existingPool == null || incomingPool == null ||

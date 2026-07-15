@@ -506,9 +506,13 @@ public class KubernetesServiceWatcher {
 
             log.trace("processAddOrMod called and parsed lb is {}", lb);
 
-            if (adminService.loadBalancer(lb.serviceName()) == null) {
+            KubernetesExternalLb existing = adminService.loadBalancer(lb.serviceName());
+            if (existing == null) {
                 adminService.createExternalLb(lb);
-            } else {
+            } else if (!lb.equals(existing)) {
+                // every watch reconnect replays every service as ADDED, so
+                // skip the write when nothing changed to avoid churning the
+                // store and re-triggering the flow rule handlers
                 adminService.updateExternalLb(lb);
             }
             return true;

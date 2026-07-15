@@ -350,12 +350,15 @@ public class NetworkAttachmentDefinitionWatcher {
 
             KubevirtNetwork network = parseKubevirtNetwork(resource);
             if (network != null) {
-                if (adminService.network(network.networkId()) == null) {
+                KubevirtNetwork existing = adminService.network(network.networkId());
+                if (existing == null) {
                     adminService.createNetwork(network);
-                } else {
+                } else if (changed(existing, network)) {
                     // on a resync the API server re-delivers existing networks
                     // as ADDED; upsert so one changed while the watch was down
-                    // is not silently kept stale
+                    // is not silently kept stale. Skip the write when nothing
+                    // changed: every reconnect replays every network, and
+                    // writing identical content just churns the store and log
                     adminService.updateNetwork(network);
                 }
             }
@@ -373,7 +376,14 @@ public class NetworkAttachmentDefinitionWatcher {
 
             KubevirtNetwork network = parseKubevirtNetwork(resource);
             if (network != null) {
-                adminService.updateNetwork(network);
+                KubevirtNetwork existing = adminService.network(network.networkId());
+                if (existing == null) {
+                    adminService.createNetwork(network);
+                } else if (changed(existing, network)) {
+                    // MODIFIED also fires for metadata/status-only changes that
+                    // leave the spec untouched, so skip the no-op write
+                    adminService.updateNetwork(network);
+                }
             }
         }
 
@@ -394,6 +404,15 @@ public class NetworkAttachmentDefinitionWatcher {
 
         private boolean isMaster() {
             return Objects.equals(localNodeId, leadershipService.getLeader(appId.name()));
+        }
+
+        // the store grafts the stored pool's IP allocations onto the incoming
+        // network on update, so compare the post-merge result; a plain equals
+        // would flag every network with an allocated IP as changed and re-write
+        // it on every watch replay
+        private boolean changed(KubevirtNetwork existing, KubevirtNetwork incoming) {
+            return !DistributedKubevirtNetworkStore
+                    .preserveIpAllocations(existing, incoming).equals(existing);
         }
     }
 }
