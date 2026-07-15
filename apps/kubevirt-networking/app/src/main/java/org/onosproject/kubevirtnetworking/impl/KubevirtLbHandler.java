@@ -38,6 +38,8 @@ import org.onosproject.kubevirtnetworking.api.KubevirtLoadBalancerService;
 import org.onosproject.kubevirtnetworking.api.KubevirtNetwork;
 import org.onosproject.kubevirtnetworking.api.KubevirtNetworkService;
 import org.onosproject.kubevirtnetworking.api.KubevirtPort;
+import org.onosproject.kubevirtnetworking.api.KubevirtPortEvent;
+import org.onosproject.kubevirtnetworking.api.KubevirtPortListener;
 import org.onosproject.kubevirtnetworking.api.KubevirtPortService;
 import org.onosproject.kubevirtnetworking.api.KubevirtRouter;
 import org.onosproject.kubevirtnetworking.api.KubevirtRouterEvent;
@@ -154,6 +156,8 @@ public class KubevirtLbHandler {
 
     private final InternalRouterEventListener kubevirtRouterlistener = new InternalRouterEventListener();
 
+    private final InternalPortListener kubevirtPortListener = new InternalPortListener();
+
     @Activate
     protected void activate() {
         appId = coreService.registerApplication(KUBEVIRT_NETWORKING_APP_ID);
@@ -162,6 +166,7 @@ public class KubevirtLbHandler {
 
         loadBalancerService.addListener(lbEventListener);
         routerService.addListener(kubevirtRouterlistener);
+        portService.addListener(kubevirtPortListener);
 
 
         log.info("Started");
@@ -173,6 +178,7 @@ public class KubevirtLbHandler {
 
         loadBalancerService.removeListener(lbEventListener);
         routerService.removeListener(kubevirtRouterlistener);
+        portService.removeListener(kubevirtPortListener);
 
         eventExecutor.shutdown();
 
@@ -463,10 +469,16 @@ public class KubevirtLbHandler {
         }
 
         loadBalancer.members().forEach(ip -> {
-            ports.stream().filter(port -> port.ipAddress().equals(ip) && port.macAddress() != null)
+            ports.stream().filter(port -> ip.equals(port.ipAddress()) && port.macAddress() != null)
                     .findAny().ifPresent(port -> {
 
                         KubevirtNode workerNode = nodeService.node(port.deviceId());
+                        if (workerNode == null) {
+                            log.warn("Failed to set lb tun bridge rules for member {} of lb {} " +
+                                    "because the worker node hosting the member is not found",
+                                    ip, loadBalancer.name());
+                            return;
+                        }
 
                         TrafficSelector.Builder sBuilder = DefaultTrafficSelector.builder()
                                 .matchEthType(Ethernet.TYPE_IPV4)
@@ -814,6 +826,64 @@ public class KubevirtLbHandler {
                 return;
             }
             processRouterGatewayNodeAttached(router, newGatewayNode.hostname());
+        }
+    }
+
+    private class InternalPortListener implements KubevirtPortListener {
+        private boolean isRelevantHelper() {
+            return Objects.equals(localNodeId, leadershipService.getLeader(appId.name()));
+        }
+
+        @Override
+        public void event(KubevirtPortEvent event) {
+            switch (event.type()) {
+                case KUBEVIRT_PORT_MIGRATED:
+                case KUBEVIRT_PORT_DEVICE_ADDED:
+                    // the downstream tun-bridge rule tunnels member traffic to
+                    // the worker node hosting the member VM; its selector does
+                    // not change across a migration, so reinstalling with the
+                    // new port overwrites the stale rule in place (same flow
+                    // ID) and no teardown of the old rule is needed
+                    eventExecutor.execute(() -> processMemberWorkerChange(event.subject()));
+                    break;
+                default:
+                    // do nothing
+                    break;
+            }
+        }
+
+        private void processMemberWorkerChange(KubevirtPort port) {
+            if (!isRelevantHelper()) {
+                return;
+            }
+
+            if (port.ipAddress() == null) {
+                return;
+            }
+
+            KubevirtNetwork network = networkService.network(port.networkId());
+            if (network == null) {
+                return;
+            }
+
+            if (network.type() != VXLAN && network.type() != GENEVE && network.type() != GRE) {
+                return;
+            }
+
+            KubevirtRouter router = getRouterForKubevirtNetwork(routerService, network);
+            if (router == null || router.electedGateway() == null) {
+                return;
+            }
+
+            KubevirtNode gateway = nodeService.node(router.electedGateway());
+            if (gateway == null) {
+                return;
+            }
+
+            loadBalancerService.loadBalancers().stream()
+                    .filter(lb -> Objects.equals(lb.networkId(), port.networkId()))
+                    .filter(lb -> lb.members().contains(port.ipAddress()))
+                    .forEach(lb -> setLbDownStreamRulesForTunBridge(lb, gateway, true));
         }
     }
 }
