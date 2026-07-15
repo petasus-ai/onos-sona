@@ -426,7 +426,24 @@ public class KubevirtRouterWatcher extends AbstractWatcher {
             log.trace("Process Virtual Router {} removal event from API server.",
                     id);
 
-            adminService.removeRouter(id);
+            // kubernetes guarantees no deletion order between the
+            // virtualrouters and floatingips CRs, so floating IPs may still
+            // reference the router when its DELETED event arrives. This is
+            // the only delivery of that event: cascade the floating IP
+            // removal instead of letting removeRouter's in-use guard reject
+            // the removal and leave the router in the store for good
+            try {
+                adminService.floatingIpsByRouter(id).forEach(fip -> {
+                    try {
+                        adminService.removeFloatingIp(fip.id());
+                    } catch (IllegalArgumentException e) {
+                        // already removed by the floating IP watcher
+                    }
+                });
+                adminService.removeRouter(id);
+            } catch (IllegalArgumentException | IllegalStateException e) {
+                log.warn("Failed to remove router {}: {}", id, e.getMessage());
+            }
         }
 
         private boolean isMaster() {

@@ -400,7 +400,13 @@ public class KubevirtFloatingIpWatcher extends AbstractWatcher {
             if (fip != null) {
                 log.trace("Process floating IP {} removal event from API server.", fip.floatingIp());
 
-                adminService.removeFloatingIp(fip.id());
+                try {
+                    adminService.removeFloatingIp(fip.id());
+                } catch (IllegalArgumentException e) {
+                    // already removed as part of its router's cascading
+                    // removal; nothing left to do
+                    log.debug("Floating IP {} was already removed", fip.floatingIp());
+                }
             }
         }
 
