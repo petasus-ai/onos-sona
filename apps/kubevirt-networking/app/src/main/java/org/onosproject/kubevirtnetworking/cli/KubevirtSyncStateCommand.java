@@ -110,30 +110,33 @@ public class KubevirtSyncStateCommand extends AbstractShellCommand {
 
         print("Re-synchronizing Kubevirt states..");
         KubevirtApiConfig config = apiConfigService.apiConfig();
-        KubernetesClient k8sClient = k8sClient(config);
 
-        if (k8sClient == null) {
-            error("Failed to initialize Kubernetes client.");
-            return;
+        // the client owns an OkHttp dispatcher and connection pool, so close
+        // it once the sync is done or every CLI invocation leaks its threads
+        try (KubernetesClient k8sClient = k8sClient(config)) {
+            if (k8sClient == null) {
+                error("Failed to initialize Kubernetes client.");
+                return;
+            }
+
+            // try to sync nodes
+            syncNodes(k8sClient);
+
+            // try to sync networks
+            syncNetworks(k8sClient);
+
+            // try to sync routers
+            syncRouters(k8sClient);
+
+            // try to sync security groups
+            syncSecurityGroups(k8sClient);
+
+            // try to sync security group rules
+            syncSecurityGroupRules(k8sClient);
+
+            // try to sync load balancers
+            syncLoadBalancers(k8sClient);
         }
-
-        // try to sync nodes
-        syncNodes(k8sClient);
-
-        // try to sync networks
-        syncNetworks(k8sClient);
-
-        // try to sync routers
-        syncRouters(k8sClient);
-
-        // try to sync security groups
-        syncSecurityGroups(k8sClient);
-
-        // try to sync security group rules
-        syncSecurityGroupRules(k8sClient);
-
-        // try to sync load balancers
-        syncLoadBalancers(k8sClient);
 
         print("Done.");
     }
