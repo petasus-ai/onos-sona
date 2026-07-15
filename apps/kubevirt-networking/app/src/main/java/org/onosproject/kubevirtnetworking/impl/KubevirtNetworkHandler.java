@@ -1249,18 +1249,23 @@ public class KubevirtNetworkHandler {
                 return;
             }
 
+            // the old gateway may already be gone from the node store
+            // (scale-in); its cleanup is best-effort and must not stop the
+            // new gateway from being programmed. cleanup stays before the
+            // install: the worker-side rules of the old and the new gateway
+            // share flow IDs (the gateway only appears in the treatment), so
+            // removing the old ones afterwards would delete the rules just
+            // installed
             KubevirtNode oldGatewayNode = nodeService.node(disAssociatedGateway);
-            if (oldGatewayNode == null) {
-                return;
+            if (oldGatewayNode != null) {
+                router.internal().forEach(networkName -> {
+                    KubevirtNetwork network = networkService.network(networkName);
+
+                    if (network != null) {
+                        initGatewayNodeForInternalNetwork(network, router, oldGatewayNode, false);
+                    }
+                });
             }
-
-            router.internal().forEach(networkName -> {
-                KubevirtNetwork network = networkService.network(networkName);
-
-                if (network != null) {
-                    initGatewayNodeForInternalNetwork(network, router, oldGatewayNode, false);
-                }
-            });
 
             KubevirtNode newGatewayNode = nodeService.node(router.electedGateway());
             if (newGatewayNode == null) {
