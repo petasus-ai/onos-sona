@@ -221,11 +221,14 @@ public class KubernetesConfigMapWatcher {
         public void eventReceived(Action action, ConfigMap configMap) {
             switch (action) {
                 case ADDED:
-                    log.info("ConfigMap event ADDED received");
+                    // every watch (re)connect replays the current config map as
+                    // ADDED/MODIFIED regardless of any actual change, so receipt
+                    // alone is routine; an applied change is logged separately
+                    log.debug("ConfigMap event ADDED received");
                     eventExecutor.execute(() -> processAddOrMod(configMap));
                     break;
                 case MODIFIED:
-                    log.info("ConfigMap event MODIFIED received");
+                    log.debug("ConfigMap event MODIFIED received");
                     eventExecutor.execute(() -> processAddOrMod(configMap));
                     break;
                 case DELETED:
@@ -253,8 +256,8 @@ public class KubernetesConfigMapWatcher {
             if (e != null && e.isHttpGone()) {
                 // expected 410: our (stale) resourceVersion aged out of the
                 // API server watch cache; the reconnect re-lists from a fresh
-                // version, so log it without the noisy stack trace
-                log.info("Configmap watcher expired (too old resource version), " +
+                // version, so log it at debug without the noisy stack trace
+                log.debug("Configmap watcher expired (too old resource version), " +
                         "re-instantiating in {}s", RECONNECT_DELAY_S);
             } else {
                 log.warn("Configmap watcher closed, re-instantiating in {}s",

@@ -264,8 +264,8 @@ public class KubevirtNodeWatcher {
             if (e != null && e.isHttpGone()) {
                 // expected 410: our (stale) resourceVersion aged out of the
                 // API server watch cache; the reconnect re-lists from a fresh
-                // version, so log it without the noisy stack trace
-                log.info("Node watcher expired (too old resource version), " +
+                // version, so log it at debug without the noisy stack trace
+                log.debug("Node watcher expired (too old resource version), " +
                         "re-instantiating in {}s", RECONNECT_DELAY_S);
             } else {
                 log.warn("Node watcher closed, re-instantiating in {}s",
