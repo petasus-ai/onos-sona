@@ -469,11 +469,11 @@ public class KubevirtVmWatcher {
                     if (!existing.securityGroups().equals(sgs)) {
                         updatedPort = updatedPort.updateSecurityGroups(sgs);
                     }
-                    if (!existing.ipAddress().equals(ip)) {
+                    if (!Objects.equals(existing.ipAddress(), ip)) {
                         updatedPort = updatedPort.updateIpAddress(ip);
                     }
                     if (!existing.securityGroups().equals(sgs) ||
-                            !existing.ipAddress().equals(ip)) {
+                            !Objects.equals(existing.ipAddress(), ip)) {
                         portAdminService.updatePort(updatedPort);
                     }
                 }
@@ -535,8 +535,14 @@ public class KubevirtVmWatcher {
                 ArrayNode interfaces = (ArrayNode) mapper.readTree(interfacesString);
                 for (JsonNode intf : interfaces) {
                     String network = intf.get(NETWORK).asText();
-                    String ip = intf.get(IP).asText();
-                    result.put(network, IpAddress.valueOf(ip));
+                    JsonNode ipJson = intf.get(IP);
+                    // SR-IOV fabric NICs (e.g. InfiniBand) are listed without
+                    // an IP address; skip them so one IP-less entry does not
+                    // abort port creation for the entire VM.
+                    if (ipJson == null || ipJson.isNull()) {
+                        continue;
+                    }
+                    result.put(network, IpAddress.valueOf(ipJson.asText()));
                 }
 
                 return result;
