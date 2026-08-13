@@ -695,6 +695,11 @@ public class KubevirtNetworkHandler {
                                                             DeviceId gwDeviceId,
                                                             DeviceId tenantDeviceId,
                                                             boolean install) {
+        // an L2-only network has no gateway to answer ICMP for
+        if (network.gatewayIp() == null) {
+            return;
+        }
+
         MacAddress routerMacAddress = getRouterMacAddress(router);
 
         if (routerMacAddress == null) {
@@ -804,6 +809,10 @@ public class KubevirtNetworkHandler {
                                                            DeviceId gwDeviceId,
                                                            DeviceId tenantDeviceId,
                                                            boolean install) {
+        // an L2-only network has no gateway to answer ARP for
+        if (network.gatewayIp() == null) {
+            return;
+        }
 
         MacAddress routerMacAddress = getRouterMacAddress(router);
 
@@ -952,7 +961,10 @@ public class KubevirtNetworkHandler {
 
     private void setGatewayArpRuleForProviderInternalNetwork(KubevirtRouter router, KubevirtNetwork network,
                                                              int tableNum, DeviceId gwDeviceId, boolean install) {
-
+        // an L2-only network has no gateway to answer ARP for
+        if (network.gatewayIp() == null) {
+            return;
+        }
 
         Device device = deviceService.getDevice(gwDeviceId);
         MacAddress routerMacAddress = getRouterMacAddress(router);
@@ -1000,6 +1012,11 @@ public class KubevirtNetworkHandler {
      */
     private void setGatewayIcmpRuleForProviderInternalNetwork(KubevirtRouter router, KubevirtNetwork network,
                                                               int tableNum, DeviceId deviceId, boolean install) {
+        // an L2-only network has no gateway to answer ICMP for
+        if (network.gatewayIp() == null) {
+            return;
+        }
+
         MacAddress routerMacAddress = getRouterMacAddress(router);
 
         if (routerMacAddress == null) {

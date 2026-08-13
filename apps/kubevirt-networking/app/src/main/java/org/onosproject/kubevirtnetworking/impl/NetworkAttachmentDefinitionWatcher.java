@@ -348,7 +348,15 @@ public class NetworkAttachmentDefinitionWatcher {
             log.trace("Process NetworkAttachmentDefinition {} creating event from API server.",
                     name);
 
-            KubevirtNetwork network = parseKubevirtNetwork(resource);
+            // a malformed network-config must reject only this NAD, with a
+            // pointer to it - not surface as an uncaught executor exception
+            KubevirtNetwork network;
+            try {
+                network = parseKubevirtNetwork(resource);
+            } catch (Exception e) {
+                log.error("Failed to parse network-attachment-definition {}", name, e);
+                return;
+            }
             if (network != null) {
                 KubevirtNetwork existing = adminService.network(network.networkId());
                 if (existing == null) {
@@ -374,7 +382,13 @@ public class NetworkAttachmentDefinitionWatcher {
             log.trace("Process NetworkAttachmentDefinition {} updating event from API server.",
                     name);
 
-            KubevirtNetwork network = parseKubevirtNetwork(resource);
+            KubevirtNetwork network;
+            try {
+                network = parseKubevirtNetwork(resource);
+            } catch (Exception e) {
+                log.error("Failed to parse network-attachment-definition {}", name, e);
+                return;
+            }
             if (network != null) {
                 KubevirtNetwork existing = adminService.network(network.networkId());
                 if (existing == null) {

@@ -1270,8 +1270,15 @@ public final class KubevirtNetworkingUtil {
             }
 
             builder.networkId(id).name(name).type(KubevirtNetwork.Type.valueOf(type))
-                    .mtu(mtu).gatewayIp(IpAddress.valueOf(gatewayIp))
                     .defaultRoute(defaultRoute).cidr(cidr);
+
+            // the gateway is optional: an L2-only network (e.g. a storage
+            // subnet with no router) legitimately has none, and parsing an
+            // absent value with IpAddress.valueOf() would throw and abort
+            // the registration of the whole network
+            if (!gatewayIp.isEmpty()) {
+                builder.gatewayIp(IpAddress.valueOf(gatewayIp));
+            }
 
             return builder.build();
         }

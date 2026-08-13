@@ -222,7 +222,7 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
                 name.equals(that.name) && mtu.equals(that.mtu) &&
                 Objects.equals(segmentId, that.segmentId) &&
                 Objects.equals(physnetName, that.physnetName) &&
-                gatewayIp.equals(that.gatewayIp) && defaultRoute == that.defaultRoute &&
+                Objects.equals(gatewayIp, that.gatewayIp) && defaultRoute == that.defaultRoute &&
                 cidr.equals(that.cidr) && hostRoutes.equals(that.hostRoutes) &&
                 ipPool.equals(that.ipPool) &&
                 dnses.equals(that.dnses);

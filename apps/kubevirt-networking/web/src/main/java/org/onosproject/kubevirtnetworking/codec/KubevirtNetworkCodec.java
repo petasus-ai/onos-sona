@@ -66,9 +66,13 @@ public final class KubevirtNetworkCodec extends JsonCodec<KubevirtNetwork> {
                 .put(TYPE, network.type().name())
                 .put(NAME, network.name())
                 .put(MTU, network.mtu())
-                .put(GATEWAY_IP, network.gatewayIp().toString())
                 .put(DEFAULT_ROUTE, network.defaultRoute())
                 .put(CIDR, network.cidr());
+
+        // the gateway is absent on L2-only networks
+        if (network.gatewayIp() != null) {
+            result.put(GATEWAY_IP, network.gatewayIp().toString());
+        }
 
         if (network.segmentId() != null) {
             result.put(SEGMENT_ID, network.segmentId());
@@ -118,8 +122,6 @@ public final class KubevirtNetworkCodec extends JsonCodec<KubevirtNetwork> {
                 NAME + MISSING_MESSAGE);
         Integer mtu = nullIsIllegal(json.get(MTU).asInt(),
                 MTU + MISSING_MESSAGE);
-        String gatewayIp = nullIsIllegal(json.get(GATEWAY_IP).asText(),
-                GATEWAY_IP + MISSING_MESSAGE);
         boolean defaultRoute = nullIsIllegal(json.get(DEFAULT_ROUTE).asBoolean(),
                 DEFAULT_ROUTE + MISSING_MESSAGE);
         String cidr = nullIsIllegal(json.get(CIDR).asText(),
@@ -130,9 +132,14 @@ public final class KubevirtNetworkCodec extends JsonCodec<KubevirtNetwork> {
                 .type(KubevirtNetwork.Type.valueOf(type))
                 .name(name)
                 .mtu(mtu)
-                .gatewayIp(IpAddress.valueOf(gatewayIp))
                 .defaultRoute(defaultRoute)
                 .cidr(cidr);
+
+        // the gateway is optional: an L2-only network legitimately has none
+        JsonNode gatewayIpJson = json.get(GATEWAY_IP);
+        if (gatewayIpJson != null) {
+            networkBuilder.gatewayIp(IpAddress.valueOf(gatewayIpJson.asText()));
+        }
 
         if (!type.equals(KubevirtNetwork.Type.FLAT.name())) {
             JsonNode segmentIdJson = json.get(SEGMENT_ID);
