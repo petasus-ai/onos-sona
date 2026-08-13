@@ -91,6 +91,13 @@ public interface KubevirtPort {
     boolean isFlat();
 
     /**
+     * Returns the result whether the port is associated with the VLAN network.
+     *
+     * @return true if the port is associated with VLAN network, false otherwise
+     */
+    boolean isVlan();
+
+    /**
      * Returns the port number of the port.
      *
      * @return port number

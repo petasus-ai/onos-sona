@@ -602,7 +602,12 @@ public class KubevirtSecurityGroupHandler {
     private DeviceId aclDeviceId(KubevirtPort port) {
         if (port.isTenant()) {
             return port.tenantDeviceId();
-        } else if (port.isFlat()) {
+        } else if (port.isFlat() || port.isVlan()) {
+            // provider network VMs are wired to the physical bridge, and the
+            // ACL rules below are built against the provider ACL tables, so
+            // installing them anywhere else (e.g. the integration bridge,
+            // which has no ports on a worker) leaves them permanently unmatched
+            // while the physical bridge's ACL table-miss drops all VM traffic
             return port.physnetDeviceId();
         } else {
             return port.deviceId();

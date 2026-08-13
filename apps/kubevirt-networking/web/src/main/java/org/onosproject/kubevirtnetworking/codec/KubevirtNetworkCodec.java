@@ -139,7 +139,12 @@ public final class KubevirtNetworkCodec extends JsonCodec<KubevirtNetwork> {
             if (segmentIdJson != null) {
                 networkBuilder.segmentId(segmentIdJson.asText());
             }
-        } else {
+        }
+
+        // provider networks (FLAT and VLAN) are bound to a host NIC
+        // through the physnet name
+        if (type.equals(KubevirtNetwork.Type.FLAT.name()) ||
+                type.equals(KubevirtNetwork.Type.VLAN.name())) {
             JsonNode physnetNameJson = json.get(PHYSNET_NAME);
             if (physnetNameJson != null) {
                 networkBuilder.physnetName(physnetNameJson.asText());

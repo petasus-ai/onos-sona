@@ -160,6 +160,18 @@ public final class DefaultKubevirtPort implements KubevirtPort {
     }
 
     @Override
+    public boolean isVlan() {
+        KubevirtNetworkService networkService =
+                DefaultServiceDirectory.getService(KubevirtNetworkService.class);
+        KubevirtNetwork network = networkService.network(networkId);
+        if (network == null) {
+            return false;
+        } else {
+            return network.type() == KubevirtNetwork.Type.VLAN;
+        }
+    }
+
+    @Override
     public PortNumber portNumber() {
         return portNumber;
     }

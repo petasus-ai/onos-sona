@@ -94,6 +94,7 @@ import java.util.stream.Collectors;
 import static org.onosproject.kubevirtnetworking.api.Constants.CLI_MARGIN_LENGTH;
 import static org.onosproject.kubevirtnetworking.api.Constants.TUNNEL_TO_TENANT_PREFIX;
 import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.FLAT;
+import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.VLAN;
 import static org.onosproject.kubevirtnode.api.Constants.CALICO_PROJECT_DOMAIN;
 import static org.onosproject.kubevirtnode.api.Constants.SONA_PROJECT_DOMAIN;
 import static org.onosproject.kubevirtnode.api.KubevirtNode.Type.GATEWAY;
@@ -1214,7 +1215,13 @@ public final class KubevirtNetworkingUtil {
 
             if (!type.equalsIgnoreCase(FLAT.name())) {
                 builder.segmentId(configJson.getString(SEGMENT_ID, ""));
-            } else {
+            }
+
+            // provider networks (FLAT and VLAN) are bound to a host NIC
+            // through the physnet name; without it the per-port flows
+            // (e.g. security group ACLs) cannot be resolved to the
+            // physical bridge that actually carries the VM's traffic
+            if (type.equalsIgnoreCase(FLAT.name()) || type.equalsIgnoreCase(VLAN.name())) {
                 builder.physnetName(configJson.getString(PHYSNET_NAME, ""));
             }
 

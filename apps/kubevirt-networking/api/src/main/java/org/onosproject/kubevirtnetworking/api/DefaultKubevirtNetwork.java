@@ -33,6 +33,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static org.onosproject.kubevirtnetworking.api.Constants.TENANT_TO_TUNNEL_PREFIX;
 import static org.onosproject.kubevirtnetworking.api.Constants.TUNNEL_TO_TENANT_PREFIX;
 import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.FLAT;
+import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.VLAN;
 import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.GENEVE;
 import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.GRE;
 import static org.onosproject.kubevirtnetworking.api.KubevirtNetwork.Type.VXLAN;
@@ -310,7 +311,9 @@ public final class DefaultKubevirtNetwork implements KubevirtNetwork {
                 checkArgument(segmentId != null, NOT_NULL_MSG, "segmentId");
             }
 
-            if (type == FLAT) {
+            // provider networks must name their physnet, otherwise per-port
+            // flows cannot be resolved to the hosting physical bridge
+            if (type == FLAT || type == VLAN) {
                 checkArgument(physnetName != null, NOT_NULL_MSG, "physnetName");
             }
 
