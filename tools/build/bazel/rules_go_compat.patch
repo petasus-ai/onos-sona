@@ -1,0 +1,129 @@
+diff -Naur a/go/private/actions/archive.bzl b/go/private/actions/archive.bzl
+--- a/go/private/actions/archive.bzl	2026-08-13 20:05:21
++++ b/go/private/actions/archive.bzl	2026-08-13 20:05:30
+@@ -13,10 +13,6 @@
+ # limitations under the License.
+ 
+ load(
+-    "@bazel_skylib//lib:old_sets.bzl",
+-    "sets",
+-)
+-load(
+     "@io_bazel_rules_go//go/private:common.bzl",
+     "as_tuple",
+     "split_srcs",
+@@ -230,3 +226,11 @@
+         runfiles = runfiles,
+         mode = go.mode,
+     )
++
++# bazel-skylib 1.0 removed lib/old_sets.bzl, which this version of rules_go
++# loaded for its depset-based set helpers. Only sets.union() is used here, so
++# ONOS patches in a local equivalent instead of pinning an older skylib.
++def _old_sets_union(*args):
++    return depset(transitive = [x if type(x) == "depset" else depset(x) for x in args])
++
++sets = struct(union = _old_sets_union)
+diff -Naur a/go/private/common.bzl b/go/private/common.bzl
+--- a/go/private/common.bzl	2026-08-13 20:27:15
++++ b/go/private/common.bzl	2026-08-13 20:27:15
+@@ -247,3 +247,11 @@
+     if type(v) == "tuple":
+         return depset(v)
+     fail("as_tuple failed on {}".format(v))
++
++# Newer rules_go releases export the Go toolchain type from this module, and
++# tooling that inspects a workspace (the IntelliJ Bazel plugin's generated
++# aspects in .bazelbsp/modules/go_info.bzl, for one) loads it unconditionally.
++# ONOS adds it here so that tooling can load against this pinned release.
++GO_TOOLCHAIN = "@io_bazel_rules_go//go:toolchain"
++
++GO_TOOLCHAIN_LABEL = Label(GO_TOOLCHAIN)
+diff -Naur a/go/private/repositories.bzl b/go/private/repositories.bzl
+--- a/go/private/repositories.bzl	2026-08-13 20:36:38
++++ b/go/private/repositories.bzl	2026-08-13 20:36:38
+@@ -153,26 +153,12 @@
+         # gazelle args: -go_prefix google.golang.org/genproto -proto disable_global
+     )
+ 
+-    # go_proto_library targets for gRPC and Google APIs.
+-    # TODO(#1986): migrate to com_google_googleapis. This workspace was added
+-    # before the real workspace supported Bazel. Gazelle resolves dependencies
+-    # here. Gazelle should resolve dependencies to com_google_googleapis
+-    # instead, and we should remove this.
+-    _maybe(
+-        git_repository,
+-        name = "go_googleapis",
+-        remote = "https://github.com/googleapis/googleapis",
+-        # "latest" as of 2019-07-09
+-        commit = "b4c73face84fefb967ef6c72f0eae64faf67895f",
+-        shallow_since = "1562194577 -0700",
+-        patches = [
+-            "@io_bazel_rules_go//third_party:go_googleapis-deletebuild.patch",
+-            "@io_bazel_rules_go//third_party:go_googleapis-directives.patch",
+-            "@io_bazel_rules_go//third_party:go_googleapis-gazelle.patch",
+-            "@io_bazel_rules_go//third_party:go_googleapis-fix.patch",
+-        ],
+-        patch_args = ["-E", "-p1"],
+-    )
++    # ONOS: the @go_googleapis declaration was removed. It is a git_repository
++    # patched with rules_go's own third_party/go_googleapis-*.patch files, and
++    # go_googleapis-directives.patch no longer applies: Bazel now writes its own
++    # one-line WORKSPACE file into the checkout before patching, so the hunks
++    # targeting the upstream WORKSPACE fail and abort `bazel sync`. Nothing in
++    # ONOS builds Go protos, so the repository is simply not declared.
+ 
+     # This may be overridden by go_register_toolchains, but it's not mandatory
+     # for users to call that function (they may declare their own @go_sdk and
+diff -Naur a/go/private/rules/cgo.bzl b/go/private/rules/cgo.bzl
+--- a/go/private/rules/cgo.bzl	2026-08-13 20:05:21
++++ b/go/private/rules/cgo.bzl	2026-08-13 20:05:30
+@@ -13,10 +13,6 @@
+ # limitations under the License.
+ 
+ load(
+-    "@bazel_skylib//lib:old_sets.bzl",
+-    "sets",
+-)
+-load(
+     "@io_bazel_rules_go//go/private:context.bzl",
+     "go_context",
+ )
+@@ -901,3 +897,11 @@
+         visibility = ["//visibility:public"],
+         tags = tags,
+     )
++
++# bazel-skylib 1.0 removed lib/old_sets.bzl, which this version of rules_go
++# loaded for its depset-based set helpers. Only sets.union() is used here, so
++# ONOS patches in a local equivalent instead of pinning an older skylib.
++def _old_sets_union(*args):
++    return depset(transitive = [x if type(x) == "depset" else depset(x) for x in args])
++
++sets = struct(union = _old_sets_union)
+diff -Naur a/proto/compiler.bzl b/proto/compiler.bzl
+--- a/proto/compiler.bzl	2026-08-13 20:05:21
++++ b/proto/compiler.bzl	2026-08-13 20:05:30
+@@ -13,10 +13,6 @@
+ # limitations under the License.
+ 
+ load(
+-    "@bazel_skylib//lib:old_sets.bzl",
+-    "sets",
+-)
+-load(
+     "@bazel_skylib//lib:paths.bzl",
+     "paths",
+ )
+@@ -178,3 +174,11 @@
+         ),
+     },
+ )
++
++# bazel-skylib 1.0 removed lib/old_sets.bzl, which this version of rules_go
++# loaded for its depset-based set helpers. Only sets.union() is used here, so
++# ONOS patches in a local equivalent instead of pinning an older skylib.
++def _old_sets_union(*args):
++    return depset(transitive = [x if type(x) == "depset" else depset(x) for x in args])
++
++sets = struct(union = _old_sets_union)

@@ -164,6 +164,27 @@ http_archive(
             -e 's|@bazel_tools//platforms:s390x|@platforms//cpu:s390x|g' \
             "$f" > "$f.tmp" && mv "$f.tmp" "$f"
         """,
+        # rules_nodejs 2.3.2 predates Apple Silicon: BUILT_IN_NODE_PLATFORMS has
+        # no darwin_arm64, so on an arm64 mac no toolchain satisfies the node
+        # toolchain type and every target reaching @npm fails toolchain
+        # resolution. The rules already treat any mac as "darwin_amd64" when
+        # picking the node binary (os_name() in internal/common/os_name.bzl), so
+        # point the arm64 host at the same x86_64 node and let Rosetta 2 run it.
+        # Registered below; a no-op on every other host.
+        """
+        cat >> toolchains/node/BUILD.bazel <<'EOF'
+
+toolchain(
+    name = "node_darwin_arm64_toolchain",
+    target_compatible_with = [
+        "@platforms//os:osx",
+        "@platforms//cpu:aarch64",
+    ],
+    toolchain = "@nodejs_darwin_amd64_config//:toolchain",
+    toolchain_type = ":toolchain_type",
+)
+EOF
+        """,
     ],
     sha256 = RULES_NODEJS_SHA256,
     urls = [
@@ -196,6 +217,11 @@ node_repositories(
         "10.16.0-darwin_amd64": ("node-v10.16.0-darwin-x64.tar.gz", "node-v10.16.0-darwin-x64", "6c009df1b724026d84ae9a838c5b382662e30f6c5563a0995532f2bece39fa9c"),
         "10.16.0-linux_amd64": ("node-v10.16.0-linux-x64.tar.xz", "node-v10.16.0-linux-x64", "1827f5b99084740234de0c506f4dd2202a696ed60f76059696747c34339b9d48"),
         "10.16.0-windows_amd64": ("node-v10.16.0-win-x64.zip", "node-v10.16.0-win-x64", "aa22cb357f0fb54ccbc06b19b60e37eefea5d7dd9940912675d3ed988bf9a059"),
+        # Never used to build ONOS, but rules_nodejs declares a repository for
+        # every entry in BUILT_IN_NODE_PLATFORMS, and `bazel sync` fetches all
+        # of them. Without this entry the fetch fails with
+        # "Unknown NodeJS version-host 10.16.0-linux_s390x".
+        "10.16.0-linux_s390x": ("node-v10.16.0-linux-s390x.tar.xz", "node-v10.16.0-linux-s390x", "e8202e285a88be9b53bbf50cfae2f08fff2b1ae3597893e4049c9dff3e4b9b14"),
     },
     node_version = "10.16.0",
     # Bazel tries these in order, so a single mirror timing out no longer
@@ -207,6 +233,11 @@ node_repositories(
         "https://mirror.bazel.build/nodejs.org/dist/v{version}/{filename}",
     ],
 )
+
+# node_repositories() registers a toolchain per BUILT_IN_NODE_PLATFORMS, which
+# does not include darwin_arm64. Register the one appended by the patch_cmds
+# above; it only matches an arm64 mac host.
+register_toolchains("@build_bazel_rules_nodejs//toolchains/node:node_darwin_arm64_toolchain")
 
 # TODO give this a name like `gui2_npm` once the @bazel/karma tools can tolerate a name other than `npm`
 yarn_install(
@@ -248,8 +279,21 @@ RULES_GO_VERSION = "v0.19.8"
 
 RULES_GO_SHA256 = "9976c2572587aa71f81b502cc870ef8058f6de37f5fcfaade6a5996934b4a324"
 
+# Two compatibility fixes for this 2019-era rules_go pin, both load-phase
+# breakages that abort the whole build:
+#   1. It loads @bazel_skylib//lib:old_sets.bzl, which bazel-skylib 1.0 turned
+#      into a fail() stub, so with the skylib 1.5.0 pin above any Go rule (e.g.
+#      via @com_github_bazelbuild_buildtools//buildifier, reached by both
+#      //:buildifier_check and `bazel sync`) fails to load. The patch drops the
+#      load and inlines the one helper rules_go uses, sets.union().
+#   2. It predates GO_TOOLCHAIN_LABEL in go/private/common.bzl, which the
+#      IntelliJ Bazel plugin's generated aspect (.bazelbsp/modules/go_info.bzl)
+#      loads unconditionally, breaking IDE sync. The patch defines it.
+# The long-term fix is upgrading rules_go; see rules-go-upgrade-spec.md.
 http_archive(
     name = "io_bazel_rules_go",
+    patch_args = ["-p1"],
+    patches = ["//tools/build/bazel:rules_go_compat.patch"],
     sha256 = RULES_GO_SHA256,
     urls = [
         "https://storage.googleapis.com/bazel-mirror/github.com/bazelbuild/rules_go/releases/download/%s/rules_go-%s.tar.gz" % (RULES_GO_VERSION, RULES_GO_VERSION),
@@ -280,9 +324,11 @@ http_archive(
     ],
 )
 
-load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
-
-gazelle_dependencies()
+# NOTE: gazelle_dependencies() is intentionally not called. It declares
+# @bazel_gazelle_go_repository_cache, whose fetch needs a Go SDK and therefore
+# fails ("gazelle could not find a Go SDK") because go_register_toolchains() is
+# skipped above. ONOS has no gazelle targets; the archive itself stays because
+# @com_github_bazelbuild_buildtools//BUILD.bazel loads @bazel_gazelle//:def.bzl.
 
 BUILDTOOLS_VERSION = "0.29.0"
 

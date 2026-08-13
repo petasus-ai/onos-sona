@@ -33,6 +33,9 @@ py_binary(
     visibility = ["//visibility:public"],
 )
 
+# Patches applied to external repositories from the WORKSPACE file.
+exports_files(glob(["*.patch"]))
+
 java_binary(
     name = "onos_yang_compiler",
     main_class = "org.onosproject.yang.compiler.main.YangCompilerMain",

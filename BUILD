@@ -134,7 +134,15 @@ config_setting(
     },
 )
 
-# Run onos-local with JAVA_HOME set to ABSOLUTE_JAVABASE (see .bazelrc)
+# Run onos-local with JAVA_HOME set to ABSOLUTE_JAVABASE, which has to be passed
+# on the command line together with RUN_WITH_ABSOLUTE_JAVABASE:
+#   bazel run //:onos-local --define RUN_WITH_ABSOLUTE_JAVABASE=true \
+#                           --define ABSOLUTE_JAVABASE=/path/to/jdk
+# Tagged manual because $(ABSOLUTE_JAVABASE) is undefined without that flag, so
+# expanding this genrule under a wildcard pattern (bazel build //..., and the
+# IDE sync that does the same) fails analysis with "$(ABSOLUTE_JAVABASE) not
+# defined". The manual tag only affects wildcard expansion; //:onos-local still
+# selects this target when the defines are set.
 genrule(
     name = "onos-local_absolute-javabase",
     srcs = [":onos-local-base"],
@@ -143,6 +151,7 @@ genrule(
           "$(location onos-local-base) > $(location onos-runner_absolute-javabase)",
     executable = True,
     output_to_bindir = True,
+    tags = ["manual"],
     visibility = ["//visibility:private"],
 )
 
