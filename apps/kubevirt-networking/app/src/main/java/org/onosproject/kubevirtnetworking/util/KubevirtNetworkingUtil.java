@@ -1270,7 +1270,7 @@ public final class KubevirtNetworkingUtil {
             }
 
             builder.networkId(id).name(name).type(KubevirtNetwork.Type.valueOf(type))
-                    .defaultRoute(defaultRoute).cidr(cidr);
+                    .mtu(mtu).defaultRoute(defaultRoute).cidr(cidr);
 
             // the gateway is optional: an L2-only network (e.g. a storage
             // subnet with no router) legitimately has none, and parsing an
