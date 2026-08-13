@@ -3,6 +3,7 @@
 .classpath
 .project
 .ijwb
+.bazelbsp
 .pydevproject
 .settings
 .javacp*
