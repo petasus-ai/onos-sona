@@ -153,6 +153,14 @@ public class KubevirtSecurityGroupHandler {
     private static final String INGRESS = "INGRESS";
     private static final IpPrefix IP_PREFIX_ANY = Ip4Prefix.valueOf("0.0.0.0/0");
 
+    // the ACL recirculation table of a physical bridge must hand the packet to
+    // the OVS L2 pipeline instead of writing the uplink port number: an
+    // explicit output bypasses the VLAN semantics of the bridge ports, so a VM
+    // sitting on an access port would leave the trunk uplink untagged. NORMAL
+    // also removes the dependency on a physical port number that changes on
+    // reboot, and delivers to local ports of the same bridge.
+    private static final PortNumber PHYSNET_ACL_OUT_PORT = PortNumber.NORMAL;
+
     private static final int ICMP_CODE_MIN = 0;
     private static final int ICMP_CODE_MAX = 255;
     private static final int ICMP_TYPE_MIN = 0;
@@ -313,8 +321,8 @@ public class KubevirtSecurityGroupHandler {
         initializeAclTable(deviceId, ACL_RECIRC_TABLE, PortNumber.NORMAL, install);
     }
 
-    private void initializeCommonAclTable(DeviceId deviceId, PortNumber portNumber, boolean install) {
-        initializeAclTable(deviceId, COMMON_ACL_RECIRC_TABLE, portNumber, install);
+    private void initializeCommonAclTable(DeviceId deviceId, PortNumber aclOutPort, boolean install) {
+        initializeAclTable(deviceId, COMMON_ACL_RECIRC_TABLE, aclOutPort, install);
     }
 
     private void initializeAclTable(DeviceId deviceId, int recircTable,
@@ -352,7 +360,7 @@ public class KubevirtSecurityGroupHandler {
     private void initializeEgressTable(DeviceId deviceId, int egressTable,
                                        int forwardTable, boolean install) {
         if (install) {
-            flowRuleService.setUpTableMissEntry(deviceId, COMMON_ACL_EGRESS_TABLE);
+            flowRuleService.setUpTableMissEntry(deviceId, egressTable);
         } else {
             flowRuleService.connectTables(deviceId, egressTable, forwardTable);
         }
@@ -383,11 +391,11 @@ public class KubevirtSecurityGroupHandler {
     }
 
     private void initializeCommonPipeline(DeviceId deviceId,
-                                          PortNumber portNumber, boolean install) {
+                                          PortNumber aclOutPort, boolean install) {
         initializeCommonIngressTable(deviceId, install);
         initializeCommonEgressTable(deviceId, install);
         initializeCommonConnTrackTable(deviceId, install);
-        initializeCommonAclTable(deviceId, portNumber, install);
+        initializeCommonAclTable(deviceId, aclOutPort, install);
     }
 
     private void updateSecurityGroupRule(KubevirtPort port,
@@ -975,13 +983,11 @@ public class KubevirtSecurityGroupHandler {
             for (Port port : deviceService.getPorts(device.id())) {
                 String portName = port.annotations().value(PORT_NAME);
                 String adminState = port.annotations().value(ADMIN_STATE);
-                // FIXME: since the physical port number can be changed on reboot,
-                // we need to add another intermediate bridge to handle this
                 if (!StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX) &&
                         !port.number().equals(PortNumber.LOCAL) &&
                         StringUtils.equals(adminState, STATE_ENABLED)) {
                     try {
-                        initializeCommonPipeline(device.id(), port.number(), install);
+                        initializeCommonPipeline(device.id(), PHYSNET_ACL_OUT_PORT, install);
                     } catch (Exception e) {
                         log.error("Failed to initialize physnet pipeline for port {} on device {}",
                                 portName, device.id(), e);
@@ -1349,12 +1355,10 @@ public class KubevirtSecurityGroupHandler {
         private void initializeFlatTable(Device device, Port port) {
             String portName = port.annotations().value(PORT_NAME);
             String adminState = port.annotations().value(ADMIN_STATE);
-            // FIXME: since the physical port number can be changed on reboot,
-            // we need to add another intermediate bridge to handle this
             if (!StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX) &&
                     !port.number().equals(PortNumber.LOCAL) &&
                     StringUtils.equals(adminState, STATE_ENABLED)) {
-                initializeCommonPipeline(device.id(), port.number(), true);
+                initializeCommonPipeline(device.id(), PHYSNET_ACL_OUT_PORT, true);
             }
         }
     }

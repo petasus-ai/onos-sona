@@ -446,7 +446,7 @@ public class KubevirtNetworkHandler {
                 if (portName.equals(kpi.intf()) &&
                         StringUtils.equals(adminState, STATE_ENABLED)) {
                     setIngressTransitionRule(deviceId, port, true);
-                    setIgmpRule(deviceId, port, true);
+                    setIgmpRule(deviceId, true);
                 }
             }
         }
@@ -745,13 +745,17 @@ public class KubevirtNetworkHandler {
                 install);
     }
 
-    private void setIgmpRule(DeviceId deviceId, Port port, boolean install) {
+    private void setIgmpRule(DeviceId deviceId, boolean install) {
         TrafficSelector.Builder sBuilder = DefaultTrafficSelector.builder()
                 .matchEthType(Ethernet.TYPE_IPV4)
                 .matchIPProtocol(IPv4.PROTOCOL_IGMP);
 
+        // hand the report to the OVS L2 pipeline rather than writing the uplink
+        // port number: an explicit output skips the VLAN semantics of the
+        // bridge ports, which would send the report of a VM on an access port
+        // out the trunk uplink untagged
         TrafficTreatment.Builder tBuilder = DefaultTrafficTreatment.builder()
-                .setOutput(port.number());
+                .setOutput(PortNumber.NORMAL);
 
         flowService.setRule(
                 appId,
