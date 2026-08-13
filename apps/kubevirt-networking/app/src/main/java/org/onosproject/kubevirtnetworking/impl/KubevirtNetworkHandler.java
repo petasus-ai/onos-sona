@@ -446,7 +446,7 @@ public class KubevirtNetworkHandler {
                 if (portName.equals(kpi.intf()) &&
                         StringUtils.equals(adminState, STATE_ENABLED)) {
                     setIngressTransitionRule(deviceId, port, true);
-                    setIgmpRule(deviceId, true);
+                    setIgmpRule(deviceId, port, true);
                 }
             }
         }
@@ -745,17 +745,19 @@ public class KubevirtNetworkHandler {
                 install);
     }
 
-    private void setIgmpRule(DeviceId deviceId, boolean install) {
+    // NOTE: the explicit output skips the VLAN semantics of the bridge ports,
+    // so the report of a VM sitting on an access port leaves the trunk uplink
+    // untagged. Left as is on purpose: switching this to NORMAL would also
+    // start flooding the queries arriving from the uplink to the VMs, which
+    // this rule drops today, and that changes multicast behaviour for the
+    // FLAT networks already running on the same rule.
+    private void setIgmpRule(DeviceId deviceId, Port port, boolean install) {
         TrafficSelector.Builder sBuilder = DefaultTrafficSelector.builder()
                 .matchEthType(Ethernet.TYPE_IPV4)
                 .matchIPProtocol(IPv4.PROTOCOL_IGMP);
 
-        // hand the report to the OVS L2 pipeline rather than writing the uplink
-        // port number: an explicit output skips the VLAN semantics of the
-        // bridge ports, which would send the report of a VM on an access port
-        // out the trunk uplink untagged
         TrafficTreatment.Builder tBuilder = DefaultTrafficTreatment.builder()
-                .setOutput(PortNumber.NORMAL);
+                .setOutput(port.number());
 
         flowService.setRule(
                 appId,
