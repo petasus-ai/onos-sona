@@ -169,8 +169,9 @@ http_archive(
         # toolchain type and every target reaching @npm fails toolchain
         # resolution. The rules already treat any mac as "darwin_amd64" when
         # picking the node binary (os_name() in internal/common/os_name.bzl), so
-        # point the arm64 host at the same x86_64 node and let Rosetta 2 run it.
-        # Registered below; a no-op on every other host.
+        # reuse the @nodejs_darwin_amd64 repository for the arm64 host too;
+        # node_repositories() below serves a native arm64 node into that
+        # repository on Apple Silicon. Registered below; a no-op elsewhere.
         """
         cat >> toolchains/node/BUILD.bazel <<'EOF'
 
@@ -209,12 +210,25 @@ http_archive(
 
 load("@build_bazel_rules_nodejs//:index.bzl", "node_repositories", "npm_install", "yarn_install")
 
+# See node_host.bzl: tells us whether this WORKSPACE is being evaluated on an
+# Apple Silicon mac, which the darwin entry of node_repositories needs below.
+load("//tools/build/bazel:node_host.bzl", "node_host_repository")
+
+node_host_repository(name = "node_host")
+
+load("@node_host//:defs.bzl", "IS_DARWIN_ARM64")
+
 # Setup the Node repositories. We need a NodeJS version that is more recent than v10.15.0
 # because "selenium-webdriver" which is required for "ng e2e" cannot be installed.
 node_repositories(
     node_repositories = {
         "10.16.0-linux_arm64": ("node-v10.16.0-linux-arm64.tar.gz", "node-v10.16.0-linux-arm64", "2d84a777318bc95dd2a201ab8d700aea7e20641b3ece0c048399398dc645cbd7"),
-        "10.16.0-darwin_amd64": ("node-v10.16.0-darwin-x64.tar.gz", "node-v10.16.0-darwin-x64", "6c009df1b724026d84ae9a838c5b382662e30f6c5563a0995532f2bece39fa9c"),
+        # node v10 has no darwin-arm64 build, so on an Apple Silicon host
+        # (which rules_nodejs also files under "darwin_amd64") serve the first
+        # node release that does, keeping the build free of any Rosetta 2
+        # dependency. The v16 download URL is prepended to node_urls below,
+        # since {version} still expands to 10.16.0.
+        "10.16.0-darwin_amd64": ("node-v16.20.2-darwin-arm64.tar.gz", "node-v16.20.2-darwin-arm64", "6a5c4108475871362d742b988566f3fe307f6a67ce14634eb3fbceb4f9eea88c") if IS_DARWIN_ARM64 else ("node-v10.16.0-darwin-x64.tar.gz", "node-v10.16.0-darwin-x64", "6c009df1b724026d84ae9a838c5b382662e30f6c5563a0995532f2bece39fa9c"),
         "10.16.0-linux_amd64": ("node-v10.16.0-linux-x64.tar.xz", "node-v10.16.0-linux-x64", "1827f5b99084740234de0c506f4dd2202a696ed60f76059696747c34339b9d48"),
         "10.16.0-windows_amd64": ("node-v10.16.0-win-x64.zip", "node-v10.16.0-win-x64", "aa22cb357f0fb54ccbc06b19b60e37eefea5d7dd9940912675d3ed988bf9a059"),
         # Never used to build ONOS, but rules_nodejs declares a repository for
@@ -227,7 +241,12 @@ node_repositories(
     # Bazel tries these in order, so a single mirror timing out no longer
     # fails the build; the pinned sha256 above guards integrity on all of
     # them. The bazel mirror lacks the linux-arm64 tarball, hence last.
-    node_urls = [
+    node_urls = ([
+        # Hosts the arm64 mac tarball selected above; tried first there so the
+        # common fetch on such a host does not walk three 404s. Every other
+        # platform/filename only exists under v{version} and falls through.
+        "https://nodejs.org/dist/v16.20.2/{filename}",
+    ] if IS_DARWIN_ARM64 else []) + [
         "https://nodejs.org/dist/v{version}/{filename}",
         "https://mirrors.cloud.tencent.com/nodejs-release/v{version}/{filename}",
         "https://mirror.bazel.build/nodejs.org/dist/v{version}/{filename}",
@@ -242,6 +261,10 @@ register_toolchains("@build_bazel_rules_nodejs//toolchains/node:node_darwin_arm6
 # TODO give this a name like `gui2_npm` once the @bazel/karma tools can tolerate a name other than `npm`
 yarn_install(
     name = "npm",
+    # gui2 pins engines.node to <13 and yarn hard-fails on a mismatch, which
+    # the node 16 served on Apple Silicon hosts (see node_repositories above)
+    # would trip. The pinned yarn.lock keeps installs reproducible regardless.
+    args = ["--ignore-engines"],
     package_json = "//web/gui2:package.json",
     use_global_yarn_cache = True,
     yarn_lock = "//web/gui2:yarn.lock",
