@@ -53,8 +53,11 @@ import org.onosproject.net.device.DeviceEvent;
 import org.onosproject.net.device.DeviceListener;
 import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.flow.FlowRuleService;
+import org.onosproject.ovsdb.controller.OvsdbBridge;
 import org.onosproject.ovsdb.controller.OvsdbClientService;
 import org.onosproject.ovsdb.controller.OvsdbController;
+import org.onosproject.ovsdb.controller.OvsdbPortName;
+import org.onosproject.ovsdb.rfc.table.Interface;
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -65,7 +68,10 @@ import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.slf4j.Logger;
 
 import java.util.Dictionary;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -784,6 +790,82 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                 log.info("Removing physical bridge {}...", brName);
             }
         }
+
+        // a physnet bridge whose network survives the update is kept as-is
+        // above, but the annotation may now map that network to a different
+        // uplink interface; the old uplink then stays attached next to the
+        // new one, bridging both NICs into one L2 segment and forming a loop
+        // through the physical fabric, so detach every uplink the node no
+        // longer declares
+        detachStalePhysicalPorts(node);
+    }
+
+    private void detachStalePhysicalPorts(KubevirtNode node) {
+        OvsdbClientService client = getOvsdbClient(node, ovsdbPortNum, ovsdbController);
+        if (client == null) {
+            log.warn("Failed to get ovsdb client for {}, " +
+                    "skipping stale physical port cleanup", node.hostname());
+            return;
+        }
+
+        Map<String, Set<String>> declaredIntfs = new HashMap<>();
+        node.phyIntfs().forEach(pi -> declaredIntfs
+                .computeIfAbsent(BRIDGE_PREFIX + pi.network(), k -> new HashSet<>())
+                .add(pi.intf()));
+
+        List<String> allPortNames = client.getPorts().stream()
+                .map(p -> p.portName().value())
+                .collect(Collectors.toList());
+
+        for (OvsdbBridge bridge : client.getBridges()) {
+            String brName = bridge.name();
+            Set<String> intfs = declaredIntfs.get(brName);
+            if (intfs == null) {
+                // not a physnet bridge of this node; bridges of dropped
+                // networks were already removed wholesale above
+                continue;
+            }
+
+            String dpid = bridge.datapathId().orElse(null);
+            if (dpid == null) {
+                continue;
+            }
+
+            String patchPortName = structurePortName(
+                    brName.substring(NETWORK_BEGIN) + PHYSICAL_TO_INTEGRATION_SUFFIX);
+            DeviceId bridgeDevId = DeviceId.deviceId("of:" + dpid);
+
+            for (OvsdbPortName port : client.getPorts(allPortNames, bridgeDevId)) {
+                String portName = port.value();
+                if (portName.equals(brName) || portName.equals(patchPortName) ||
+                        intfs.contains(portName)) {
+                    continue;
+                }
+
+                // uplinks attached by this handler are plain system
+                // interfaces; leave patch, internal, tunnel or dpdk ports
+                // that other components may have added to the bridge alone
+                if (!isSystemInterface(client.getInterface(portName))) {
+                    continue;
+                }
+
+                log.info("Detaching stale uplink {} from physnet bridge {} of node {}",
+                        portName, brName, node.hostname());
+                detachPhysicalPort(node, brName.substring(NETWORK_BEGIN), portName);
+            }
+        }
+    }
+
+    private static boolean isSystemInterface(Interface iface) {
+        if (iface == null || iface.getTypeColumn() == null) {
+            return false;
+        }
+        Object type = iface.getTypeColumn().data();
+        if (type == null) {
+            return false;
+        }
+        String typeStr = type.toString().trim();
+        return typeStr.isEmpty() || "system".equals(typeStr);
     }
 
 
