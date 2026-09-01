@@ -16,6 +16,7 @@
 package org.onosproject.kubevirtnode.impl;
 
 import com.google.common.collect.Lists;
+import org.apache.commons.lang.StringUtils;
 import org.onlab.packet.IpAddress;
 import org.onlab.util.Tools;
 import org.onosproject.cfg.ComponentConfigService;
@@ -127,6 +128,13 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
     private final Logger log = getLogger(getClass());
 
     private static final String DEFAULT_OF_PROTO = "tcp";
+
+    // host-side ports the CNI plugs VM instances in with; they are plain
+    // system interfaces just like an uplink NIC, so stale-uplink cleanup
+    // must recognize them by name (same convention as kubevirt-networking's
+    // INSTANCE_PORT_PREFIX)
+    private static final String VM_PORT_PREFIX_VETH = "veth";
+    private static final String VM_PORT_PREFIX_TAP = "tap";
 
     private static final int DEFAULT_OFPORT = 6653;
     private static final int DPID_BEGIN = 3;
@@ -839,6 +847,15 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                 String portName = port.value();
                 if (portName.equals(brName) || portName.equals(patchPortName) ||
                         intfs.contains(portName)) {
+                    continue;
+                }
+
+                // VM instance ports the CNI plugged into this bridge are
+                // veth/tap devices, indistinguishable from an uplink NIC by
+                // their OVSDB interface type; detaching them cuts running
+                // VMs off the network, so exclude them by name convention
+                if (StringUtils.startsWithIgnoreCase(portName, VM_PORT_PREFIX_VETH) ||
+                        StringUtils.startsWithIgnoreCase(portName, VM_PORT_PREFIX_TAP)) {
                     continue;
                 }
 
