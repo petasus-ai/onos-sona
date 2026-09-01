@@ -821,8 +821,13 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                 .computeIfAbsent(BRIDGE_PREFIX + pi.network(), k -> new HashSet<>())
                 .add(pi.intf()));
 
-        List<String> allPortNames = client.getPorts().stream()
-                .map(p -> p.portName().value())
+        // getPorts() silently drops interfaces whose ofport is negative,
+        // which is exactly the state of an uplink attached for a NIC that
+        // does not exist on the host; enumerate the interface table instead
+        // so such a dead uplink is still seen and detached
+        List<String> allPortNames = client.getInterfaces().stream()
+                .map(Interface::getName)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
 
         for (OvsdbBridge bridge : client.getBridges()) {
