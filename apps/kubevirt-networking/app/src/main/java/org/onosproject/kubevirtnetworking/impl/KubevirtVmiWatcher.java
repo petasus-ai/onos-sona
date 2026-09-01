@@ -43,6 +43,7 @@ import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -72,6 +73,10 @@ public class KubevirtVmiWatcher {
     private static final String INTERFACES = "interfaces";
     private static final String MAC = "mac";
     private static final String DEFAULT = "default";
+    private static final String SPEC = "spec";
+    private static final String DOMAIN = "domain";
+    private static final String DEVICES = "devices";
+    private static final String SRIOV = "sriov";
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected CoreService coreService;
@@ -315,19 +320,19 @@ public class KubevirtVmiWatcher {
 
             if (ports.size() == 0) {
                 if (!hasUsableInterface(resource)) {
-                    // virt-handler fills status.interfaces only after the
-                    // domain is up, and the retries re-parse this frozen
-                    // event snapshot, so waiting can never make the entries
-                    // appear; the MODIFIED event that carries the interfaces
-                    // re-enters this handler and completes the update
+                    // two permanent cases the retries can never fix: the
+                    // status carries no interface entries yet (virt-handler
+                    // fills them only after the domain is up, and the retries
+                    // re-parse this frozen event snapshot), or every entry is
+                    // an SR-IOV passthrough NIC that SONA never manages; the
+                    // MODIFIED event that carries new interfaces re-enters
+                    // this handler and completes the update
                     log.debug("Skipping the device ID update of VMI {}: " +
-                            "status carries no usable interface yet", vmiName);
+                            "status carries no SONA-manageable interface", vmiName);
                     return;
                 }
-                // the interfaces are present but match no known network:
-                // either the network store is not synced yet, or the NIC is
-                // not SONA-managed at all; the latter just lets the bounded
-                // retries expire without any effect
+                // a bridge-bound interface is present but matches no known
+                // network: the network store is likely not synced yet
                 retryAddition(resource, vmiName, attempt,
                         "no interface matches a known network");
                 return;
@@ -379,9 +384,10 @@ public class KubevirtVmiWatcher {
         }
 
         // tells whether the VMI snapshot carries at least one interface entry
-        // that getPorts() can turn into a port: a non-default name plus a MAC;
-        // before the domain is up the status has no such entry, and retrying
-        // on the frozen snapshot can never change that
+        // that getPorts() could ever turn into a port: a non-default name, a
+        // MAC, and not an SR-IOV binding; before the domain is up the status
+        // has no such entry, and retrying on the frozen snapshot can never
+        // change that
         private boolean hasUsableInterface(String resource) {
             try {
                 ObjectMapper mapper = new ObjectMapper();
@@ -392,9 +398,11 @@ public class KubevirtVmiWatcher {
                 if (interfacesJson == null) {
                     return false;
                 }
+                Set<String> sriovNames = sriovInterfaceNames(json);
                 for (JsonNode intf : interfacesJson) {
                     JsonNode nameJson = intf.get(NAME);
                     if (nameJson != null && !DEFAULT.equals(nameJson.asText())
+                            && !sriovNames.contains(nameJson.asText())
                             && intf.get(MAC) != null) {
                         return true;
                     }
@@ -403,6 +411,23 @@ public class KubevirtVmiWatcher {
                 log.error("Failed to parse kubevirt VMI interfaces");
             }
             return false;
+        }
+
+        // names of the interfaces the VMI spec binds via SR-IOV; such NICs
+        // are passed through to the VM directly (their NAD carries no
+        // network-config annotation), so they can never match a SONA network
+        // and must not keep the device ID retries alive
+        private Set<String> sriovInterfaceNames(JsonNode json) {
+            Set<String> names = new HashSet<>();
+            JsonNode interfacesJson = json.path(SPEC).path(DOMAIN)
+                    .path(DEVICES).path(INTERFACES);
+            for (JsonNode intf : interfacesJson) {
+                JsonNode nameJson = intf.get(NAME);
+                if (intf.has(SRIOV) && nameJson != null) {
+                    names.add(nameJson.asText());
+                }
+            }
+            return names;
         }
 
         private String parseVmiName(String resource) {
