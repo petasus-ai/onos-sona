@@ -68,6 +68,8 @@ import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.slf4j.Logger;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Dictionary;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -766,6 +768,25 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
         Set<String> phyNetworkNames = node.phyIntfs().stream()
                 .map(pi -> BRIDGE_PREFIX + pi.network()).collect(Collectors.toSet());
 
+        OvsdbClientService client = getOvsdbClient(node, ovsdbPortNum, ovsdbController);
+        if (client == null) {
+            log.warn("Failed to get ovsdb client for {}, " +
+                    "skipping physnet bridge and stale uplink cleanup", node.hostname());
+            return;
+        }
+
+        // getPorts() silently drops interfaces whose ofport is negative,
+        // which is exactly the state of an uplink attached for a NIC that
+        // does not exist on the host; enumerate the interface table instead
+        // so such a dead uplink is still seen and detached
+        List<String> allPortNames = client.getInterfaces().stream()
+                .map(Interface::getName)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
+        Map<String, OvsdbBridge> ovsdbBridges = client.getBridges().stream()
+                .collect(Collectors.toMap(OvsdbBridge::name, br -> br, (a, b) -> a));
+
         // we remove existing physical bridges and patch ports, if the physical
         // bridges are not defined in kubevirt node
         for (String brName : bridgeNames) {
@@ -792,11 +813,42 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                 continue;
             }
 
-            if (!phyNetworkNames.contains(brName)) {
-                removePhysicalPatchPorts(node, brName.substring(NETWORK_BEGIN));
-                removePhysicalBridge(node, brName.substring(NETWORK_BEGIN));
-                log.info("Removing physical bridge {}...", brName);
+            if (phyNetworkNames.contains(brName)) {
+                continue;
             }
+
+            // an undeclared physnet bridge is usually a network the operator
+            // dropped on purpose, but it is just as easily a network that was
+            // renamed or mistyped in the annotation while VMs still run on
+            // it; dropping the bridge would take the veth/tap ports the CNI
+            // plugged into it down with it and cut those VMs off instantly,
+            // so a bridge that still carries VM ports is kept and only its
+            // uplinks are detached (freeing the NIC for the bridge the
+            // annotation now declares) until the operator migrates the VMs
+            OvsdbBridge bridge = ovsdbBridges.get(brName);
+            List<String> ports = portsOnBridge(client, allPortNames, bridge);
+            if (ports == null) {
+                log.warn("Keeping physnet bridge {} of node {} that the annotation " +
+                        "no longer declares: its ports cannot be inspected, so it " +
+                        "may still carry VM ports", brName, node.hostname());
+                continue;
+            }
+
+            Set<String> vmPorts = ports.stream()
+                    .filter(DefaultKubevirtNodeHandler::isVmInstancePort)
+                    .collect(Collectors.toSet());
+            if (!vmPorts.isEmpty()) {
+                log.warn("Keeping physnet bridge {} of node {} that the annotation " +
+                        "no longer declares: VM ports {} are still attached; migrate " +
+                        "the VMs off it before dropping the network",
+                        brName, node.hostname(), vmPorts);
+                detachUndeclaredUplinks(node, client, bridge, ports, Collections.emptySet());
+                continue;
+            }
+
+            removePhysicalPatchPorts(node, brName.substring(NETWORK_BEGIN));
+            removePhysicalBridge(node, brName.substring(NETWORK_BEGIN));
+            log.info("Removing physical bridge {}...", brName);
         }
 
         // a physnet bridge whose network survives the update is kept as-is
@@ -805,77 +857,95 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
         // new one, bridging both NICs into one L2 segment and forming a loop
         // through the physical fabric, so detach every uplink the node no
         // longer declares
-        detachStalePhysicalPorts(node);
+        detachStalePhysicalPorts(node, client, allPortNames, ovsdbBridges.values());
     }
 
-    private void detachStalePhysicalPorts(KubevirtNode node) {
-        OvsdbClientService client = getOvsdbClient(node, ovsdbPortNum, ovsdbController);
-        if (client == null) {
-            log.warn("Failed to get ovsdb client for {}, " +
-                    "skipping stale physical port cleanup", node.hostname());
-            return;
-        }
-
+    private void detachStalePhysicalPorts(KubevirtNode node, OvsdbClientService client,
+                                          List<String> allPortNames,
+                                          Collection<OvsdbBridge> bridges) {
         Map<String, Set<String>> declaredIntfs = new HashMap<>();
         node.phyIntfs().forEach(pi -> declaredIntfs
                 .computeIfAbsent(BRIDGE_PREFIX + pi.network(), k -> new HashSet<>())
                 .add(pi.intf()));
 
-        // getPorts() silently drops interfaces whose ofport is negative,
-        // which is exactly the state of an uplink attached for a NIC that
-        // does not exist on the host; enumerate the interface table instead
-        // so such a dead uplink is still seen and detached
-        List<String> allPortNames = client.getInterfaces().stream()
-                .map(Interface::getName)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-
-        for (OvsdbBridge bridge : client.getBridges()) {
-            String brName = bridge.name();
-            Set<String> intfs = declaredIntfs.get(brName);
+        for (OvsdbBridge bridge : bridges) {
+            Set<String> intfs = declaredIntfs.get(bridge.name());
             if (intfs == null) {
                 // not a physnet bridge of this node; bridges of dropped
-                // networks were already removed wholesale above
+                // networks were already handled above
                 continue;
             }
 
-            String dpid = bridge.datapathId().orElse(null);
-            if (dpid == null) {
+            List<String> ports = portsOnBridge(client, allPortNames, bridge);
+            if (ports == null) {
                 continue;
             }
 
-            String patchPortName = structurePortName(
-                    brName.substring(NETWORK_BEGIN) + PHYSICAL_TO_INTEGRATION_SUFFIX);
-            DeviceId bridgeDevId = DeviceId.deviceId("of:" + dpid);
-
-            for (OvsdbPortName port : client.getPorts(allPortNames, bridgeDevId)) {
-                String portName = port.value();
-                if (portName.equals(brName) || portName.equals(patchPortName) ||
-                        intfs.contains(portName)) {
-                    continue;
-                }
-
-                // VM instance ports the CNI plugged into this bridge are
-                // veth/tap devices, indistinguishable from an uplink NIC by
-                // their OVSDB interface type; detaching them cuts running
-                // VMs off the network, so exclude them by name convention
-                if (StringUtils.startsWithIgnoreCase(portName, VM_PORT_PREFIX_VETH) ||
-                        StringUtils.startsWithIgnoreCase(portName, VM_PORT_PREFIX_TAP)) {
-                    continue;
-                }
-
-                // uplinks attached by this handler are plain system
-                // interfaces; leave patch, internal, tunnel or dpdk ports
-                // that other components may have added to the bridge alone
-                if (!isSystemInterface(client.getInterface(portName))) {
-                    continue;
-                }
-
-                log.info("Detaching stale uplink {} from physnet bridge {} of node {}",
-                        portName, brName, node.hostname());
-                detachPhysicalPort(node, brName.substring(NETWORK_BEGIN), portName);
-            }
+            detachUndeclaredUplinks(node, client, bridge, ports, intfs);
         }
+    }
+
+    /**
+     * Returns the names of the ports OVSDB reports on the given bridge, or
+     * null when the bridge or its datapath id is unknown and the ports
+     * cannot be resolved.
+     */
+    private List<String> portsOnBridge(OvsdbClientService client,
+                                       List<String> allPortNames, OvsdbBridge bridge) {
+        if (bridge == null) {
+            return null;
+        }
+        String dpid = bridge.datapathId().orElse(null);
+        if (dpid == null) {
+            return null;
+        }
+        return client.getPorts(allPortNames, DeviceId.deviceId("of:" + dpid)).stream()
+                .map(OvsdbPortName::value)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Detaches every uplink on the given physnet bridge that the node does
+     * not declare for it, leaving the bridge itself, its patch port, its VM
+     * instance ports and any non-system interface untouched.
+     */
+    private void detachUndeclaredUplinks(KubevirtNode node, OvsdbClientService client,
+                                         OvsdbBridge bridge, List<String> ports,
+                                         Set<String> declaredIntfs) {
+        String brName = bridge.name();
+        String network = brName.substring(NETWORK_BEGIN);
+        String patchPortName = structurePortName(network + PHYSICAL_TO_INTEGRATION_SUFFIX);
+
+        for (String portName : ports) {
+            if (portName.equals(brName) || portName.equals(patchPortName) ||
+                    declaredIntfs.contains(portName)) {
+                continue;
+            }
+
+            // VM instance ports the CNI plugged into this bridge are
+            // veth/tap devices, indistinguishable from an uplink NIC by
+            // their OVSDB interface type; detaching them cuts running
+            // VMs off the network, so exclude them by name convention
+            if (isVmInstancePort(portName)) {
+                continue;
+            }
+
+            // uplinks attached by this handler are plain system
+            // interfaces; leave patch, internal, tunnel or dpdk ports
+            // that other components may have added to the bridge alone
+            if (!isSystemInterface(client.getInterface(portName))) {
+                continue;
+            }
+
+            log.info("Detaching stale uplink {} from physnet bridge {} of node {}",
+                    portName, brName, node.hostname());
+            detachPhysicalPort(node, network, portName);
+        }
+    }
+
+    private static boolean isVmInstancePort(String portName) {
+        return StringUtils.startsWithIgnoreCase(portName, VM_PORT_PREFIX_VETH) ||
+                StringUtils.startsWithIgnoreCase(portName, VM_PORT_PREFIX_TAP);
     }
 
     private static boolean isSystemInterface(Interface iface) {
