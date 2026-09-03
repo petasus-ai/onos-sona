@@ -72,8 +72,13 @@ import org.onosproject.net.device.DeviceListener;
 import org.onosproject.net.driver.DriverService;
 import org.onosproject.net.flow.DefaultTrafficSelector;
 import org.onosproject.net.flow.DefaultTrafficTreatment;
+import org.onosproject.net.flow.FlowEntry;
+import org.onosproject.net.flow.FlowRuleService;
+import org.onosproject.net.flow.IndexTableId;
 import org.onosproject.net.flow.TrafficSelector;
 import org.onosproject.net.flow.TrafficTreatment;
+import org.onosproject.net.flow.criteria.Criterion;
+import org.onosproject.net.flow.criteria.PortCriterion;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
@@ -85,6 +90,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.concurrent.ExecutorService;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
@@ -103,6 +109,7 @@ import static org.onosproject.kubevirtnetworking.api.Constants.COMMON_MULTICAST_
 import static org.onosproject.kubevirtnetworking.api.Constants.FORWARDING_TABLE;
 import static org.onosproject.kubevirtnetworking.api.Constants.GW_ENTRY_TABLE;
 import static org.onosproject.kubevirtnetworking.api.Constants.KUBEVIRT_NETWORKING_APP_ID;
+import static org.onosproject.kubevirtnetworking.api.Constants.INSTANCE_PORT_PREFIX;
 import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_ARP_DEFAULT_RULE;
 import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_ARP_GATEWAY_RULE;
 import static org.onosproject.kubevirtnetworking.api.Constants.PRIORITY_DHCP_RULE;
@@ -183,6 +190,9 @@ public class KubevirtNetworkHandler {
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected KubevirtFlowRuleService flowService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    protected FlowRuleService flowRuleService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected DriverService driverService;
@@ -437,6 +447,18 @@ public class KubevirtNetworkHandler {
             setForwardingRule(deviceId, true);
             setEgressTransitionRule(deviceId, true);
 
+            // the ingress transition rule is keyed on the uplink's OpenFlow
+            // port number, which changes every time the uplink is
+            // re-attached; drop the copies left behind for numbers the
+            // uplink no longer has before installing the current one, or a
+            // VM port that OVS later hands one of those numbers to has its
+            // egress steered into the ACL ingress table
+            Set<PortNumber> uplinkPorts = deviceService.getPorts(deviceId).stream()
+                    .filter(p -> kpi.intf().equals(p.annotations().value(PORT_NAME)))
+                    .map(Port::number)
+                    .collect(Collectors.toSet());
+            purgeStaleIngressTransitionRules(deviceId, uplinkPorts);
+
             for (Port port : deviceService.getPorts(deviceId)) {
                 String adminState = port.annotations().value(ADMIN_STATE);
                 String portName = port.annotations().value(PORT_NAME);
@@ -484,6 +506,15 @@ public class KubevirtNetworkHandler {
 
         // security group related rules
         setEgressTransitionRule(deviceId, true);
+
+        // same port-number keyed rule as on the physnet bridge: clean up
+        // the copies for numbers the patch port no longer has
+        Set<PortNumber> patchPorts = deviceService.getPorts(deviceId).stream()
+                .filter(p -> StringUtils.startsWithIgnoreCase(
+                        p.annotations().value(PORT_NAME), TENANT_TO_TUNNEL_PREFIX))
+                .map(Port::number)
+                .collect(Collectors.toSet());
+        purgeStaleIngressTransitionRules(deviceId, patchPorts);
 
         // if patch port is available, we install ingress transition rule;
         // otherwise the patch port event will trigger the rule installation
@@ -1570,6 +1601,45 @@ public class KubevirtNetworkHandler {
         );
     }
 
+    /**
+     * Removes every ingress transition rule of this application on the
+     * device whose in_port is not one of the given ports.
+     *
+     * The rule matches an OpenFlow port number, and nothing ties that
+     * number to the uplink or patch port it was installed for: OVS hands a
+     * freed number to the next interface it adds once an hour has passed,
+     * and right after ovs-vswitchd restarts or the host reboots it starts
+     * allocating from 1 again since only the interfaces already in its
+     * database keep their numbers. A VM port that inherits the number of
+     * a former uplink then has its IP egress sent to the ACL ingress
+     * table, where everything but same-host VM traffic is dropped as a
+     * new connection, so the VM can ARP but cannot talk off the host.
+     *
+     * @param deviceId   bridge carrying the rules
+     * @param validPorts ports that legitimately own an ingress transition rule
+     */
+    private void purgeStaleIngressTransitionRules(DeviceId deviceId, Set<PortNumber> validPorts) {
+        IndexTableId table = IndexTableId.of(COMMON_ICMP_TABLE);
+
+        for (FlowEntry entry : flowRuleService.getFlowEntries(deviceId)) {
+            if (entry.appId() != appId.id() ||
+                    entry.priority() != PRIORITY_IP_INGRESS_RULE ||
+                    !table.equals(entry.table())) {
+                continue;
+            }
+
+            PortCriterion inPort = (PortCriterion)
+                    entry.selector().getCriterion(Criterion.Type.IN_PORT);
+            if (inPort == null || validPorts.contains(inPort.port())) {
+                continue;
+            }
+
+            log.warn("Removing stale ingress transition rule keyed on port {} of {}; " +
+                    "the ports owning the rule are now {}", inPort.port(), deviceId, validPorts);
+            flowRuleService.removeFlowRules(entry);
+        }
+    }
+
     private class InternalBridgeListener implements DeviceListener {
 
         @Override
@@ -1607,6 +1677,13 @@ public class KubevirtNetworkHandler {
                     });
                     break;
                 case PORT_REMOVED:
+                    eventExecutor.execute(() -> {
+                        if (!isRelevantHelper()) {
+                            return;
+                        }
+                        processPortRemoval(device, port);
+                    });
+                    break;
                 default:
                     // do nothing
                     break;
@@ -1658,6 +1735,33 @@ public class KubevirtNetworkHandler {
 
             if (StringUtils.startsWithIgnoreCase(portName, TENANT_TO_TUNNEL_PREFIX)) {
                 setIngressTransitionRule(device.id(), port, true);
+            }
+        }
+
+        private void processPortRemoval(Device device, Port port) {
+            String portName = port.annotations().value(PORT_NAME);
+            if (portName == null) {
+                return;
+            }
+
+            // the ingress transition rule installed for this port is keyed
+            // on its OpenFlow port number and would otherwise be handed to
+            // whichever interface OVS gives that number to next; on a
+            // physnet bridge every port but the VM instance ports is a
+            // candidate uplink (the node store may already declare another
+            // interface when an annotation update detaches this one), on a
+            // tenant bridge it is the patch port to the tunnel bridge;
+            // removing a rule that was never installed is a no-op
+            boolean physnetBridge = nodeService.nodes().stream()
+                    .flatMap(node -> node.phyIntfs().stream())
+                    .anyMatch(pi -> device.id().equals(pi.physBridge()));
+            boolean candidate = physnetBridge &&
+                    !StringUtils.startsWithIgnoreCase(portName, INSTANCE_PORT_PREFIX);
+
+            if (candidate || StringUtils.startsWithIgnoreCase(portName, TENANT_TO_TUNNEL_PREFIX)) {
+                log.info("Removing ingress transition rule of port {} ({}) removed from {}",
+                        port.number(), portName, device.id());
+                setIngressTransitionRule(device.id(), port, false);
             }
         }
     }
