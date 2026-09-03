@@ -32,7 +32,9 @@ import org.onosproject.kubevirtnode.api.KubevirtApiConfigListener;
 import org.onosproject.kubevirtnode.api.KubevirtApiConfigService;
 import org.onosproject.kubevirtnode.api.KubevirtNode;
 import org.onosproject.kubevirtnode.api.KubevirtNodeAdminService;
+import org.onosproject.kubevirtnode.api.KubevirtPhyInterface;
 import org.onosproject.mastership.MastershipService;
+import org.onosproject.net.DeviceId;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
@@ -40,6 +42,7 @@ import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.slf4j.Logger;
 
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -47,6 +50,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
@@ -201,6 +205,36 @@ public class KubevirtNodeWatcher {
                 RECONNECT_DELAY_S, TimeUnit.SECONDS);
     }
 
+    /**
+     * Returns the physnet bridge datapath ids of the given node that are
+     * either declared twice within the node itself or already assigned to a
+     * bridge (integration, tunnel or physnet) of another node.
+     *
+     * @param node   node being registered or updated
+     * @param others nodes currently in the store
+     * @return conflicting datapath ids, empty if there are none
+     */
+    static Set<DeviceId> conflictingPhysBridgeIds(KubevirtNode node, Set<KubevirtNode> others) {
+        Set<DeviceId> seen = new HashSet<>();
+        Set<DeviceId> conflicts = new HashSet<>();
+        node.phyIntfs().forEach(pi -> {
+            if (!seen.add(pi.physBridge())) {
+                conflicts.add(pi.physBridge());
+            }
+        });
+
+        others.stream()
+                .filter(other -> !Objects.equals(other.hostname(), node.hostname()))
+                .flatMap(other -> Stream.concat(
+                        Stream.of(other.intgBridge(), other.tunBridge()),
+                        other.phyIntfs().stream().map(KubevirtPhyInterface::physBridge)))
+                .filter(Objects::nonNull)
+                .filter(seen::contains)
+                .forEach(conflicts::add);
+
+        return conflicts;
+    }
+
     private class InternalKubevirtApiConfigListener implements KubevirtApiConfigListener {
 
         private boolean isRelevantHelper() {
@@ -308,6 +342,19 @@ public class KubevirtNodeWatcher {
                 return;
             }
 
+            // a phys_bridge_id shared by two physnet bridges makes ONOS treat
+            // two OVS switches as one OpenFlow device and install one bridge's
+            // flows on the other host; the generated ids are a zero-padded
+            // 32-bit hash, so this can also happen without an operator typo
+            Set<DeviceId> conflicts = conflictingPhysBridgeIds(
+                    kubevirtNode, kubevirtNodeAdminService.nodes());
+            if (!conflicts.isEmpty()) {
+                log.error("Refusing to register node {} whose physnet bridge " +
+                        "datapath id(s) {} are declared twice or already assigned " +
+                        "to a bridge of another node", kubevirtNode.hostname(), conflicts);
+                return;
+            }
+
             if (kubevirtNode.type() == WORKER || kubevirtNode.type() == GATEWAY) {
                 if (!kubevirtNodeAdminService.hasNode(kubevirtNode.hostname())) {
                     kubevirtNodeAdminService.createNode(kubevirtNode);
@@ -350,6 +397,19 @@ public class KubevirtNodeWatcher {
                         "annotation declares more than one interface for " +
                         "network(s) {}; keeping its last known configuration",
                         original.hostname(), duplicated);
+                return;
+            }
+
+            // same datapath id hazard as in processAddition; the node's own
+            // stored copy is excluded from the comparison since the update
+            // replaces it
+            Set<DeviceId> conflicts = conflictingPhysBridgeIds(
+                    original, kubevirtNodeAdminService.nodes());
+            if (!conflicts.isEmpty()) {
+                log.warn("Ignoring update for node {} whose physnet bridge " +
+                        "datapath id(s) {} are declared twice or already assigned " +
+                        "to a bridge of another node; keeping its last known " +
+                        "configuration", original.hostname(), conflicts);
                 return;
             }
 

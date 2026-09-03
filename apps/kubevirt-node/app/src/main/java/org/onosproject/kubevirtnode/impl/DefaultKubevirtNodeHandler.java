@@ -733,6 +733,24 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                 log.info("Creating physnet bridge {} for gateway node {}", bridgeName, node.hostname());
                 log.info("Creating patch ports for physnet {} for gateway node {}", bridgeName, node.hostname());
             } else {
+                // the worker branch above finds the bridge by name, so editing
+                // phys_bridge_id in the annotation leaves the OVS bridge on its
+                // old datapath id while the store carries the new one; the
+                // networking app programs its flows against the stored id, so
+                // they target a device that does not exist and physnet traffic
+                // silently blackholes; rewrite the bridge's datapath id to the
+                // declared one (createBridge updates an existing bridge in
+                // place), which is what the gateway branch already does
+                // through its availability check
+                String dpid = ovsdbBridgeDpid(node, bridgeName);
+                if (dpid != null && !pi.physBridge().toString().equalsIgnoreCase("of:" + dpid)) {
+                    log.warn("Physnet bridge {} of node {} has datapath id of:{} while the " +
+                            "node declares {}; rewriting the bridge's datapath id so the " +
+                            "flows keyed on the declared id reach it",
+                            bridgeName, node.hostname(), dpid, pi.physBridge());
+                    createPhysicalBridge(node, pi);
+                }
+
                 // in case physical bridge exists, but physnet interface is missing,
                 // we will add the physnet interface to connect br-physnet to the external
                 if (!hasPhyIntf(node, pi.intf())) {
@@ -755,6 +773,23 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                 }
             }
         });
+    }
+
+    /**
+     * Returns the datapath id OVSDB reports for the bridge of the given name
+     * on the node, or null when the bridge is unknown.
+     */
+    private String ovsdbBridgeDpid(KubevirtNode node, String bridgeName) {
+        OvsdbClientService client = getOvsdbClient(node, ovsdbPortNum, ovsdbController);
+        if (client == null) {
+            return null;
+        }
+        return client.getBridges().stream()
+                .filter(br -> bridgeName.equals(br.name()))
+                .map(br -> br.datapathId().orElse(null))
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
     }
 
     private void cleanPhysicalInterfaces(KubevirtNode node) {
