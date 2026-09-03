@@ -399,7 +399,8 @@ public final class KubevirtNodeUtil {
      * Returns the kubevirt node from the node.
      *
      * @param node a raw node object returned from a k8s client
-     * @return kubevirt node
+     * @return kubevirt node, or null if any of the node's SONA annotations
+     *         cannot be parsed
      */
     public static KubevirtNode buildKubevirtNode(Node node) {
         String hostname = node.getMetadata().getName();
@@ -459,48 +460,74 @@ public final class KubevirtNodeUtil {
 
         KubernetesExternalLbInterface kubernetesExternalLbInterface = null;
 
+        // each annotation is parsed in its own try, and every parse failure
+        // ends the build with null: a syntax error in tunnel-config used to
+        // skip the gateway-config parsing that followed it in the same try,
+        // so the node came out with its label-derived type (MASTER/WORKER)
+        // instead of GATEWAY and the watcher, reading that as "gateway
+        // annotation removed", tore the live gateway down; minimal-json's
+        // ParseException and the NPE on a missing key are unchecked and
+        // escaped the caller entirely, dropping the event with nothing but a
+        // stack trace; returning null lets the watcher refuse or ignore the
+        // node object explicitly instead
         try {
             if (physnetConfig != null) {
                 JsonArray configJson = JsonArray.readFrom(physnetConfig);
 
                 for (int i = 0; i < configJson.size(); i++) {
                     JsonObject object = configJson.get(i).asObject();
-                    String network = object.get(NETWORK_KEY).asString();
-                    String intf = object.get(INTERFACE_KEY).asString();
+                    JsonValue networkJson = object.get(NETWORK_KEY);
+                    JsonValue intfJson = object.get(INTERFACE_KEY);
+                    if (networkJson == null || intfJson == null) {
+                        throw new IllegalArgumentException("physnet entry " + object +
+                                " lacks the " + NETWORK_KEY + " or " + INTERFACE_KEY + " key");
+                    }
+                    String network = networkJson.asString();
+                    String intf = intfJson.asString();
                     JsonValue jsonKaasElbs = object.get(KAAS_ELB_GWS_KEY);
 
-                    if (network != null && intf != null) {
-                        String physBridgeId;
-                        if (object.get(PHYS_BRIDGE_ID) != null) {
-                            physBridgeId = object.get(PHYS_BRIDGE_ID).asString();
-                        } else {
-                            physBridgeId = genDpidFromName(network + intf + hostname);
-                            log.trace("host {} physnet dpid for network {} intf {} is null so generate dpid {}",
-                                    hostname, network, intf, physBridgeId);
-                        }
-
-                        Set<String> kaasElbs = new HashSet<>();
-                        if (jsonKaasElbs != null) {
-                            jsonKaasElbs.asArray().forEach(jsonElb -> kaasElbs.add(jsonElb.asString()));
-                        }
-
-                        phys.add(DefaultKubevirtPhyInterface.builder()
-                                .network(network)
-                                .intf(intf)
-                                .physBridge(DeviceId.deviceId(physBridgeId))
-                                .kaasElbs(kaasElbs)
-                                .build());
+                    String physBridgeId;
+                    if (object.get(PHYS_BRIDGE_ID) != null) {
+                        physBridgeId = object.get(PHYS_BRIDGE_ID).asString();
+                    } else {
+                        physBridgeId = genDpidFromName(network + intf + hostname);
+                        log.trace("host {} physnet dpid for network {} intf {} is null so generate dpid {}",
+                                hostname, network, intf, physBridgeId);
                     }
+
+                    Set<String> kaasElbs = new HashSet<>();
+                    if (jsonKaasElbs != null) {
+                        jsonKaasElbs.asArray().forEach(jsonElb -> kaasElbs.add(jsonElb.asString()));
+                    }
+
+                    phys.add(DefaultKubevirtPhyInterface.builder()
+                            .network(network)
+                            .intf(intf)
+                            .physBridge(DeviceId.deviceId(physBridgeId))
+                            .kaasElbs(kaasElbs)
+                            .build());
                 }
             }
+        } catch (RuntimeException e) {
+            log.error("Failed to parse physnet-config annotation of node {}: {}",
+                    hostname, physnetConfig, e);
+            return null;
+        }
 
+        try {
             if (tunnelConfig != null) {
                 JsonNode jsonNode = new ObjectMapper().readTree(tunnelConfig);
                 dataIp = IpAddress.valueOf(jsonNode.get("ip").asText());
             } else if (dataIpStr != null) {
                 dataIp = IpAddress.valueOf(dataIpStr);
             }
+        } catch (JsonProcessingException | RuntimeException e) {
+            log.error("Failed to parse tunnel-config or data-ip annotation of node {}: {}",
+                    hostname, tunnelConfig != null ? tunnelConfig : dataIpStr, e);
+            return null;
+        }
 
+        try {
             if (gatewayConfig != null) {
                 JsonNode jsonNode = new ObjectMapper().readTree(gatewayConfig);
 
@@ -526,8 +553,10 @@ public final class KubevirtNodeUtil {
                             .build();
                 }
             }
-        } catch (JsonProcessingException e) {
-            log.error("Failed to parse physnet config or gateway config object", e);
+        } catch (JsonProcessingException | RuntimeException e) {
+            log.error("Failed to parse gateway-config or externalLb-config annotation of node {}: {}",
+                    hostname, gatewayConfig, e);
+            return null;
         }
 
         // if the node is taint with kubevirt.io key configured,

@@ -285,6 +285,15 @@ public class KubevirtNodeWatcher {
             KubevirtNode kubevirtNode = buildKubevirtNode(node);
             log.info("buildKubevirtNode: {}", kubevirtNode);
 
+            // an unparseable annotation leaves the intended configuration
+            // unknown; nothing is running on an unregistered node yet, so
+            // fail fast and make the operator fix the annotation
+            if (kubevirtNode == null) {
+                log.error("Refusing to register node {} whose SONA annotations " +
+                        "could not be parsed", node.getMetadata().getName());
+                return;
+            }
+
             // a physnet-config annotation that maps one network to several
             // interfaces would attach every one of them to the same
             // NORMAL-forwarding physnet bridge, bridging the NICs into one
@@ -316,6 +325,18 @@ public class KubevirtNodeWatcher {
 
             KubevirtNode original = buildKubevirtNode(node);
             KubevirtNode existing = kubevirtNodeAdminService.node(node.getMetadata().getName());
+
+            // an unparseable annotation used to build the node with whatever
+            // the surviving annotations said, e.g. a gateway demoted to its
+            // label-derived MASTER type, which the branches below read as
+            // "gateway annotation removed" and tore the live node down;
+            // ignore the event and keep the last known good configuration
+            if (original == null) {
+                log.warn("Ignoring update for node {} whose SONA annotations " +
+                        "could not be parsed; keeping its last known configuration",
+                        node.getMetadata().getName());
+                return;
+            }
 
             // same duplicate-network hazard as in processAddition, but here
             // the node may already be serving VMs, so acting on the broken
