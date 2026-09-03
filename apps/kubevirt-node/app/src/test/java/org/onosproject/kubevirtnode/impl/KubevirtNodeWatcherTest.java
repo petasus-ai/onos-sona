@@ -31,6 +31,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.onosproject.kubevirtnode.api.KubevirtNode.Type.WORKER;
 import static org.onosproject.kubevirtnode.impl.KubevirtNodeWatcher.conflictingPhysBridgeIds;
+import static org.onosproject.kubevirtnode.impl.KubevirtNodeWatcher.duplicatedPhysnetValues;
 
 /**
  * Unit tests for the annotation validation helpers of the node watcher.
@@ -110,6 +111,44 @@ public class KubevirtNodeWatcherTest {
                 phyIntf("net1", "eth1", DPID_1));
 
         assertTrue(conflictingPhysBridgeIds(node, ImmutableSet.of(stored)).isEmpty());
+    }
+
+    /**
+     * Checks that distinct networks and interfaces raise no duplicate.
+     */
+    @Test
+    public void testDistinctNetworksAndInterfaces() {
+        KubevirtNode node = node("worker-1", null, null,
+                phyIntf("net1", "eth1", DPID_1), phyIntf("net2", "eth2", DPID_2));
+
+        assertTrue(duplicatedPhysnetValues(node, KubevirtPhyInterface::network).isEmpty());
+        assertTrue(duplicatedPhysnetValues(node, KubevirtPhyInterface::intf).isEmpty());
+    }
+
+    /**
+     * Checks that a network declared with two interfaces is reported.
+     */
+    @Test
+    public void testNetworkDeclaredTwice() {
+        KubevirtNode node = node("worker-1", null, null,
+                phyIntf("net1", "eth1", DPID_1), phyIntf("net1", "eth2", DPID_2));
+
+        assertEquals(ImmutableSet.of("net1"),
+                duplicatedPhysnetValues(node, KubevirtPhyInterface::network));
+        assertTrue(duplicatedPhysnetValues(node, KubevirtPhyInterface::intf).isEmpty());
+    }
+
+    /**
+     * Checks that an interface declared for two networks is reported.
+     */
+    @Test
+    public void testInterfaceDeclaredForTwoNetworks() {
+        KubevirtNode node = node("worker-1", null, null,
+                phyIntf("net1", "eth1", DPID_1), phyIntf("net2", "eth1", DPID_2));
+
+        assertTrue(duplicatedPhysnetValues(node, KubevirtPhyInterface::network).isEmpty());
+        assertEquals(ImmutableSet.of("eth1"),
+                duplicatedPhysnetValues(node, KubevirtPhyInterface::intf));
     }
 
     private static KubevirtPhyInterface phyIntf(String network, String intf, DeviceId dpid) {

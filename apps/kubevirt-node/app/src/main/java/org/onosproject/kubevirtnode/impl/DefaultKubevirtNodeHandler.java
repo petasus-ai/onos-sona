@@ -757,6 +757,16 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                     attachPhysicalPort(node, pi);
 
                     log.info("Attaching external ports for physnet {}", bridgeName);
+                } else if (!isPortOnBridge(node, bridgeName, pi.intf())) {
+                    // hasPhyIntf matches against every port of the OVSDB
+                    // device, so a NIC that sits on another bridge (declared
+                    // for two networks, or moved by hand) is skipped as
+                    // "already present" and the physnet silently stays
+                    // without an uplink; say so instead of staying quiet
+                    log.warn("Uplink {} declared for physnet bridge {} of node {} is " +
+                            "attached to another bridge; the network stays without " +
+                            "an uplink until the annotation or the host is fixed",
+                            pi.intf(), bridgeName, node.hostname());
                 }
 
                 // we do not create any patch ports for worker nodes
@@ -773,6 +783,24 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                 }
             }
         });
+    }
+
+    /**
+     * Returns whether OVSDB reports the given port on the bridge of the given
+     * name; true as well when the bridge's ports cannot be resolved, so that
+     * the caller does not act on an unknown state.
+     */
+    private boolean isPortOnBridge(KubevirtNode node, String bridgeName, String portName) {
+        OvsdbClientService client = getOvsdbClient(node, ovsdbPortNum, ovsdbController);
+        if (client == null) {
+            return true;
+        }
+        OvsdbBridge bridge = client.getBridges().stream()
+                .filter(br -> bridgeName.equals(br.name()))
+                .findFirst()
+                .orElse(null);
+        List<String> ports = portsOnBridge(client, Collections.singletonList(portName), bridge);
+        return ports == null || ports.contains(portName);
     }
 
     /**

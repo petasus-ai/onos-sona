@@ -49,6 +49,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -206,6 +207,25 @@ public class KubevirtNodeWatcher {
     }
 
     /**
+     * Returns the values of the given physnet attribute (network name or
+     * interface name) that more than one entry of the node's physnet-config
+     * annotation carries.
+     *
+     * @param node      node being registered or updated
+     * @param attribute physnet attribute to compare by
+     * @return duplicated attribute values, empty if there are none
+     */
+    static Set<String> duplicatedPhysnetValues(KubevirtNode node,
+                                               Function<KubevirtPhyInterface, String> attribute) {
+        return node.phyIntfs().stream()
+                .collect(Collectors.groupingBy(attribute, Collectors.counting()))
+                .entrySet().stream()
+                .filter(e -> e.getValue() > 1)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
+    }
+
+    /**
      * Returns the physnet bridge datapath ids of the given node that are
      * either declared twice within the node itself or already assigned to a
      * bridge (integration, tunnel or physnet) of another node.
@@ -334,11 +354,26 @@ public class KubevirtNodeWatcher {
             // L2 segment and looping the physical fabric; nothing is running
             // on an unregistered node yet, so fail fast and make the operator
             // fix the annotation
-            Set<String> duplicated = duplicatePhysnetNetworks(kubevirtNode);
+            Set<String> duplicated = duplicatedPhysnetValues(
+                    kubevirtNode, KubevirtPhyInterface::network);
             if (!duplicated.isEmpty()) {
                 log.error("Refusing to register node {} whose physnet-config " +
                         "annotation declares more than one interface for " +
                         "network(s) {}", kubevirtNode.hostname(), duplicated);
+                return;
+            }
+
+            // the mirror image, one interface declared for several networks,
+            // is just as broken: a NIC can only sit in one bridge, so the
+            // bridge provisioned first claims it and the other physnet is
+            // left without an uplink, with the winner depending on
+            // iteration order
+            Set<String> shared = duplicatedPhysnetValues(
+                    kubevirtNode, KubevirtPhyInterface::intf);
+            if (!shared.isEmpty()) {
+                log.error("Refusing to register node {} whose physnet-config " +
+                        "annotation declares interface(s) {} for more than one " +
+                        "network", kubevirtNode.hostname(), shared);
                 return;
             }
 
@@ -391,12 +426,24 @@ public class KubevirtNodeWatcher {
             // data-plane outage; ignore the event entirely and keep the
             // node's last known good configuration until the operator fixes
             // the annotation
-            Set<String> duplicated = duplicatePhysnetNetworks(original);
+            Set<String> duplicated = duplicatedPhysnetValues(
+                    original, KubevirtPhyInterface::network);
             if (!duplicated.isEmpty()) {
                 log.warn("Ignoring update for node {} whose physnet-config " +
                         "annotation declares more than one interface for " +
                         "network(s) {}; keeping its last known configuration",
                         original.hostname(), duplicated);
+                return;
+            }
+
+            // same shared-interface hazard as in processAddition
+            Set<String> shared = duplicatedPhysnetValues(
+                    original, KubevirtPhyInterface::intf);
+            if (!shared.isEmpty()) {
+                log.warn("Ignoring update for node {} whose physnet-config " +
+                        "annotation declares interface(s) {} for more than one " +
+                        "network; keeping its last known configuration",
+                        original.hostname(), shared);
                 return;
             }
 
@@ -471,15 +518,6 @@ public class KubevirtNodeWatcher {
             if (existing != null) {
                 kubevirtNodeAdminService.removeNode(node.getMetadata().getName());
             }
-        }
-
-        private Set<String> duplicatePhysnetNetworks(KubevirtNode node) {
-            return node.phyIntfs().stream()
-                    .collect(Collectors.groupingBy(pi -> pi.network(), Collectors.counting()))
-                    .entrySet().stream()
-                    .filter(e -> e.getValue() > 1)
-                    .map(Map.Entry::getKey)
-                    .collect(Collectors.toSet());
         }
 
         private boolean isMaster() {
