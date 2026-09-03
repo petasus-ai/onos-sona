@@ -977,19 +977,9 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                                          Set<String> declaredIntfs) {
         String brName = bridge.name();
         String network = brName.substring(NETWORK_BEGIN);
-        String patchPortName = structurePortName(network + PHYSICAL_TO_INTEGRATION_SUFFIX);
 
         for (String portName : ports) {
-            if (portName.equals(brName) || portName.equals(patchPortName) ||
-                    declaredIntfs.contains(portName)) {
-                continue;
-            }
-
-            // VM instance ports the CNI plugged into this bridge are
-            // veth/tap devices, indistinguishable from an uplink NIC by
-            // their OVSDB interface type; detaching them cuts running
-            // VMs off the network, so exclude them by name convention
-            if (isVmInstancePort(portName)) {
+            if (!isUplinkCandidate(brName, portName, declaredIntfs)) {
                 continue;
             }
 
@@ -1004,6 +994,104 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                     portName, brName, node.hostname());
             detachPhysicalPort(node, network, portName);
         }
+    }
+
+    /**
+     * Detaches the port OVS just reported on the physnet bridge of the given
+     * device id when the node does not declare it as that bridge's uplink and
+     * it is a plain system interface, i.e. a NIC attached to the bridge
+     * outside of the physnet annotation (typically by hand with ovs-vsctl).
+     * Any other port, or a device that is not a physnet bridge of the node,
+     * is left alone.
+     */
+    private void detachUndeclaredUplink(KubevirtNode node, DeviceId deviceId, String portName) {
+        if (portName == null) {
+            return;
+        }
+
+        KubevirtPhyInterface phyIntf = node.phyIntfs().stream()
+                .filter(pi -> deviceId.equals(pi.physBridge()))
+                .findFirst()
+                .orElse(null);
+        if (phyIntf == null) {
+            return;
+        }
+
+        String network = phyIntf.network();
+        String bridgeName = BRIDGE_PREFIX + network;
+        Set<String> declaredIntfs = node.phyIntfs().stream()
+                .filter(pi -> network.equals(pi.network()))
+                .map(KubevirtPhyInterface::intf)
+                .collect(Collectors.toSet());
+        if (!isUplinkCandidate(bridgeName, portName, declaredIntfs)) {
+            return;
+        }
+
+        OvsdbClientService client = getOvsdbClient(node, ovsdbPortNum, ovsdbController);
+        if (client == null) {
+            log.warn("Failed to get ovsdb client for {}, cannot tell whether port {} " +
+                    "on physnet bridge {} is an undeclared uplink", node.hostname(),
+                    portName, bridgeName);
+            return;
+        }
+
+        Interface iface = client.getInterface(portName);
+        if (iface == null) {
+            // the OVSDB monitor update carrying the interface row is sent
+            // before ovs-vswitchd even creates the OpenFlow port, but the
+            // two travel over different connections, so give the row a
+            // moment to land before treating the port as unknown
+            try {
+                sleep(SLEEP_SHORT_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            iface = client.getInterface(portName);
+        }
+
+        // same rule as the INIT-time cleanup: only plain system interfaces
+        // are uplinks; a port whose interface row cannot be read is skipped
+        // rather than removed
+        if (!isSystemInterface(iface)) {
+            return;
+        }
+
+        // the port may already be gone, e.g. detached on the PORT_ADDED
+        // event while this is the PORT_UPDATED that followed it
+        if (!isPortOnBridge(node, bridgeName, portName)) {
+            return;
+        }
+
+        log.warn("Detaching uplink {} attached to physnet bridge {} of node {} outside " +
+                "of the physnet annotation, which declares {} for that network; a second " +
+                "uplink would bridge the NICs and loop the physical fabric",
+                portName, bridgeName, node.hostname(), declaredIntfs);
+        detachPhysicalPort(node, network, portName);
+    }
+
+    /**
+     * Returns whether the given port of the given physnet bridge may be an
+     * uplink the node does not declare, judged by name alone: the bridge's
+     * own internal port, its patch port to br-int, a declared uplink and
+     * the VM instance ports are never candidates. The caller still has to
+     * check the OVSDB interface type before detaching.
+     */
+    private static boolean isUplinkCandidate(String brName, String portName,
+                                             Set<String> declaredIntfs) {
+        String network = brName.substring(NETWORK_BEGIN);
+        String patchPortName = structurePortName(network + PHYSICAL_TO_INTEGRATION_SUFFIX);
+
+        if (portName.equals(brName) || portName.equals(patchPortName) ||
+                declaredIntfs.contains(portName)) {
+            return false;
+        }
+
+        // VM instance ports the CNI plugged into this bridge are
+        // veth/tap devices, indistinguishable from an uplink NIC by
+        // their OVSDB interface type; detaching them cuts running
+        // VMs off the network, so exclude them by name convention
+        return !isVmInstancePort(portName);
     }
 
     private static boolean isVmInstancePort(String portName) {
@@ -1415,6 +1503,16 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
             }
 
             String portName = port.annotations().value(PORT_NAME);
+
+            // a physnet bridge forwards with the NORMAL action, so a second
+            // uplink an operator attaches by hand (ovs-vsctl add-port) next
+            // to the declared one bridges both NICs into one L2 segment and
+            // loops the physical fabric; the stale-uplink cleanup in INIT
+            // only runs on (re)bootstrap and the annotation guards in the
+            // node watcher never see a host-side change, so catch such a
+            // port the moment OVS reports it, whatever state the node is in
+            detachUndeclaredUplink(current, device.id(), portName);
+
             if (current.state() == DEVICE_CREATED && (
                     Objects.equals(portName, VXLAN) ||
                             Objects.equals(portName, GRE) ||
