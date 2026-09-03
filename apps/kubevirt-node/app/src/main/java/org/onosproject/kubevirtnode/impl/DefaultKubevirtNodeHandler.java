@@ -21,6 +21,8 @@ import org.onlab.packet.IpAddress;
 import org.onlab.util.Tools;
 import org.onosproject.cfg.ComponentConfigService;
 import org.onosproject.cluster.ClusterService;
+import org.onosproject.cluster.LeadershipEvent;
+import org.onosproject.cluster.LeadershipEventListener;
 import org.onosproject.cluster.LeadershipService;
 import org.onosproject.cluster.NodeId;
 import org.onosproject.core.ApplicationId;
@@ -78,6 +80,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static java.lang.Thread.sleep;
@@ -197,6 +200,11 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
     private final DeviceListener ovsdbListener = new InternalOvsdbListener();
     private final DeviceListener bridgeListener = new InternalBridgeListener();
     private final KubevirtNodeListener kubevirtNodeListener = new InternalKubevirtNodeListener();
+    private final LeadershipEventListener leadershipListener = new InternalLeadershipListener();
+
+    // whether this instance held the leadership at the last leadership
+    // event; the leader-change hook must fire on the transition only
+    private final AtomicBoolean wasLeader = new AtomicBoolean(false);
 
     private ApplicationId appId;
     private NodeId localNode;
@@ -207,6 +215,9 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
         localNode = clusterService.getLocalNode().id();
 
         componentConfigService.registerProperties(getClass());
+        // listen before running for leadership so that the election this
+        // instance may win right away is not missed
+        leadershipService.addListener(leadershipListener);
         leadershipService.runForLeadership(appId.name());
         deviceService.addListener(ovsdbListener);
         deviceService.addListener(bridgeListener);
@@ -222,6 +233,7 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
         deviceService.removeListener(ovsdbListener);
         componentConfigService.unregisterProperties(getClass(), false);
         leadershipService.withdraw(appId.name());
+        leadershipService.removeListener(leadershipListener);
         dispatchExecutor.shutdown();
         for (ExecutorService executor : bootstrapExecutors) {
             executor.shutdown();
@@ -838,14 +850,7 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
             return;
         }
 
-        // getPorts() silently drops interfaces whose ofport is negative,
-        // which is exactly the state of an uplink attached for a NIC that
-        // does not exist on the host; enumerate the interface table instead
-        // so such a dead uplink is still seen and detached
-        List<String> allPortNames = client.getInterfaces().stream()
-                .map(Interface::getName)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+        List<String> allPortNames = interfaceNames(client);
 
         Map<String, OvsdbBridge> ovsdbBridges = client.getBridges().stream()
                 .collect(Collectors.toMap(OvsdbBridge::name, br -> br, (a, b) -> a));
@@ -921,6 +926,77 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
         // through the physical fabric, so detach every uplink the node no
         // longer declares
         detachStalePhysicalPorts(node, client, allPortNames, ovsdbBridges.values());
+    }
+
+    /**
+     * Returns the names of every interface OVSDB reports on the node.
+     * getPorts() silently drops interfaces whose ofport is negative, which
+     * is exactly the state of an uplink attached for a NIC that does not
+     * exist on the host; the interface table is enumerated instead so such
+     * a dead uplink is still seen and detached.
+     */
+    private static List<String> interfaceNames(OvsdbClientService client) {
+        Set<Interface> interfaces = client.getInterfaces();
+        if (interfaces == null) {
+            return Collections.emptyList();
+        }
+        return interfaces.stream()
+                .map(Interface::getName)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Detaches every uplink the node does not declare from its declared
+     * physnet bridges, resolving the bridges by name through OVSDB. This is
+     * the uplink half of the INIT-time cleanup, for use on a node that is
+     * not bootstrapping: a node in INIT is skipped since its bootstrap does
+     * the same, and so is a node whose OVSDB is not connected.
+     */
+    private void auditPhysnetUplinks(KubevirtNode node) {
+        if (node.state() == INIT) {
+            return;
+        }
+        if (!isOvsdbConnected(node, ovsdbPortNum, ovsdbController, deviceService)) {
+            log.debug("OVSDB of {} is not connected, skipping physnet uplink audit",
+                    node.hostname());
+            return;
+        }
+        OvsdbClientService client = getOvsdbClient(node, ovsdbPortNum, ovsdbController);
+        if (client == null) {
+            return;
+        }
+
+        log.debug("Auditing physnet uplinks of {}", node.hostname());
+        detachStalePhysicalPorts(node, client, interfaceNames(client), client.getBridges());
+    }
+
+    /**
+     * Audits the physnet uplinks of every node. Nodes whose OVSDB this
+     * instance is not connected to yet get a connection attempt instead;
+     * the OVSDB listener audits them once the connection is up.
+     */
+    private void auditAllPhysnetUplinks() {
+        for (KubevirtNode node : nodeAdminService.nodes()) {
+            executeByHostname(node.hostname(), () -> {
+                if (!isRelevantLeader()) {
+                    return;
+                }
+                KubevirtNode current = nodeAdminService.node(node.hostname());
+                if (current == null) {
+                    return;
+                }
+                if (!isOvsdbConnected(current, ovsdbPortNum, ovsdbController, deviceService)) {
+                    ovsdbController.connect(current.managementIp(), tpPort(ovsdbPortNum));
+                    return;
+                }
+                auditPhysnetUplinks(current);
+            });
+        }
+    }
+
+    private boolean isRelevantLeader() {
+        return Objects.equals(localNode, leadershipService.getLeader(appId.name()));
     }
 
     private void detachStalePhysicalPorts(KubevirtNode node, OvsdbClientService client,
@@ -1365,6 +1441,17 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                             if (deviceService.isAvailable(device.id())) {
                                 log.debug("OVSDB {} detected", device.id());
                                 bootstrapNode(node);
+
+                                // this instance has just (re)gained sight of
+                                // the host's OVSDB: whatever was attached to a
+                                // physnet bridge while it had none - before it
+                                // became leader, or while ONOS was down - never
+                                // produced a port event it could act on, so
+                                // reconcile the uplinks now
+                                KubevirtNode current = nodeAdminService.node(node.hostname());
+                                if (current != null) {
+                                    auditPhysnetUplinks(current);
+                                }
                             }
                         });
                     });
@@ -1581,6 +1668,39 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                             Objects.equals(portName, GENEVE))) {
                 log.warn("Interface {} removed from {}", portName, device.id());
                 setState(current, INCOMPLETE);
+            }
+        }
+    }
+
+    /**
+     * An internal leadership listener. Device events that arrive while no
+     * instance holds the leadership are dropped by every handler above, so
+     * an uplink attached to a physnet bridge during a leader change is never
+     * seen by the instance that takes over; audit every node once when this
+     * instance becomes the leader.
+     */
+    private class InternalLeadershipListener implements LeadershipEventListener {
+
+        @Override
+        public boolean isRelevant(LeadershipEvent event) {
+            return appId != null && Objects.equals(event.subject().topic(), appId.name());
+        }
+
+        @Override
+        public void event(LeadershipEvent event) {
+            switch (event.type()) {
+                case LEADER_CHANGED:
+                case LEADER_AND_CANDIDATES_CHANGED:
+                    boolean leader = Objects.equals(localNode, event.subject().leaderNodeId());
+                    if (wasLeader.getAndSet(leader) || !leader) {
+                        return;
+                    }
+                    log.info("Became the leader, auditing physnet uplinks of every node");
+                    dispatchExecutor.execute(DefaultKubevirtNodeHandler.this::auditAllPhysnetUplinks);
+                    break;
+                case CANDIDATES_CHANGED:
+                default:
+                    break;
             }
         }
     }
