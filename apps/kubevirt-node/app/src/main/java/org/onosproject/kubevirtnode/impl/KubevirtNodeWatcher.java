@@ -40,10 +40,13 @@ import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.slf4j.Logger;
 
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
@@ -281,6 +284,21 @@ public class KubevirtNodeWatcher {
 
             KubevirtNode kubevirtNode = buildKubevirtNode(node);
             log.info("buildKubevirtNode: {}", kubevirtNode);
+
+            // a physnet-config annotation that maps one network to several
+            // interfaces would attach every one of them to the same
+            // NORMAL-forwarding physnet bridge, bridging the NICs into one
+            // L2 segment and looping the physical fabric; nothing is running
+            // on an unregistered node yet, so fail fast and make the operator
+            // fix the annotation
+            Set<String> duplicated = duplicatePhysnetNetworks(kubevirtNode);
+            if (!duplicated.isEmpty()) {
+                log.error("Refusing to register node {} whose physnet-config " +
+                        "annotation declares more than one interface for " +
+                        "network(s) {}", kubevirtNode.hostname(), duplicated);
+                return;
+            }
+
             if (kubevirtNode.type() == WORKER || kubevirtNode.type() == GATEWAY) {
                 if (!kubevirtNodeAdminService.hasNode(kubevirtNode.hostname())) {
                     kubevirtNodeAdminService.createNode(kubevirtNode);
@@ -298,6 +316,21 @@ public class KubevirtNodeWatcher {
 
             KubevirtNode original = buildKubevirtNode(node);
             KubevirtNode existing = kubevirtNodeAdminService.node(node.getMetadata().getName());
+
+            // same duplicate-network hazard as in processAddition, but here
+            // the node may already be serving VMs, so acting on the broken
+            // annotation in any way (re-INIT, gateway add/remove) risks a
+            // data-plane outage; ignore the event entirely and keep the
+            // node's last known good configuration until the operator fixes
+            // the annotation
+            Set<String> duplicated = duplicatePhysnetNetworks(original);
+            if (!duplicated.isEmpty()) {
+                log.warn("Ignoring update for node {} whose physnet-config " +
+                        "annotation declares more than one interface for " +
+                        "network(s) {}; keeping its last known configuration",
+                        original.hostname(), duplicated);
+                return;
+            }
 
             // if a master node is annotated as a gateway node, we simply add
             // the node into the cluster
@@ -357,6 +390,15 @@ public class KubevirtNodeWatcher {
             if (existing != null) {
                 kubevirtNodeAdminService.removeNode(node.getMetadata().getName());
             }
+        }
+
+        private Set<String> duplicatePhysnetNetworks(KubevirtNode node) {
+            return node.phyIntfs().stream()
+                    .collect(Collectors.groupingBy(pi -> pi.network(), Collectors.counting()))
+                    .entrySet().stream()
+                    .filter(e -> e.getValue() > 1)
+                    .map(Map.Entry::getKey)
+                    .collect(Collectors.toSet());
         }
 
         private boolean isMaster() {
