@@ -1387,6 +1387,48 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
         bootstrapExecutors[Math.floorMod(hostname.hashCode(), BOOTSTRAP_STRIPES)].execute(task);
     }
 
+    /**
+     * Returns the node that owns a declared physnet bridge which OVSDB
+     * reports under the given datapath id although the node declares a
+     * different one for it, or null when no node does. The caller has
+     * already established that no node claims the id as one of its
+     * bridges, so a match is a drifted datapath id by construction.
+     */
+    private KubevirtNode nodeByDriftedPhyBridge(DeviceId deviceId) {
+        return nodeAdminService.nodes().stream()
+                .filter(node -> driftedPhyBridgeName(node, deviceId) != null)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Returns the name of the declared physnet bridge of the node that
+     * OVSDB reports under the given datapath id while the node declares
+     * a different id for it, or null when there is no such bridge.
+     */
+    private String driftedPhyBridgeName(KubevirtNode node, DeviceId deviceId) {
+        OvsdbClientService client = getOvsdbClient(node, ovsdbPortNum, ovsdbController);
+        if (client == null || !client.isConnected()) {
+            return null;
+        }
+
+        String bridgeName = client.getBridges().stream()
+                .filter(br -> br.datapathId()
+                        .map(dpid -> deviceId.toString().equalsIgnoreCase("of:" + dpid))
+                        .orElse(false))
+                .map(OvsdbBridge::name)
+                .findFirst()
+                .orElse(null);
+        if (bridgeName == null) {
+            return null;
+        }
+
+        boolean drifted = node.phyIntfs().stream()
+                .anyMatch(pi -> bridgeName.equals(BRIDGE_PREFIX + pi.network()) &&
+                        !deviceId.equals(pi.physBridge()));
+        return drifted ? bridgeName : null;
+    }
+
     private KubevirtNode nodeByTunOrPhyBridge(DeviceId deviceId) {
         KubevirtNode node = nodeAdminService.nodeByTunBridge(deviceId);
         if (node == null) {
@@ -1494,6 +1536,18 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                     dispatchExecutor.execute(() -> {
                         KubevirtNode node = nodeAdminService.node(device.id());
                         if (node == null) {
+                            // node(DeviceId) resolves br-int and OVSDB ids
+                            // only; a switch no node claims under any of its
+                            // bridge ids may be a physnet bridge whose
+                            // datapath id drifted from the declared one
+                            if (deviceService.isAvailable(device.id()) &&
+                                    nodeByTunOrPhyBridge(device.id()) == null) {
+                                KubevirtNode owner = nodeByDriftedPhyBridge(device.id());
+                                if (owner != null) {
+                                    executeByHostname(owner.hostname(),
+                                            () -> processPhyBridgeDrift(device, owner));
+                                }
+                            }
                             return;
                         }
                         executeByHostname(node.hostname(),
@@ -1573,6 +1627,45 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                     setState(current, INCOMPLETE);
                 }
             }
+        }
+
+        /**
+         * Re-initializes the node whose declared physnet bridge connected
+         * under a datapath id other than the declared one, so that the
+         * bootstrap rewrites the bridge's id and the physnet flows keyed on
+         * the declared id reach it again.
+         */
+        void processPhyBridgeDrift(Device device, KubevirtNode node) {
+            if (!isRelevantHelper()) {
+                return;
+            }
+
+            // Re-read the freshest store copy; the annotation may have been
+            // fixed, or the node re-initialized, while this task was queued.
+            KubevirtNode current = nodeAdminService.node(node.hostname());
+            if (current == null || current.state() == INIT) {
+                return;
+            }
+
+            String bridgeName = driftedPhyBridgeName(current, device.id());
+            if (bridgeName == null) {
+                return;
+            }
+
+            if (!autoRecovery) {
+                log.warn("Physnet bridge {} of node {} is connected as {} while the node " +
+                        "declares another datapath id; physnet flows do not reach it " +
+                        "until the node is re-initialized (auto recovery is disabled)",
+                        bridgeName, current.hostname(), device.id());
+                return;
+            }
+
+            log.warn("Physnet bridge {} of node {} is connected as {} while the node " +
+                    "declares another datapath id, so the physnet flows keyed on the " +
+                    "declared id do not reach it; re-initializing the node to " +
+                    "rewrite the bridge's datapath id",
+                    bridgeName, current.hostname(), device.id());
+            setState(current, INIT);
         }
 
         void processPortAdditionOrUpdate(Device device, Port port, KubevirtNode node) {
