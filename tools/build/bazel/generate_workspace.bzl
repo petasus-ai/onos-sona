@@ -1215,153 +1215,165 @@ def generated_maven_jars():
     if "k8s_client" not in native.existing_rules():
         java_import_external(
             name = "k8s_client",
-            jar_sha256 = "c61490f7eafa4f976ac06206056a77d4e28ec9dc3b7ec4cad86e6379c623a7ca",
+            jar_sha256 = "525aabac3d27752659cd40c553c7067098d8b975a95f28119984e386e420e1e0",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-client/5.4.2/kubernetes-client-5.4.2.jar"],        )
-    if "k8s_model" not in native.existing_rules():
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-client/6.13.5/kubernetes-client-6.13.5.jar"],        )
+    if "k8s_client_api" not in native.existing_rules():
         java_import_external(
-            name = "k8s_model",
-            jar_sha256 = "d60a02f1b9e5078fea05d71647b541ecf3b82100ca60d39688c59cb7cd906ff4",
+            name = "k8s_client_api",
+            jar_sha256 = "059023c992c4ee7b9b7eec71fed5b90a8af92f0d0e3ff6a5464132c60fd80702",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model/5.4.2/kubernetes-model-5.4.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-client-api/6.13.5/kubernetes-client-api-6.13.5.jar"],        )
+    if "k8s_httpclient_okhttp" not in native.existing_rules():
+        java_import_external(
+            name = "k8s_httpclient_okhttp",
+            jar_sha256 = "78478a5435026b94b8671635aaac9945f9d2a5501ed8e8017ab3099477e98bbd",
+            licenses = ["notice"],
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-httpclient-okhttp/6.13.5/kubernetes-httpclient-okhttp-6.13.5.jar"],        )
     if "k8s_model_common" not in native.existing_rules():
         java_import_external(
             name = "k8s_model_common",
-            jar_sha256 = "423de93e55b9af7a6f54f99bc606857680acf19332b66150bd392be968660b5d",
+            jar_sha256 = "06bb68c9247034d9e1009ed8f51f02734ff74d8d230e576d46e67f76fdd1fc21",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-common/5.4.2/kubernetes-model-common-5.4.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-common/6.13.5/kubernetes-model-common-6.13.5.jar"],        )
     if "k8s_model_core" not in native.existing_rules():
         java_import_external(
             name = "k8s_model_core",
-            jar_sha256 = "d70c16838f95a7c27e1eb75ef64c9217db945ba438cc8fae2c9048fc50b7e60c",
+            jar_sha256 = "8be97837e74b55ea5e3e5ba1b816a0afad94e5108b2b64b826c0cd3b7baf1c66",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-core/5.4.2/kubernetes-model-core-5.4.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-core/6.13.5/kubernetes-model-core-6.13.5.jar"],        )
     if "k8s_model_rbac" not in native.existing_rules():
         java_import_external(
             name = "k8s_model_rbac",
-            jar_sha256 = "b88045da1dd0d3f2cdda04398306b4ce742539d9f475f0f5626f94366c7c41d6",
+            jar_sha256 = "bde1cfc4d191ed11e8df8c3c85947ea505bea1b30a3a0f8c5159d74d09a990d4",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-rbac/5.4.2/kubernetes-model-rbac-5.4.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-rbac/6.13.5/kubernetes-model-rbac-6.13.5.jar"],        )
     if "k8s_model_admissionregistration" not in native.existing_rules():
         java_import_external(
             name = "k8s_model_admissionregistration",
-            jar_sha256 = "5f4cec99af539ac3bcc70160362fa9c738e165cbae649f9c2cf52d7917b16884",
+            jar_sha256 = "a53c33da1e5c1b67f9074bdf5e35c04e0ebf415baef92007789c474768cb58a2",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-admissionregistration/5.4.2/kubernetes-model-admissionregistration-5.4.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-admissionregistration/6.13.5/kubernetes-model-admissionregistration-6.13.5.jar"],        )
     if "k8s_model_apiextensions" not in native.existing_rules():
         java_import_external(
             name = "k8s_model_apiextensions",
-            jar_sha256 = "0fd76135e697d35d9e0937c6b3c6fd04429139db4089ebfceaa5346fb86b2c77",
+            jar_sha256 = "f604af9309aabf8046225516d9378fd3123ba3f12b1a61aee6e448148ac1c4df",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-apiextensions/5.4.2/kubernetes-model-apiextensions-5.4.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-apiextensions/6.13.5/kubernetes-model-apiextensions-6.13.5.jar"],        )
     if "k8s_model_batch" not in native.existing_rules():
         java_import_external(
             name = "k8s_model_batch",
-            jar_sha256 = "d3add7016f4ad9ee929d6137ba7fe6c9179b9c84fb825f886c27070522647a43",
+            jar_sha256 = "67369dfdf007be3ace3b6bc073457575a55c0a355e19f63521a9f13ec8e6e37e",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-batch/5.4.2/kubernetes-model-batch-5.4.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-batch/6.13.5/kubernetes-model-batch-6.13.5.jar"],        )
     if "k8s_model_certificates" not in native.existing_rules():
         java_import_external(
             name = "k8s_model_certificates",
-            jar_sha256 = "26a7d2cd94bf25d408a984a1f9c00f8c2e90a1b5704d85cf608f83474cd1107b",
+            jar_sha256 = "5e4eb07bc2fd7ac02d556c927d1be219b0b2b4646acb3348b8c012e582c308c4",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-certificates/5.4.2/kubernetes-model-certificates-5.4.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-certificates/6.13.5/kubernetes-model-certificates-6.13.5.jar"],        )
     if "k8s_model_coordination" not in native.existing_rules():
         java_import_external(
             name = "k8s_model_coordination",
-            jar_sha256 = "4660fd19352425dd998b2f365de44d15fee8d0c0c201ed9dedff520330728421",
+            jar_sha256 = "152db0ad93167bcd989731d1e282493ffdf2ebe3b78d7ca71e213ec908ad3d47",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-coordination/5.4.2/kubernetes-model-coordination-5.4.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-coordination/6.13.5/kubernetes-model-coordination-6.13.5.jar"],        )
     if "k8s_model_discovery" not in native.existing_rules():
         java_import_external(
             name = "k8s_model_discovery",
-            jar_sha256 = "54857b1c9aebd05feacc7ac33ce8d39a8465cc9246a7b2477f98c2ceb31d9873",
+            jar_sha256 = "71e203d5d72f795a831b7e2f7bdff8d72869f69b540bf997fe99aa92eeca7bde",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-discovery/5.4.2/kubernetes-model-discovery-5.4.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-discovery/6.13.5/kubernetes-model-discovery-6.13.5.jar"],        )
     if "k8s_model_flowcontrol" not in native.existing_rules():
         java_import_external(
             name = "k8s_model_flowcontrol",
-            jar_sha256 = "fd18b3e534ac6f2a65762d486c2389497fdd6a3e277a3cad8bbc9742361389c7",
+            jar_sha256 = "fa3a0950277af764a610c4b9df24e46df4a0713f0ff849a907960eeb07fead43",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-flowcontrol/5.4.2/kubernetes-model-flowcontrol-5.4.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-flowcontrol/6.13.5/kubernetes-model-flowcontrol-6.13.5.jar"],        )
     if "k8s_model_metrics" not in native.existing_rules():
         java_import_external(
             name = "k8s_model_metrics",
-            jar_sha256 = "b39eef5ef7b13543a253a80a2cbddba19e94416a15ffe0962f26d17ce96c6184",
+            jar_sha256 = "ff32b949be3653292d5f3996478f6d6acbbb76b3fbf1814ea4a9803589323a1d",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-metrics/5.4.2/kubernetes-model-metrics-5.4.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-metrics/6.13.5/kubernetes-model-metrics-6.13.5.jar"],        )
     if "k8s_model_scheduling" not in native.existing_rules():
         java_import_external(
             name = "k8s_model_scheduling",
-            jar_sha256 = "71dfde7859eaddfa3308dd90e40158c07e2505bd66e1a134f608ef9e22be91f2",
+            jar_sha256 = "3a7e38f9edccacf1c13a52f39ae6cfe2187b2319728e1c51634af69b7a4a97ae",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-scheduling/5.4.2/kubernetes-model-scheduling-5.4.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-scheduling/6.13.5/kubernetes-model-scheduling-6.13.5.jar"],        )
     if "k8s_model_storageclass" not in native.existing_rules():
         java_import_external(
             name = "k8s_model_storageclass",
-            jar_sha256 = "45a45c839a19e8d7e9db7ee42971e812040c1733ae835ac48b9a2eff8087e617",
+            jar_sha256 = "3c0c25614980f4174cf64443d9487f2961ffc8d06ad741b4d04f2e014beef3bb",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-storageclass/5.4.2/kubernetes-model-storageclass-5.4.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-storageclass/6.13.5/kubernetes-model-storageclass-6.13.5.jar"],        )
     if "k8s_model_autoscaling" not in native.existing_rules():
         java_import_external(
             name = "k8s_model_autoscaling",
-            jar_sha256 = "31647e74f5c168bbce4780557bd603ba3aa1100168c9f3073306e300145c7bf9",
+            jar_sha256 = "fd20752a74e1969d3fe9bada2a1f3cbb5800852521ee1a057ededb1209021823",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-autoscaling/5.4.2/kubernetes-model-autoscaling-5.4.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-autoscaling/6.13.5/kubernetes-model-autoscaling-6.13.5.jar"],        )
     if "k8s_model_apps" not in native.existing_rules():
         java_import_external(
             name = "k8s_model_apps",
-            jar_sha256 = "4fc5bf249f30d75f8ee4a92f4b01bf8d551645232e6b2519ee07925066e8914d",
+            jar_sha256 = "0839d38fce0baa49497edb6746fed1169dd8d8a731ebea92a25dfc0ebc383f19",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-apps/5.4.2/kubernetes-model-apps-5.4.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-apps/6.13.5/kubernetes-model-apps-6.13.5.jar"],        )
     if "k8s_model_events" not in native.existing_rules():
         java_import_external(
             name = "k8s_model_events",
-            jar_sha256 = "e041ea193f4ca194adabc960335257035ec3d4e5cef650c3c51966091ddd7111",
+            jar_sha256 = "af9a3c755bfe6afe299db7a52b258dc5d8566b0947b6a6e75f47bebcccc589e3",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-events/5.4.2/kubernetes-model-events-5.4.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-events/6.13.5/kubernetes-model-events-6.13.5.jar"],        )
     if "k8s_model_extensions" not in native.existing_rules():
         java_import_external(
             name = "k8s_model_extensions",
-            jar_sha256 = "e0dc58b3d835cab8cea4473104453cf7834680903885330bab31c458ced825a6",
+            jar_sha256 = "88cb1a994323bb1fd750e4512db1bdb3fb3af04c362c8c527bad432d6251334b",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-extensions/5.4.2/kubernetes-model-extensions-5.4.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-extensions/6.13.5/kubernetes-model-extensions-6.13.5.jar"],        )
     if "k8s_model_networking" not in native.existing_rules():
         java_import_external(
             name = "k8s_model_networking",
-            jar_sha256 = "626cde028e26cb26f78a3a8b3702ee3aee9e1727658341adc90912145902d3f7",
+            jar_sha256 = "be60218fc38d70952207177ec0945221a59324d7d7e9d797ebbe0fefcdde4644",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-networking/5.4.2/kubernetes-model-networking-5.4.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-networking/6.13.5/kubernetes-model-networking-6.13.5.jar"],        )
     if "k8s_model_node" not in native.existing_rules():
         java_import_external(
             name = "k8s_model_node",
-            jar_sha256 = "e254fa5afd650956cbfd563c817c85901413ec1d48f6a5d38bf68e73840a6016",
+            jar_sha256 = "0202e16758bc23a161f47b14ac87813158d48c8a4aed8cb9d297ebb264102beb",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-node/5.4.2/kubernetes-model-node-5.4.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-node/6.13.5/kubernetes-model-node-6.13.5.jar"],        )
     if "k8s_model_policy" not in native.existing_rules():
         java_import_external(
             name = "k8s_model_policy",
-            jar_sha256 = "dffbe9902e9f59e50d68ef324204d3f82709cb947cbe5d0d006dc7d3e9db3b7c",
+            jar_sha256 = "dd0ca0fe7010d2214e2d3e3a2a9cc39695234dbbeea531a847667bdcb0d1e43f",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-policy/5.4.2/kubernetes-model-policy-5.4.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-policy/6.13.5/kubernetes-model-policy-6.13.5.jar"],        )
+    if "k8s_model_gatewayapi" not in native.existing_rules():
+        java_import_external(
+            name = "k8s_model_gatewayapi",
+            jar_sha256 = "eeba2b6a2d43e71aed3f9dbd1b70fe5f5ed1b6f94bae8b9ad1ce12ecc3224ff9",
+            licenses = ["notice"],
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-gatewayapi/6.13.5/kubernetes-model-gatewayapi-6.13.5.jar"],        )
+    if "k8s_model_resource" not in native.existing_rules():
+        java_import_external(
+            name = "k8s_model_resource",
+            jar_sha256 = "e26c2e3a0c72b276eb81b28440f6c0fab93c3ed722bfbe31022af5de5bf39295",
+            licenses = ["notice"],
+            jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-resource/6.13.5/kubernetes-model-resource-6.13.5.jar"],        )
     if "zjsonpatch" not in native.existing_rules():
         java_import_external(
             name = "zjsonpatch",
             jar_sha256 = "ae4e5e931646a25cb09b55186de4f3346e358e01130bef279ddf495a719c71d5",
             licenses = ["notice"],
             jar_urls = ["https://repo1.maven.org/maven2/io/fabric8/zjsonpatch/0.3.0/zjsonpatch-0.3.0.jar"],        )
-    if "generex" not in native.existing_rules():
+    if "snakeyaml_engine" not in native.existing_rules():
         java_import_external(
-            name = "generex",
-            jar_sha256 = "8f8ce233c335e08e113a3f9579de1046fb19927e82468b1bbebcd6cba8760b81",
+            name = "snakeyaml_engine",
+            jar_sha256 = "4053f878c171692aab8782f53a3974f43e55e2b6ed12c3682b36a46968c5ded1",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/com/github/mifmif/generex/1.0.2/generex-1.0.2.jar"],        )
-    if "automaton" not in native.existing_rules():
-        java_import_external(
-            name = "automaton",
-            jar_sha256 = "a24475f6ccfe1cc7a4fe9e34e05ce687b0ce0c6e8cb781e0eced3b186482c61e",
-            licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/dk/brics/automaton/automaton/1.11-8/automaton-1.11-8.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/snakeyaml/snakeyaml-engine/2.7/snakeyaml-engine-2.7.jar"],        )
     if "onos_yang_model" not in native.existing_rules():
         java_import_external(
             name = "onos_yang_model",
@@ -1676,31 +1688,33 @@ artifact_map["@jackson_coreutils//:jackson_coreutils"] = "mvn:com.github.fge:jac
 artifact_map["@btf//:btf"] = "mvn:com.github.fge:btf:jar:1.2"
 artifact_map["@msg_simple//:msg_simple"] = "mvn:com.github.fge:msg-simple:jar:1.1"
 artifact_map["@snakeyaml//:snakeyaml"] = "mvn:org.yaml:snakeyaml:jar:2.7"
-artifact_map["@k8s_client//:k8s_client"] = "mvn:io.fabric8:kubernetes-client:jar:NON-OSGI:5.4.2"
-artifact_map["@k8s_model//:k8s_model"] = "mvn:io.fabric8:kubernetes-model:jar:NON-OSGI:5.4.2"
-artifact_map["@k8s_model_common//:k8s_model_common"] = "mvn:io.fabric8:kubernetes-model-common:jar:5.4.2"
-artifact_map["@k8s_model_core//:k8s_model_core"] = "mvn:io.fabric8:kubernetes-model-core:jar:5.4.2"
-artifact_map["@k8s_model_rbac//:k8s_model_rbac"] = "mvn:io.fabric8:kubernetes-model-rbac:jar:5.4.2"
-artifact_map["@k8s_model_admissionregistration//:k8s_model_admissionregistration"] = "mvn:io.fabric8:kubernetes-model-admissionregistration:jar:5.4.2"
-artifact_map["@k8s_model_apiextensions//:k8s_model_apiextensions"] = "mvn:io.fabric8:kubernetes-model-apiextensions:jar:5.4.2"
-artifact_map["@k8s_model_batch//:k8s_model_batch"] = "mvn:io.fabric8:kubernetes-model-batch:jar:5.4.2"
-artifact_map["@k8s_model_certificates//:k8s_model_certificates"] = "mvn:io.fabric8:kubernetes-model-certificates:jar:5.4.2"
-artifact_map["@k8s_model_coordination//:k8s_model_coordination"] = "mvn:io.fabric8:kubernetes-model-coordination:jar:5.4.2"
-artifact_map["@k8s_model_discovery//:k8s_model_discovery"] = "mvn:io.fabric8:kubernetes-model-discovery:jar:5.4.2"
-artifact_map["@k8s_model_flowcontrol//:k8s_model_flowcontrol"] = "mvn:io.fabric8:kubernetes-model-flowcontrol:jar:5.4.2"
-artifact_map["@k8s_model_metrics//:k8s_model_metrics"] = "mvn:io.fabric8:kubernetes-model-metrics:jar:5.4.2"
-artifact_map["@k8s_model_scheduling//:k8s_model_scheduling"] = "mvn:io.fabric8:kubernetes-model-scheduling:jar:5.4.2"
-artifact_map["@k8s_model_storageclass//:k8s_model_storageclass"] = "mvn:io.fabric8:kubernetes-model-storageclass:jar:5.4.2"
-artifact_map["@k8s_model_autoscaling//:k8s_model_autoscaling"] = "mvn:io.fabric8:kubernetes-model-autoscaling:jar:5.4.2"
-artifact_map["@k8s_model_apps//:k8s_model_apps"] = "mvn:io.fabric8:kubernetes-model-apps:jar:5.4.2"
-artifact_map["@k8s_model_events//:k8s_model_events"] = "mvn:io.fabric8:kubernetes-model-events:jar:5.4.2"
-artifact_map["@k8s_model_extensions//:k8s_model_extensions"] = "mvn:io.fabric8:kubernetes-model-extensions:jar:5.4.2"
-artifact_map["@k8s_model_networking//:k8s_model_networking"] = "mvn:io.fabric8:kubernetes-model-networking:jar:5.4.2"
-artifact_map["@k8s_model_node//:k8s_model_node"] = "mvn:io.fabric8:kubernetes-model-node:jar:5.4.2"
-artifact_map["@k8s_model_policy//:k8s_model_policy"] = "mvn:io.fabric8:kubernetes-model-policy:jar:5.4.2"
+artifact_map["@k8s_client//:k8s_client"] = "mvn:io.fabric8:kubernetes-client:jar:NON-OSGI:6.13.5"
+artifact_map["@k8s_client_api//:k8s_client_api"] = "mvn:io.fabric8:kubernetes-client-api:jar:NON-OSGI:6.13.5"
+artifact_map["@k8s_httpclient_okhttp//:k8s_httpclient_okhttp"] = "mvn:io.fabric8:kubernetes-httpclient-okhttp:jar:NON-OSGI:6.13.5"
+artifact_map["@k8s_model_common//:k8s_model_common"] = "mvn:io.fabric8:kubernetes-model-common:jar:6.13.5"
+artifact_map["@k8s_model_core//:k8s_model_core"] = "mvn:io.fabric8:kubernetes-model-core:jar:6.13.5"
+artifact_map["@k8s_model_rbac//:k8s_model_rbac"] = "mvn:io.fabric8:kubernetes-model-rbac:jar:6.13.5"
+artifact_map["@k8s_model_admissionregistration//:k8s_model_admissionregistration"] = "mvn:io.fabric8:kubernetes-model-admissionregistration:jar:6.13.5"
+artifact_map["@k8s_model_apiextensions//:k8s_model_apiextensions"] = "mvn:io.fabric8:kubernetes-model-apiextensions:jar:6.13.5"
+artifact_map["@k8s_model_batch//:k8s_model_batch"] = "mvn:io.fabric8:kubernetes-model-batch:jar:6.13.5"
+artifact_map["@k8s_model_certificates//:k8s_model_certificates"] = "mvn:io.fabric8:kubernetes-model-certificates:jar:6.13.5"
+artifact_map["@k8s_model_coordination//:k8s_model_coordination"] = "mvn:io.fabric8:kubernetes-model-coordination:jar:6.13.5"
+artifact_map["@k8s_model_discovery//:k8s_model_discovery"] = "mvn:io.fabric8:kubernetes-model-discovery:jar:6.13.5"
+artifact_map["@k8s_model_flowcontrol//:k8s_model_flowcontrol"] = "mvn:io.fabric8:kubernetes-model-flowcontrol:jar:6.13.5"
+artifact_map["@k8s_model_metrics//:k8s_model_metrics"] = "mvn:io.fabric8:kubernetes-model-metrics:jar:6.13.5"
+artifact_map["@k8s_model_scheduling//:k8s_model_scheduling"] = "mvn:io.fabric8:kubernetes-model-scheduling:jar:6.13.5"
+artifact_map["@k8s_model_storageclass//:k8s_model_storageclass"] = "mvn:io.fabric8:kubernetes-model-storageclass:jar:6.13.5"
+artifact_map["@k8s_model_autoscaling//:k8s_model_autoscaling"] = "mvn:io.fabric8:kubernetes-model-autoscaling:jar:6.13.5"
+artifact_map["@k8s_model_apps//:k8s_model_apps"] = "mvn:io.fabric8:kubernetes-model-apps:jar:6.13.5"
+artifact_map["@k8s_model_events//:k8s_model_events"] = "mvn:io.fabric8:kubernetes-model-events:jar:6.13.5"
+artifact_map["@k8s_model_extensions//:k8s_model_extensions"] = "mvn:io.fabric8:kubernetes-model-extensions:jar:6.13.5"
+artifact_map["@k8s_model_networking//:k8s_model_networking"] = "mvn:io.fabric8:kubernetes-model-networking:jar:6.13.5"
+artifact_map["@k8s_model_node//:k8s_model_node"] = "mvn:io.fabric8:kubernetes-model-node:jar:6.13.5"
+artifact_map["@k8s_model_policy//:k8s_model_policy"] = "mvn:io.fabric8:kubernetes-model-policy:jar:6.13.5"
+artifact_map["@k8s_model_gatewayapi//:k8s_model_gatewayapi"] = "mvn:io.fabric8:kubernetes-model-gatewayapi:jar:6.13.5"
+artifact_map["@k8s_model_resource//:k8s_model_resource"] = "mvn:io.fabric8:kubernetes-model-resource:jar:6.13.5"
 artifact_map["@zjsonpatch//:zjsonpatch"] = "mvn:io.fabric8:zjsonpatch:jar:0.3.0"
-artifact_map["@generex//:generex"] = "mvn:com.github.mifmif:generex:jar:NON-OSGI:1.0.2"
-artifact_map["@automaton//:automaton"] = "mvn:dk.brics.automaton:automaton:jar:NON-OSGI:1.11-8"
+artifact_map["@snakeyaml_engine//:snakeyaml_engine"] = "mvn:org.snakeyaml:snakeyaml-engine:jar:2.7"
 artifact_map["@onos_yang_model//:onos_yang_model"] = "mvn:org.onosproject:onos-yang-model:jar:2.6.1"
 artifact_map["@onos_yang_compiler_api//:onos_yang_compiler_api"] = "mvn:org.onosproject:onos-yang-compiler-api:jar:2.6.1"
 artifact_map["@onos_yang_compiler_main//:onos_yang_compiler_main"] = "mvn:org.onosproject:onos-yang-compiler-main:jar:2.6.1"

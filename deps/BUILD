@@ -132,3 +132,52 @@ widened_import_jar(
     jar = "@metrics_graphite//jar",
     optional = ["com.rabbitmq.client"],
 )
+
+# fabric8 kubernetes-model 6.x bundles require the OSGi serviceloader extender
+# (Aries SPI Fly) in their manifest so that the KubernetesResource service files
+# get registered at runtime; Karaf 4.2.14 (Felix 5.6) does not ship the extender
+# and the requirement is not optional, so the stock jars never resolve. The apps
+# register every kind they watch or list on the KubernetesSerialization they
+# hand to the client (see the k8sClient() helper in each *Util), which makes the
+# service registration unnecessary, so the copies below just drop the
+# osgi.extender / osgi.serviceloader clauses. kubernetes-model-common also pins
+# org.slf4j to 2.x although no class in it logs; Karaf 4.2 provides 1.7. And
+# kubernetes-model-core keeps io.fabric8.kubernetes.internal (the
+# KubernetesDeserializer) private although kubernetes-client-api, which only
+# exists as a wrapped non-OSGi jar, instantiates it; export it so the wrap can
+# import it.
+K8S_MODELS = [
+    "common",
+    "core",
+    "rbac",
+    "admissionregistration",
+    "apiextensions",
+    "batch",
+    "certificates",
+    "coordination",
+    "discovery",
+    "flowcontrol",
+    "metrics",
+    "scheduling",
+    "storageclass",
+    "autoscaling",
+    "apps",
+    "events",
+    "extensions",
+    "networking",
+    "node",
+    "policy",
+    "gatewayapi",
+    "resource",
+]
+
+[widened_import_jar(
+    name = "k8s_model_" + model,
+    jar = "@k8s_model_" + model + "//jar",
+    ranges = {"org.slf4j": "[1.7,3)"} if model == "common" else {},
+    drop_capabilities = [
+        "osgi.extender",
+        "osgi.serviceloader",
+    ],
+    exports = ["io.fabric8.kubernetes.internal"] if model == "core" else [],
+) for model in K8S_MODELS]

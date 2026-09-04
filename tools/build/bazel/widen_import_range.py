@@ -30,13 +30,27 @@
 # instead of changing their range, for bundles that hard-import a package they
 # only touch on an unused code path (e.g. metrics-graphite's RabbitMQ sender).
 #
-# usage: widen_import_range.py <in.jar> <out.jar> <package-prefix> <range|optional> [<package-prefix> <range|optional> ...]
+# A rule value of "drop-capability" removes every Require-Capability and
+# Provide-Capability clause in the given namespace instead of touching
+# Import-Package, for bundles that demand an extender the runtime does not
+# ship (e.g. fabric8 6.x model bundles requiring the SPI Fly serviceloader
+# extender, which Karaf 4.2 lacks; the client registers those types itself).
+#
+# A rule value of "export" adds the given package to Export-Package at the
+# bundle's own version, for bundles that keep a package private although a
+# sibling that is only available wrapped (hence without a proper manifest of
+# its own) needs it: kubernetes-model-core hides io.fabric8.kubernetes.internal
+# from kubernetes-client-api.
+#
+# usage: widen_import_range.py <in.jar> <out.jar> <prefix> <range|optional|drop-capability|export> [<prefix> <rule> ...]
 
 import re
 import sys
 import zipfile
 
 OPTIONAL = "optional"
+DROP_CAPABILITY = "drop-capability"
+EXPORT = "export"
 
 
 def parse_manifest(raw):
@@ -88,6 +102,8 @@ def widen(value, rules):
     for clause in split_clauses(value):
         pkg = clause.split(";")[0].strip()
         for prefix, new_range in rules:
+            if new_range in (DROP_CAPABILITY, EXPORT):
+                continue
             if pkg == prefix or pkg.startswith(prefix + "."):
                 if new_range == OPTIONAL:
                     if "resolution:=optional" not in clause:
@@ -99,6 +115,21 @@ def widen(value, rules):
     return ",".join(clauses)
 
 
+def drop_capabilities(value, rules):
+    dropped = {prefix for prefix, rule in rules if rule == DROP_CAPABILITY}
+    return ",".join(clause for clause in split_clauses(value)
+                    if clause.split(";")[0].strip() not in dropped)
+
+
+def add_exports(value, rules, version):
+    clauses = split_clauses(value)
+    present = {clause.split(";")[0].strip() for clause in clauses}
+    for pkg, rule in rules:
+        if rule == EXPORT and pkg not in present:
+            clauses.append('%s;version="%s"' % (pkg, version))
+    return ",".join(clauses)
+
+
 def main(argv):
     src, dst = argv[1], argv[2]
     rules = list(zip(argv[3::2], argv[4::2]))
@@ -107,9 +138,18 @@ def main(argv):
             data = zin.read(item.filename)
             if item.filename == "META-INF/MANIFEST.MF":
                 lines = parse_manifest(data.decode("utf-8"))
+                version = next((l[len("Bundle-Version:"):].strip() for l in lines
+                                if l.startswith("Bundle-Version:")), "0")
                 for i, line in enumerate(lines):
+                    if line.startswith("Export-Package:"):
+                        lines[i] = "Export-Package: " + add_exports(line[len("Export-Package:"):].strip(), rules, version)
                     if line.startswith("Import-Package:"):
                         lines[i] = "Import-Package: " + widen(line[len("Import-Package:"):].strip(), rules)
+                    for header in ("Require-Capability:", "Provide-Capability:"):
+                        if line.startswith(header):
+                            lines[i] = header + " " + drop_capabilities(line[len(header):].strip(), rules)
+                # a capability header left without clauses must go, not stay empty
+                lines = [l for l in lines if l not in ("Require-Capability: ", "Provide-Capability: ")]
                 data = format_manifest(lines)
             # keep the entry metadata, but write a fresh, reproducible timestamp
             info = zipfile.ZipInfo(item.filename, date_time=(1980, 1, 1, 0, 0, 0))

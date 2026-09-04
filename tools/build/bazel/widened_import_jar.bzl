@@ -14,7 +14,7 @@
  limitations under the License.
 """
 
-def widened_import_jar(name, jar, ranges = {}, optional = [], visibility = ["//visibility:public"]):
+def widened_import_jar(name, jar, ranges = {}, optional = [], drop_capabilities = [], exports = [], visibility = ["//visibility:public"]):
     """Copies a third-party OSGi bundle, widening selected Import-Package version ranges.
 
     Args:
@@ -24,12 +24,19 @@ def widened_import_jar(name, jar, ranges = {}, optional = [], visibility = ["//v
               {"com.google.common": "[22.0,34)"}.
       optional: package prefixes whose imports become resolution:=optional
               (their version range is left alone).
+      drop_capabilities: capability namespaces (e.g. "osgi.extender") whose
+              Require-Capability and Provide-Capability clauses are removed.
+      exports: packages added to Export-Package at the bundle's own version.
     """
     args = []
     for prefix, version_range in ranges.items():
         args += [prefix, "'%s'" % version_range]
     for prefix in optional:
         args += [prefix, "optional"]
+    for namespace in drop_capabilities:
+        args += [namespace, "drop-capability"]
+    for package in exports:
+        args += [package, "export"]
     native.genrule(
         name = name + "-widen",
         srcs = [jar],
