@@ -15,6 +15,12 @@
  */
 package org.onosproject.k8snetworking.util;
 
+import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
+import io.fabric8.kubernetes.api.model.Pod;
+import io.fabric8.kubernetes.api.model.WatchEvent;
+import io.fabric8.kubernetes.api.model.networking.v1.Ingress;
+import io.fabric8.kubernetes.api.model.networking.v1.NetworkPolicy;
+import io.fabric8.kubernetes.client.utils.KubernetesSerialization;
 import org.junit.Test;
 import org.onlab.packet.IpAddress;
 
@@ -26,6 +32,7 @@ import static junit.framework.TestCase.assertTrue;
 import static org.onosproject.k8snetworking.util.K8sNetworkingUtil.existingContainerPortByMac;
 import static org.onosproject.k8snetworking.util.K8sNetworkingUtil.getGatewayIp;
 import static org.onosproject.k8snetworking.util.K8sNetworkingUtil.getSubnetIps;
+import static org.onosproject.k8snetworking.util.K8sNetworkingUtil.kubernetesSerialization;
 
 /**
  * Unit tests for kubernetes networking utils.
@@ -77,5 +84,40 @@ public final class K8sNetworkUtilTest {
 
         assertFalse(result3);
         assertFalse(result4);
+    }
+
+    private static String watchEvent(String apiVersion, String kind) {
+        return "{\"type\": \"ADDED\", \"object\": {" +
+                "\"apiVersion\": \"" + apiVersion + "\", \"kind\": \"" + kind + "\"," +
+                "\"metadata\": {\"name\": \"test\", \"namespace\": \"default\"}}}";
+    }
+
+    /**
+     * Tests that the serialization handed to the client maps every kind this
+     * application watches to its model class, so watch events arrive typed
+     * even where the deserializer's ServiceLoader lookup finds nothing.
+     */
+    @Test
+    public void testKubernetesSerializationRegistersWatchedKinds() {
+        KubernetesSerialization serialization = kubernetesSerialization();
+
+        assertEquals(NetworkPolicy.class,
+                serialization.getRegisteredKubernetesResource("networking.k8s.io/v1", "NetworkPolicy"));
+        assertEquals(Ingress.class,
+                serialization.getRegisteredKubernetesResource("networking.k8s.io/v1", "Ingress"));
+        assertEquals(Pod.class, serialization.getRegisteredKubernetesResource("v1", "Pod"));
+
+        WatchEvent policyEvent = serialization.unmarshal(
+                watchEvent("networking.k8s.io/v1", "NetworkPolicy"), WatchEvent.class);
+        assertTrue(policyEvent.getObject() instanceof NetworkPolicy);
+
+        WatchEvent ingressEvent = serialization.unmarshal(
+                watchEvent("networking.k8s.io/v1", "Ingress"), WatchEvent.class);
+        assertTrue(ingressEvent.getObject() instanceof Ingress);
+
+        // an unregistered kind is not an error; it just comes back untyped
+        WatchEvent unknownEvent = serialization.unmarshal(
+                watchEvent("example.io/v1", "Unknown"), WatchEvent.class);
+        assertTrue(unknownEvent.getObject() instanceof GenericKubernetesResource);
     }
 }

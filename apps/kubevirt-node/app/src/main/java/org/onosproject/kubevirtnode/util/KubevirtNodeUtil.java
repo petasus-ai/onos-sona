@@ -19,16 +19,37 @@ import com.eclipsesource.json.JsonArray;
 import com.eclipsesource.json.JsonObject;
 import com.eclipsesource.json.JsonValue;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.BeanDescription;
+import com.fasterxml.jackson.databind.BeanProperty;
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.PropertyMetadata;
+import com.fasterxml.jackson.databind.PropertyName;
+import com.fasterxml.jackson.databind.SerializationConfig;
+import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.ser.AnyGetterWriter;
+import com.fasterxml.jackson.databind.ser.BeanPropertyWriter;
+import com.fasterxml.jackson.databind.ser.BeanSerializerBuilder;
+import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
+import com.fasterxml.jackson.databind.ser.std.MapSerializer;
 import com.google.common.base.Strings;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.fabric8.kubernetes.api.model.ConfigMap;
 import io.fabric8.kubernetes.api.model.Node;
 import io.fabric8.kubernetes.api.model.NodeAddress;
 import io.fabric8.kubernetes.api.model.NodeSpec;
 import io.fabric8.kubernetes.api.model.Taint;
+import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.ConfigBuilder;
-import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.KubernetesClientBuilder;
+import io.fabric8.kubernetes.client.impl.KubernetesClientImpl;
+import io.fabric8.kubernetes.client.okhttp.OkHttpClientFactory;
+import io.fabric8.kubernetes.client.utils.KubernetesSerialization;
 import org.apache.commons.lang.StringUtils;
 import org.onlab.packet.IpAddress;
 import org.onlab.packet.MacAddress;
@@ -60,10 +81,14 @@ import java.util.Dictionary;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 import static org.onlab.util.Tools.get;
+import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnode.api.Constants.CALICO_PROJECT_DOMAIN;
 import static org.onosproject.kubevirtnode.api.Constants.CLI_MARGIN_LENGTH;
 import static org.onosproject.kubevirtnode.api.Constants.SONA_PROJECT_DOMAIN;
@@ -78,6 +103,19 @@ import static org.onosproject.kubevirtnode.api.KubevirtNode.Type.WORKER;
 public final class KubevirtNodeUtil {
 
     private static final Logger log = LoggerFactory.getLogger(KubevirtNodeUtil.class);
+
+    // Shared by every client this application builds. kubernetes-client 6.x
+    // dispatches watch events through a per-client executor that
+    // client.close() shuts down; a watcher that re-instantiates (config
+    // update, reconnect) closes its previous client while the old web socket
+    // still delivers buffered frames, and those then die with
+    // RejectedExecutionException inside fabric8's SerialExecutor. An executor
+    // handed in through withTaskExecutor() is left alone by close().
+    private static final ExecutorService CLIENT_EXECUTOR = Executors.newCachedThreadPool(
+            new ThreadFactoryBuilder()
+                    .setThreadFactory(groupedThreads("onos/kubevirt-node", "fabric8-%d", log))
+                    .setDaemon(true)
+                    .build());
 
     private static final String COLON_SLASH = "://";
     private static final String COLON = ":";
@@ -260,7 +298,53 @@ public final class KubevirtNodeUtil {
             }
         }
 
-        return new DefaultKubernetesClient(configBuilder.build());
+        return buildClient(configBuilder.build());
+    }
+
+    /**
+     * Returns the serialization the clients of this application are built
+     * with, registering every kind the application watches or lists.
+     *
+     * @return kubernetes serialization with this application's kinds registered
+     */
+    public static KubernetesSerialization kubernetesSerialization() {
+        ObjectMapper mapper = new ObjectMapper();
+        // registered ahead of fabric8's own serializer modifier on purpose:
+        // Jackson runs the most recently registered modifier first, and the
+        // repair must see the property list after UnmatchedFieldTypeModule
+        // has wrapped it
+        mapper.registerModule(new SimpleModule().setSerializerModifier(new AnyGetterRepair()));
+        KubernetesSerialization serialization = new KubernetesSerialization(mapper, true);
+        // KubernetesDeserializer learns kinds only through ServiceLoader on the
+        // context class loader and on kubernetes-model-core's loader. A Felix
+        // bundle loader exposes just its own META-INF/services, so nothing
+        // outside model-core is found and an unknown kind deserializes as
+        // GenericKubernetesResource, which closes a typed watcher on its first
+        // event. Register what this application consumes, core kinds included.
+        serialization.registerKubernetesResource(ConfigMap.class);
+        serialization.registerKubernetesResource(Node.class);
+        return serialization;
+    }
+
+    private static KubernetesClient buildClient(Config config) {
+        ClassLoader tccl = Thread.currentThread().getContextClassLoader();
+        try {
+            // KubernetesClientBuilder loads KubernetesClientImpl by name through
+            // the context class loader; the wrapped client-api bundle does not
+            // import that package, but the kubernetes-client bundle owns it
+            Thread.currentThread().setContextClassLoader(
+                    KubernetesClientImpl.class.getClassLoader());
+            return new KubernetesClientBuilder()
+                    .withConfig(config)
+                    .withTaskExecutor(CLIENT_EXECUTOR)
+                    // the okhttp HttpClient.Factory sits in another bundle's
+                    // META-INF/services, out of ServiceLoader's reach in OSGi
+                    .withHttpClientFactory(new OkHttpClientFactory())
+                    .withKubernetesSerialization(kubernetesSerialization())
+                    .build();
+        } finally {
+            Thread.currentThread().setContextClassLoader(tccl);
+        }
     }
 
     /**
@@ -630,6 +714,50 @@ public final class KubevirtNodeUtil {
             Thread.sleep(timeSecond * 1000L);
         } catch (Exception e) {
             log.error(e.toString());
+        }
+    }
+
+    /**
+     * Puts Jackson's any-getter writer back after fabric8's
+     * UnmatchedFieldTypeModule has wrapped it.
+     *
+     * Since Jackson 2.19 the any-getter behind a model's additionalProperties
+     * is an ordinary entry of the property list, and BeanSerializerBase only
+     * contextualises it when the entry still is an AnyGetterWriter. fabric8
+     * 6.13, built against Jackson 2.17, wraps every property in a
+     * BeanPropertyWriterDelegate from updateBuilder(), so the map serializer
+     * behind additionalProperties never receives its key serializer and
+     * serialising any resource that carries additional properties (every
+     * custom resource, any core resource with a field the model does not
+     * know) fails with a NullPointerException inside MapSerializer.
+     */
+    private static final class AnyGetterRepair extends BeanSerializerModifier {
+
+        @Override
+        public BeanSerializerBuilder updateBuilder(SerializationConfig config,
+                                                   BeanDescription beanDesc,
+                                                   BeanSerializerBuilder builder) {
+            AnnotatedMember anyGetter = beanDesc.findAnyGetter();
+            List<BeanPropertyWriter> props = builder.getProperties();
+            if (anyGetter == null || props == null) {
+                return builder;
+            }
+            for (int i = 0; i < props.size(); i++) {
+                BeanPropertyWriter prop = props.get(i);
+                if (prop instanceof AnyGetterWriter || prop.getMember() == null ||
+                        !Objects.equals(prop.getMember().getMember(), anyGetter.getMember())) {
+                    continue;
+                }
+                // mirrors what BeanSerializerFactory built before the wrapping
+                JavaType anyType = anyGetter.getType();
+                JsonSerializer<?> anySer = MapSerializer.construct((Set<String>) null, anyType,
+                        config.isEnabled(MapperFeature.USE_STATIC_TYPING), null, null, null, null);
+                BeanProperty.Std anyProp = new BeanProperty.Std(
+                        PropertyName.construct(anyGetter.getName()), anyType.getContentType(),
+                        null, anyGetter, PropertyMetadata.STD_OPTIONAL);
+                props.set(i, new AnyGetterWriter(prop, anyProp, anyGetter, anySer));
+            }
+            return builder;
         }
     }
 }
