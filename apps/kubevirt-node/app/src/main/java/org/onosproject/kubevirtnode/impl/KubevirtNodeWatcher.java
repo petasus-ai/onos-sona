@@ -26,6 +26,8 @@ import org.onosproject.cluster.LeadershipService;
 import org.onosproject.cluster.NodeId;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
+import org.onosproject.kubevirtnode.api.DefaultKubevirtNode;
+import org.onosproject.kubevirtnode.api.DefaultKubevirtPhyInterface;
 import org.onosproject.kubevirtnode.api.KubevirtApiConfig;
 import org.onosproject.kubevirtnode.api.KubevirtApiConfigEvent;
 import org.onosproject.kubevirtnode.api.KubevirtApiConfigListener;
@@ -42,7 +44,10 @@ import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.slf4j.Logger;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -62,6 +67,7 @@ import static org.onosproject.kubevirtnode.api.KubevirtNode.Type.WORKER;
 import static org.onosproject.kubevirtnode.api.KubevirtNodeService.APP_ID;
 import static org.onosproject.kubevirtnode.api.KubevirtNodeState.INIT;
 import static org.onosproject.kubevirtnode.util.KubevirtNodeUtil.buildKubevirtNode;
+import static org.onosproject.kubevirtnode.util.KubevirtNodeUtil.genDpidFromName;
 import static org.onosproject.kubevirtnode.util.KubevirtNodeUtil.k8sClient;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -234,6 +240,60 @@ public class KubevirtNodeWatcher {
      * @param others nodes currently in the store
      * @return conflicting datapath ids, empty if there are none
      */
+    /**
+     * Returns the updated node with the physnet bridge datapath ids of its
+     * stored copy carried over for every network whose annotation entry
+     * carries no explicit phys_bridge_id.
+     *
+     * Without an explicit id the parser derives one from the network,
+     * interface and host names, so re-pointing a network at another
+     * interface silently gives its bridge a new datapath id. The bootstrap
+     * then rewrites the id on the OVS bridge, which reconnects to ONOS as a
+     * different device: every flow installed under the old id turns into a
+     * dead store entry and a switch flow no device-scoped logic can see any
+     * more, and the port-number keyed rules among them are never cleaned
+     * up. A bridge's identity should follow the (node, network) pair it
+     * serves, not the NIC that happens to be its uplink, so the id the
+     * network already has is kept. An entry whose id is not the generated
+     * one was set by the operator on purpose and is taken as is.
+     *
+     * @param updated  node built from the current annotation
+     * @param existing the node's stored copy, or null when there is none
+     * @return the updated node with retained datapath ids
+     */
+    static KubevirtNode withRetainedPhysBridgeIds(KubevirtNode updated, KubevirtNode existing) {
+        if (existing == null || updated.phyIntfs().isEmpty()) {
+            return updated;
+        }
+
+        Map<String, DeviceId> storedIds = new HashMap<>();
+        existing.phyIntfs().stream()
+                .filter(pi -> pi.physBridge() != null)
+                .forEach(pi -> storedIds.putIfAbsent(pi.network(), pi.physBridge()));
+
+        boolean changed = false;
+        List<KubevirtPhyInterface> retained = new ArrayList<>();
+        for (KubevirtPhyInterface pi : updated.phyIntfs()) {
+            DeviceId stored = storedIds.get(pi.network());
+            DeviceId generated = DeviceId.deviceId(
+                    genDpidFromName(pi.network() + pi.intf() + updated.hostname()));
+            if (stored == null || stored.equals(pi.physBridge()) ||
+                    !generated.equals(pi.physBridge())) {
+                retained.add(pi);
+                continue;
+            }
+            retained.add(DefaultKubevirtPhyInterface.builder()
+                    .network(pi.network())
+                    .intf(pi.intf())
+                    .kaasElbs(pi.kaasElbs())
+                    .physBridge(stored)
+                    .build());
+            changed = true;
+        }
+
+        return changed ? DefaultKubevirtNode.from(updated).phyIntfs(retained).build() : updated;
+    }
+
     static Set<DeviceId> conflictingPhysBridgeIds(KubevirtNode node, Set<KubevirtNode> others) {
         Set<DeviceId> seen = new HashSet<>();
         Set<DeviceId> conflicts = new HashSet<>();
@@ -418,6 +478,16 @@ public class KubevirtNodeWatcher {
                         "could not be parsed; keeping its last known configuration",
                         node.getMetadata().getName());
                 return;
+            }
+
+            // keep the physnet bridge identity of a network across uplink
+            // changes; done before the validations below so they judge the
+            // ids the node will actually carry
+            KubevirtNode retained = withRetainedPhysBridgeIds(original, existing);
+            if (retained != original) {
+                log.info("Keeping the stored physnet bridge datapath ids of node {} " +
+                        "across its physnet-config update", original.hostname());
+                original = retained;
             }
 
             // same duplicate-network hazard as in processAddition, but here

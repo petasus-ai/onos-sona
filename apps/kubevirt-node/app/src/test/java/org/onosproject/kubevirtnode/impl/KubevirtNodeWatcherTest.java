@@ -32,6 +32,8 @@ import static org.junit.Assert.assertTrue;
 import static org.onosproject.kubevirtnode.api.KubevirtNode.Type.WORKER;
 import static org.onosproject.kubevirtnode.impl.KubevirtNodeWatcher.conflictingPhysBridgeIds;
 import static org.onosproject.kubevirtnode.impl.KubevirtNodeWatcher.duplicatedPhysnetValues;
+import static org.onosproject.kubevirtnode.impl.KubevirtNodeWatcher.withRetainedPhysBridgeIds;
+import static org.onosproject.kubevirtnode.util.KubevirtNodeUtil.genDpidFromName;
 
 /**
  * Unit tests for the annotation validation helpers of the node watcher.
@@ -149,6 +151,57 @@ public class KubevirtNodeWatcherTest {
         assertTrue(duplicatedPhysnetValues(node, KubevirtPhyInterface::network).isEmpty());
         assertEquals(ImmutableSet.of("eth1"),
                 duplicatedPhysnetValues(node, KubevirtPhyInterface::intf));
+    }
+
+    /**
+     * Checks that a network re-pointed at another interface without an
+     * explicit datapath id keeps the id its bridge already has.
+     */
+    @Test
+    public void testGeneratedPhysBridgeIdRetainedAcrossUplinkChange() {
+        DeviceId oldId = generatedId("net1", "eth1", "worker-1");
+        DeviceId newId = generatedId("net1", "eth2", "worker-1");
+        KubevirtNode existing = node("worker-1", null, null, phyIntf("net1", "eth1", oldId));
+        KubevirtNode updated = node("worker-1", null, null, phyIntf("net1", "eth2", newId));
+
+        KubevirtNode retained = withRetainedPhysBridgeIds(updated, existing);
+
+        KubevirtPhyInterface pi = retained.phyIntfs().iterator().next();
+        assertEquals("eth2", pi.intf());
+        assertEquals(oldId, pi.physBridge());
+    }
+
+    /**
+     * Checks that an explicitly declared datapath id is taken as is even
+     * when it differs from the stored one.
+     */
+    @Test
+    public void testExplicitPhysBridgeIdNotRetained() {
+        KubevirtNode existing = node("worker-1", null, null, phyIntf("net1", "eth1", DPID_1));
+        KubevirtNode updated = node("worker-1", null, null, phyIntf("net1", "eth2", DPID_2));
+
+        KubevirtNode retained = withRetainedPhysBridgeIds(updated, existing);
+
+        assertEquals(DPID_2, retained.phyIntfs().iterator().next().physBridge());
+    }
+
+    /**
+     * Checks that a network the stored copy does not know, and a node with
+     * no stored copy at all, keep their generated ids.
+     */
+    @Test
+    public void testNothingToRetain() {
+        DeviceId generated = generatedId("net2", "eth2", "worker-1");
+        KubevirtNode existing = node("worker-1", null, null, phyIntf("net1", "eth1", DPID_1));
+        KubevirtNode updated = node("worker-1", null, null,
+                phyIntf("net1", "eth1", DPID_1), phyIntf("net2", "eth2", generated));
+
+        assertEquals(updated, withRetainedPhysBridgeIds(updated, existing));
+        assertEquals(updated, withRetainedPhysBridgeIds(updated, null));
+    }
+
+    private static DeviceId generatedId(String network, String intf, String hostname) {
+        return DeviceId.deviceId(genDpidFromName(network + intf + hostname));
     }
 
     private static KubevirtPhyInterface phyIntf(String network, String intf, DeviceId dpid) {
