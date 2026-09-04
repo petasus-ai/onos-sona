@@ -292,6 +292,15 @@ public class KubernetesServiceWatcher {
                     .filter(Objects::nonNull)
                     .collect(Collectors.toSet());
         } catch (Exception e) {
+            // the guard above cannot cover a (re)connect that closes this client
+            // while the listing is still in flight (e.g. an API config update
+            // right after activation): the request then fails with "Socket
+            // closed". The replacement client runs its own resync, so this is
+            // not worth a warning.
+            if (client != watchClient) {
+                log.debug("Skipping external LB resync on a superseded client", e);
+                return;
+            }
             log.warn("Skipping external LB resync: failed to list services", e);
             return;
         }
