@@ -738,7 +738,15 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
 
                 log.info("Creating physnet bridge {} for worker node {}", bridgeName, node.hostname());
             } else if (node.type() == GATEWAY && (!deviceService.isAvailable(pi.physBridge()))) {
+                // the bridge may exist under another datapath id (the
+                // availability check is by the declared id); createBridge
+                // then rewrites it in place, orphaning the flows stored
+                // under the id it connected with so far
+                String dpid = ovsdbBridgeDpid(node, bridgeName);
                 createPhysicalBridge(node, pi);
+                if (dpid != null && !pi.physBridge().toString().equalsIgnoreCase("of:" + dpid)) {
+                    purgeOrphanedFlowRules(node, bridgeName, DeviceId.deviceId("of:" + dpid));
+                }
                 createPhysicalPatchPorts(node, pi);
                 attachPhysicalPort(node, pi);
 
@@ -761,6 +769,7 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                             "flows keyed on the declared id reach it",
                             bridgeName, node.hostname(), dpid, pi.physBridge());
                     createPhysicalBridge(node, pi);
+                    purgeOrphanedFlowRules(node, bridgeName, DeviceId.deviceId("of:" + dpid));
                 }
 
                 // in case physical bridge exists, but physnet interface is missing,
@@ -813,6 +822,31 @@ public class DefaultKubevirtNodeHandler implements KubevirtNodeHandler {
                 .orElse(null);
         List<String> ports = portsOnBridge(client, Collections.singletonList(portName), bridge);
         return ports == null || ports.contains(portName);
+    }
+
+    /**
+     * Purges the flow store entries of the datapath id a physnet bridge of
+     * the node connected under until its id was rewritten to the declared
+     * one. The bridge reconnects as a different device, so those entries
+     * would never be matched, removed or audited again and would only pile
+     * up. Only the store is touched: the flows the bridge still carries are
+     * reinstalled or overwritten under the declared id once the node
+     * completes, and the ones that are not can only be removed on the host.
+     */
+    private void purgeOrphanedFlowRules(KubevirtNode node, String bridgeName, DeviceId formerId) {
+        // the ids of a bridge some node still declares are not orphans;
+        // the conflict checks of the node watcher should make this
+        // impossible, but a purge on a live bridge is not worth the risk
+        if (nodeAdminService.node(formerId) != null || nodeByTunOrPhyBridge(formerId) != null) {
+            log.warn("Not purging the flow rules stored for {}, the former datapath id of " +
+                    "physnet bridge {} of node {}: a node still declares it as a bridge",
+                    formerId, bridgeName, node.hostname());
+            return;
+        }
+
+        log.info("Purging the flow rules stored for {}, the former datapath id of physnet " +
+                "bridge {} of node {}", formerId, bridgeName, node.hostname());
+        flowRuleService.purgeFlowRules(formerId);
     }
 
     /**
