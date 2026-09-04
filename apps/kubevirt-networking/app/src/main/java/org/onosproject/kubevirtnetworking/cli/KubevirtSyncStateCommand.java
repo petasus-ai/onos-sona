@@ -52,6 +52,7 @@ import java.util.stream.Collectors;
 
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.buildKubevirtNode;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.k8sClient;
+import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.listCustomResources;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.parseKubevirtNetwork;
 
 /**
@@ -166,7 +167,7 @@ public class KubevirtSyncStateCommand extends AbstractShellCommand {
         Set<KubevirtRouter> existingRouters = routerService.routers();
         Set<String> existingRouterNames = existingRouters.stream()
                 .map(KubevirtRouter::id).collect(Collectors.toSet());
-        Map<String, Object> refRouters = client.customResource(routerCrdCxt).list();
+        Map<String, Object> refRouters = listCustomResources(client, routerCrdCxt);
         ObjectMapper mapper = new ObjectMapper();
 
         try {
@@ -207,7 +208,7 @@ public class KubevirtSyncStateCommand extends AbstractShellCommand {
         Set<KubevirtNetwork> existingNetworks = networkService.networks();
         Set<String> existingNetworkNames = existingNetworks.stream()
                 .map(KubevirtNetwork::name).collect(Collectors.toSet());
-        Map<String, Object> refNetworks = client.customResource(nadCrdCxt).list();
+        Map<String, Object> refNetworks = listCustomResources(client, nadCrdCxt);
         ObjectMapper mapper = new ObjectMapper();
 
         try {
@@ -237,7 +238,7 @@ public class KubevirtSyncStateCommand extends AbstractShellCommand {
         Set<KubevirtSecurityGroup> existingSgs = sgService.securityGroups();
         Set<String> existingSgNames = existingSgs.stream()
                 .map(KubevirtSecurityGroup::id).collect(Collectors.toSet());
-        Map<String, Object> refSgs = client.customResource(securityGroupCrdCxt).list();
+        Map<String, Object> refSgs = listCustomResources(client, securityGroupCrdCxt);
         ObjectMapper mapper = new ObjectMapper();
 
         try {
@@ -274,7 +275,7 @@ public class KubevirtSyncStateCommand extends AbstractShellCommand {
         existingSgs.forEach(sg -> existingSgrs.addAll(sg.rules()));
         Set<String> existingSgrIds = existingSgrs.stream()
                 .map(KubevirtSecurityGroupRule::id).collect(Collectors.toSet());
-        Map<String, Object> refSgrs = client.customResource(securityGroupRuleCrdCxt).list();
+        Map<String, Object> refSgrs = listCustomResources(client, securityGroupRuleCrdCxt);
         ObjectMapper mapper = new ObjectMapper();
 
         try {
@@ -303,7 +304,7 @@ public class KubevirtSyncStateCommand extends AbstractShellCommand {
         Set<KubevirtLoadBalancer> existingLbs = lbService.loadBalancers();
         Set<String> existingLbNames = existingLbs.stream()
                 .map(KubevirtLoadBalancer::id).collect(Collectors.toSet());
-        Map<String, Object> refLbs = client.customResource(lbCrdCxt).list();
+        Map<String, Object> refLbs = listCustomResources(client, lbCrdCxt);
         ObjectMapper mapper = new ObjectMapper();
 
         try {

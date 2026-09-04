@@ -17,6 +17,7 @@ package org.onosproject.kubevirtnetworking.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
@@ -54,6 +55,7 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnetworking.api.Constants.KUBEVIRT_NETWORKING_APP_ID;
+import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.customResourceJson;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.getPorts;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.k8sClient;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -183,7 +185,7 @@ public class KubevirtVmiWatcher {
         }
 
         try {
-            watch = watchClient.customResource(vmiCrdCxt).watch(watcher);
+            watch = watchClient.genericKubernetesResources(vmiCrdCxt).inAnyNamespace().watch(watcher);
         } catch (Exception e) {
             log.error("Failed to instantiate watcher, retrying in {}s",
                     RECONNECT_DELAY_S, e);
@@ -247,10 +249,11 @@ public class KubevirtVmiWatcher {
         }
     }
 
-    private class InternalKubevirtVmiWatcher implements Watcher<String> {
+    private class InternalKubevirtVmiWatcher implements Watcher<GenericKubernetesResource> {
 
         @Override
-        public void eventReceived(Action action, String s) {
+        public void eventReceived(Action action, GenericKubernetesResource object) {
+            String s = customResourceJson(object);
             switch (action) {
                 case ADDED:
                 case MODIFIED:

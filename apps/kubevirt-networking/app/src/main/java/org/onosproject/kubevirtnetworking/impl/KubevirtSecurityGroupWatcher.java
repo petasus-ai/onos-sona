@@ -18,6 +18,7 @@ package org.onosproject.kubevirtnetworking.impl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
@@ -58,6 +59,7 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnetworking.api.Constants.KUBEVIRT_NETWORKING_APP_ID;
+import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.customResourceJson;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.k8sClient;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.liveResourceKeys;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -200,7 +202,7 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
         }
 
         try {
-            sgWatch = client.customResource(securityGroupCrdCxt).watch(sgWatcher);
+            sgWatch = client.genericKubernetesResources(securityGroupCrdCxt).inAnyNamespace().watch(sgWatcher);
         } catch (Exception e) {
             log.error("Failed to instantiate security group watcher, retrying in {}s",
                     RECONNECT_DELAY_S, e);
@@ -227,7 +229,7 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
         }
 
         try {
-            sgrWatch = client.customResource(securityGroupRuleCrdCxt).watch(sgrWatcher);
+            sgrWatch = client.genericKubernetesResources(securityGroupRuleCrdCxt).inAnyNamespace().watch(sgrWatcher);
         } catch (Exception e) {
             log.error("Failed to instantiate security group rule watcher, retrying in {}s",
                     RECONNECT_DELAY_S, e);
@@ -520,10 +522,11 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
         }
     }
 
-    private class InternalSecurityGroupWatcher implements Watcher<String> {
+    private class InternalSecurityGroupWatcher implements Watcher<GenericKubernetesResource> {
 
         @Override
-        public void eventReceived(Action action, String resource) {
+        public void eventReceived(Action action, GenericKubernetesResource object) {
+            String resource = customResourceJson(object);
             switch (action) {
                 case ADDED:
                     eventExecutor.execute(() -> processAddition(resource));
@@ -634,10 +637,11 @@ public class KubevirtSecurityGroupWatcher extends AbstractWatcher {
         }
     }
 
-    private class InternalSecurityGroupRuleWatcher implements Watcher<String> {
+    private class InternalSecurityGroupRuleWatcher implements Watcher<GenericKubernetesResource> {
 
         @Override
-        public void eventReceived(Action action, String resource) {
+        public void eventReceived(Action action, GenericKubernetesResource object) {
+            String resource = customResourceJson(object);
             switch (action) {
                 case ADDED:
                     eventExecutor.execute(() -> processAddition(resource));

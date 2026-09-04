@@ -18,6 +18,7 @@ package org.onosproject.kubevirtnetworking.impl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
@@ -56,6 +57,7 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.kubevirtnetworking.api.Constants.KUBEVIRT_NETWORKING_APP_ID;
+import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.customResourceJson;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.k8sClient;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.liveResourceKeys;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.parseResourceName;
@@ -177,7 +179,7 @@ public class KubevirtRouterWatcher extends AbstractWatcher {
         }
 
         try {
-            watch = client.customResource(routerCrdCxt).watch(watcher);
+            watch = client.genericKubernetesResources(routerCrdCxt).inAnyNamespace().watch(watcher);
         } catch (Exception e) {
             log.error("Failed to instantiate watcher, retrying in {}s",
                     RECONNECT_DELAY_S, e);
@@ -322,10 +324,11 @@ public class KubevirtRouterWatcher extends AbstractWatcher {
         }
     }
 
-    private class InternalVirtualRouterWatcher implements Watcher<String> {
+    private class InternalVirtualRouterWatcher implements Watcher<GenericKubernetesResource> {
 
         @Override
-        public void eventReceived(Action action, String resource) {
+        public void eventReceived(Action action, GenericKubernetesResource object) {
+            String resource = customResourceJson(object);
             switch (action) {
                 case ADDED:
                     eventExecutor.execute(() -> processAddition(resource));

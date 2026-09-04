@@ -143,7 +143,7 @@ public class K8sManagementWebResource extends AbstractWebResource {
             syncPortFromPod(pod, networkAdminService);
         });
 
-        client.extensions().ingresses().inAnyNamespace().list().getItems().forEach(ingress -> {
+        client.network().v1().ingresses().inAnyNamespace().list().getItems().forEach(ingress -> {
             if (ingressAdminService.ingress(ingress.getMetadata().getUid()) != null) {
                 ingressAdminService.updateIngress(ingress);
             } else {

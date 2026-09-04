@@ -20,7 +20,7 @@ import com.google.common.collect.Lists;
 import io.fabric8.kubernetes.api.model.Endpoints;
 import io.fabric8.kubernetes.api.model.Namespace;
 import io.fabric8.kubernetes.api.model.Pod;
-import io.fabric8.kubernetes.api.model.extensions.Ingress;
+import io.fabric8.kubernetes.api.model.networking.v1.Ingress;
 import io.fabric8.kubernetes.api.model.networking.v1.NetworkPolicy;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import org.apache.commons.lang.StringUtils;
@@ -155,7 +155,7 @@ public class K8sSyncStateCommand extends AbstractShellCommand {
 
         print("\nSynchronizing kubernetes ingresses");
         print(INGRESS_FORMAT, "Name", "Namespace", "LB Addresses");
-        client.extensions().ingresses().inAnyNamespace().list().getItems().forEach(ingress -> {
+        client.network().v1().ingresses().inAnyNamespace().list().getItems().forEach(ingress -> {
             if (ingressAdminService.ingress(ingress.getMetadata().getUid()) != null) {
                 ingressAdminService.updateIngress(ingress);
             } else {

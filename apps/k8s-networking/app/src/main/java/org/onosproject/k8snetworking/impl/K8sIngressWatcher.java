@@ -15,7 +15,7 @@
  */
 package org.onosproject.k8snetworking.impl;
 
-import io.fabric8.kubernetes.api.model.extensions.Ingress;
+import io.fabric8.kubernetes.api.model.networking.v1.Ingress;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.Watcher;
 import io.fabric8.kubernetes.client.WatcherException;
@@ -130,7 +130,7 @@ public class K8sIngressWatcher {
             KubernetesClient client = k8sClient(k8sApiConfigService);
 
             if (client != null) {
-                client.extensions().ingresses().inAnyNamespace().watch(internalK8sIngressWatcher);
+                client.network().v1().ingresses().inAnyNamespace().watch(internalK8sIngressWatcher);
             }
         }
     }

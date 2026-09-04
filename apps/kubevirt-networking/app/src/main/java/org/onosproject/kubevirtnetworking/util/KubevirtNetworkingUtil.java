@@ -40,6 +40,8 @@ import com.fasterxml.jackson.databind.ser.std.MapSerializer;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
+import io.fabric8.kubernetes.api.model.GenericKubernetesResourceList;
 import io.fabric8.kubernetes.api.model.Node;
 import io.fabric8.kubernetes.api.model.NodeAddress;
 import io.fabric8.kubernetes.api.model.NodeSpec;
@@ -147,6 +149,7 @@ public final class KubevirtNetworkingUtil {
                     .setThreadFactory(groupedThreads("onos/kubevirt-networking", "fabric8-%d", log))
                     .setDaemon(true)
                     .build());
+
 
     private static final int PORT_NAME_MAX_LENGTH = 15;
     private static final String COLON_SLASH = "://";
@@ -407,6 +410,7 @@ public final class KubevirtNetworkingUtil {
 
         return buildClient(configBuilder.build());
     }
+
     /**
      * Returns the serialization the clients of this application are built
      * with, registering every kind the application watches or lists.
@@ -508,6 +512,39 @@ public final class KubevirtNetworkingUtil {
     }
 
     /**
+     * Returns the JSON form of a custom resource received through a generic
+     * watch, which is the object as the API server serves it: the generic
+     * resource keeps spec, status and any other top-level field as additional
+     * properties, so the parsers written against the raw JSON of the fabric8
+     * 5.x custom resource API keep working unchanged.
+     *
+     * @param resource generic custom resource
+     * @return the resource as JSON
+     */
+    public static String customResourceJson(GenericKubernetesResource resource) {
+        return Serialization.INSTANCE.asJson(resource);
+    }
+
+    /**
+     * Lists the custom resources of the given definition across all
+     * namespaces in the map form the fabric8 5.x raw custom resource API
+     * returned (apiVersion, kind, metadata and items keys, each item a map).
+     *
+     * @param client kubernetes client
+     * @param context custom resource definition context to list
+     * @return the resource list as a map, or null if the client returned none
+     */
+    public static Map<String, Object> listCustomResources(KubernetesClient client,
+                                                          CustomResourceDefinitionContext context) {
+        GenericKubernetesResourceList list =
+                client.genericKubernetesResources(context).inAnyNamespace().list();
+        if (list == null) {
+            return null;
+        }
+        return Serialization.INSTANCE.convertValue(list, Map.class);
+    }
+
+    /**
      * Variant of {@link #liveResourceKeys} for resources that map to more than
      * one store key (e.g. a VM whose several interfaces each back a port). The
      * per-item function returns the set of store keys for that item, or null
@@ -530,7 +567,7 @@ public final class KubevirtNetworkingUtil {
         }
 
         try {
-            Map<String, Object> result = client.customResource(context).list();
+            Map<String, Object> result = listCustomResources(client, context);
             if (result == null) {
                 return null;
             }
@@ -1365,6 +1402,15 @@ public final class KubevirtNetworkingUtil {
             return builder.build();
         }
         return null;
+    }
+
+    /**
+     * Lazily created, repaired serialization for rendering custom resources
+     * (see {@link #kubernetesSerialization()}); a stock KubernetesSerialization
+     * cannot write additional properties on the Jackson this tree ships.
+     */
+    private static final class Serialization {
+        static final KubernetesSerialization INSTANCE = kubernetesSerialization();
     }
 
     /**

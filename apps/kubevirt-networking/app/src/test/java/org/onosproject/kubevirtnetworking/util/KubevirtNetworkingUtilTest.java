@@ -15,14 +15,23 @@
  */
 package org.onosproject.kubevirtnetworking.util;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
+import io.fabric8.kubernetes.client.utils.KubernetesSerialization;
 import org.junit.Test;
 import org.onlab.packet.IpAddress;
 import org.onosproject.kubevirtnetworking.api.KubevirtNetwork;
 
+import java.io.IOException;
+
 import static junit.framework.TestCase.assertEquals;
 import static junit.framework.TestCase.assertNotNull;
 import static junit.framework.TestCase.assertNull;
+import static junit.framework.TestCase.assertTrue;
+import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.customResourceJson;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.parseKubevirtNetwork;
+import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.parseResourceName;
 import static org.onosproject.kubevirtnetworking.util.KubevirtNetworkingUtil.segmentIdHex;
 
 /**
@@ -109,5 +118,73 @@ public final class KubevirtNetworkingUtilTest {
         assertNull(network.gatewayIp());
         assertEquals(Integer.valueOf(9000), network.mtu());
         assertEquals("stg-ext", network.physnetName());
+    }
+
+    private static GenericKubernetesResource genericResource(String json) {
+        return new KubernetesSerialization().unmarshal(json, GenericKubernetesResource.class);
+    }
+
+    /**
+     * Tests that a network attachment definition delivered as a generic
+     * resource parses exactly like the raw JSON string fabric8 5.x handed to
+     * the watcher.
+     */
+    @Test
+    public void testParseNetworkFromGenericResource() {
+        String config = "{" +
+                "\"networkId\": \"default/vlan-test\"," +
+                "\"name\": \"vlan-test\"," +
+                "\"type\": \"VLAN\"," +
+                "\"segmentId\": \"100\"," +
+                "\"physnetName\": \"external\"," +
+                "\"mtu\": 1500," +
+                "\"cidr\": \"20.20.20.0/24\"," +
+                "\"gatewayIp\": \"20.20.20.1\"," +
+                "\"ipPool\": {\"start\": \"20.20.20.2\", \"end\": \"20.20.20.254\"}" +
+                "}";
+        String raw = "{\"apiVersion\": \"k8s.cni.cncf.io/v1\"," +
+                "\"kind\": \"NetworkAttachmentDefinition\"," +
+                nadResource(config).substring(1);
+
+        KubevirtNetwork expected = parseKubevirtNetwork(raw);
+        KubevirtNetwork network = parseKubevirtNetwork(customResourceJson(genericResource(raw)));
+
+        assertNotNull(network);
+        assertEquals(expected.networkId(), network.networkId());
+        assertEquals(expected.name(), network.name());
+        assertEquals(expected.type(), network.type());
+        assertEquals(expected.mtu(), network.mtu());
+        assertEquals(expected.segmentId(), network.segmentId());
+        assertEquals(expected.physnetName(), network.physnetName());
+        assertEquals(expected.gatewayIp(), network.gatewayIp());
+        assertEquals(expected.cidr(), network.cidr());
+        assertEquals(expected.ipPool(), network.ipPool());
+        assertEquals("vlan-test", parseResourceName(customResourceJson(genericResource(raw))));
+    }
+
+    /**
+     * Tests that the top-level fields a generic resource only carries as
+     * additional properties (spec, status) survive the round trip with their
+     * JSON types intact, since the parsers read numbers with asInt().
+     */
+    @Test
+    public void testCustomResourceJsonKeepsSpecAndStatus() throws IOException {
+        String raw = "{\"apiVersion\": \"kubevirt.io/v1\"," +
+                "\"kind\": \"VirtualRouter\"," +
+                "\"metadata\": {\"name\": \"router-1\", \"namespace\": \"default\"}," +
+                "\"spec\": {\"mtu\": 1500, \"internal\": [\"net-1\"], " +
+                "\"gateway\": {\"name\": \"gw\", \"enabled\": true}}," +
+                "\"status\": {\"phase\": \"Active\"}}";
+
+        JsonNode json = new ObjectMapper().readTree(customResourceJson(genericResource(raw)));
+
+        assertEquals("kubevirt.io/v1", json.get("apiVersion").asText());
+        assertEquals("VirtualRouter", json.get("kind").asText());
+        assertEquals("router-1", json.get("metadata").get("name").asText());
+        assertTrue(json.get("spec").get("mtu").isInt());
+        assertEquals(1500, json.get("spec").get("mtu").asInt());
+        assertEquals("net-1", json.get("spec").get("internal").get(0).asText());
+        assertTrue(json.get("spec").get("gateway").get("enabled").asBoolean());
+        assertEquals("Active", json.get("status").get("phase").asText());
     }
 }

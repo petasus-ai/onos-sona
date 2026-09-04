@@ -19,6 +19,7 @@ package org.onosproject.kubevirtnetworking.impl;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import io.fabric8.kubernetes.api.model.LoadBalancerIngress;
+import io.fabric8.kubernetes.api.model.LoadBalancerIngressBuilder;
 import io.fabric8.kubernetes.api.model.LoadBalancerStatus;
 import io.fabric8.kubernetes.api.model.Service;
 import io.fabric8.kubernetes.client.KubernetesClient;
@@ -540,7 +541,12 @@ public class KubernetesServiceWatcher {
                 return;
             }
 
-            LoadBalancerIngress lbIngress = new LoadBalancerIngress(KUBE_VIP, lbIp, Lists.newArrayList());
+            // built rather than constructed: the all-args constructor grows
+            // with every field Kubernetes adds (ipMode in 1.29)
+            LoadBalancerIngress lbIngress = new LoadBalancerIngressBuilder()
+                    .withHostname(KUBE_VIP)
+                    .withIp(lbIp)
+                    .build();
 
             service.getStatus().getLoadBalancer().setIngress(Lists.newArrayList(lbIngress));
 

@@ -15,7 +15,7 @@
  */
 package org.onosproject.k8snetworking.api;
 
-import io.fabric8.kubernetes.api.model.extensions.Ingress;
+import io.fabric8.kubernetes.api.model.networking.v1.Ingress;
 
 /**
  * Service for administering the inventory of kubernetes ingress.

@@ -17,16 +17,22 @@ package org.onosproject.k8snetworking.impl;
 
 import com.google.common.collect.ImmutableSet;
 import io.fabric8.kubernetes.api.model.FieldsV1;
-import io.fabric8.kubernetes.api.model.LoadBalancerIngress;
-import io.fabric8.kubernetes.api.model.LoadBalancerStatus;
 import io.fabric8.kubernetes.api.model.ManagedFieldsEntry;
 import io.fabric8.kubernetes.api.model.ObjectMeta;
-import io.fabric8.kubernetes.api.model.extensions.Ingress;
-import io.fabric8.kubernetes.api.model.extensions.IngressBackend;
-import io.fabric8.kubernetes.api.model.extensions.IngressRule;
-import io.fabric8.kubernetes.api.model.extensions.IngressSpec;
-import io.fabric8.kubernetes.api.model.extensions.IngressStatus;
-import io.fabric8.kubernetes.api.model.extensions.IngressTLS;
+import io.fabric8.kubernetes.api.model.TypedLocalObjectReference;
+import io.fabric8.kubernetes.api.model.networking.v1.HTTPIngressPath;
+import io.fabric8.kubernetes.api.model.networking.v1.HTTPIngressRuleValue;
+import io.fabric8.kubernetes.api.model.networking.v1.Ingress;
+import io.fabric8.kubernetes.api.model.networking.v1.IngressBackend;
+import io.fabric8.kubernetes.api.model.networking.v1.IngressLoadBalancerIngress;
+import io.fabric8.kubernetes.api.model.networking.v1.IngressLoadBalancerStatus;
+import io.fabric8.kubernetes.api.model.networking.v1.IngressPortStatus;
+import io.fabric8.kubernetes.api.model.networking.v1.IngressRule;
+import io.fabric8.kubernetes.api.model.networking.v1.IngressServiceBackend;
+import io.fabric8.kubernetes.api.model.networking.v1.IngressSpec;
+import io.fabric8.kubernetes.api.model.networking.v1.IngressStatus;
+import io.fabric8.kubernetes.api.model.networking.v1.IngressTLS;
+import io.fabric8.kubernetes.api.model.networking.v1.ServiceBackendPort;
 import org.onlab.util.KryoNamespace;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
@@ -48,6 +54,7 @@ import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.slf4j.Logger;
 
+import java.util.LinkedHashMap;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
@@ -81,12 +88,19 @@ public class DistributedK8sIngressStore
             .register(IngressSpec.class)
             .register(IngressStatus.class)
             .register(IngressBackend.class)
+            .register(IngressServiceBackend.class)
+            .register(ServiceBackendPort.class)
+            .register(TypedLocalObjectReference.class)
             .register(IngressRule.class)
+            .register(HTTPIngressRuleValue.class)
+            .register(HTTPIngressPath.class)
             .register(IngressTLS.class)
-            .register(LoadBalancerStatus.class)
-            .register(LoadBalancerIngress.class)
+            .register(IngressLoadBalancerStatus.class)
+            .register(IngressLoadBalancerIngress.class)
+            .register(IngressPortStatus.class)
             .register(ManagedFieldsEntry.class)
             .register(FieldsV1.class)
+            .register(LinkedHashMap.class)
             .build();
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
