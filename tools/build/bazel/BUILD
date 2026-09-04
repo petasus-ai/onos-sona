@@ -45,3 +45,10 @@ java_binary(
         "@slf4j_nop//jar",  # TODO: Change to jdk14 after fixing verbosity
     ],
 )
+
+py_binary(
+    name = "widen_import_range",
+    srcs = ["widen_import_range.py"],
+    main = "widen_import_range.py",
+    visibility = ["//visibility:public"],
+)

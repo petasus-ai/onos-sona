@@ -25,6 +25,7 @@ import org.onosproject.net.pi.model.PiActionParamId;
 import java.util.Collection;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.onlab.junit.ImmutableClassChecker.assertThatClassIsImmutable;
@@ -93,7 +94,9 @@ public class PiActionTest {
                 .build();
         assertThat(piAction, is(notNullValue()));
         assertThat(piAction.id(), is(piActionId));
-        assertThat(piAction.parameters(), is(runtimeParams));
+        // parameters() is backed by ImmutableMap.values(), whose concrete type (and
+        // therefore equals() semantics) varies with the Guava release: compare contents.
+        assertThat(piAction.parameters(), contains(piActionParam));
         assertThat(piAction.type(), is(PiTableAction.Type.ACTION));
     }
 }

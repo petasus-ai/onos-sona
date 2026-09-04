@@ -3,6 +3,7 @@ COMPILE_DEPS = CORE_DEPS + JACKSON + CLI + KRYO + [
     "@sshd_core//jar",
     "@bcpkix_jdk15on//jar",
     "@bcprov_jdk15on//jar",
+    "@bcutil_jdk18on//jar",
     "@org_osgi_service_cm//jar",
     "//core/store/serializers:onos-core-serializers",
     "//protocols/netconf/api:onos-protocols-netconf-api",

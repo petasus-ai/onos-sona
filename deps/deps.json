@@ -9,6 +9,7 @@
       "commons-io",
       "commons-pool",
       "com_google_guava_guava",
+      "com_google_guava_failureaccess",
       "slf4j-api",
       "osgi-core",
       "org.osgi.util.promise",
@@ -110,19 +111,23 @@
       "//utils/rest:onlab-rest"
     ],
     "ATOMIX": [
-      "atomix",
-      "atomix-cluster",
-      "atomix-primary-backup",
-      "atomix-primitive",
-      "atomix-raft",
-      "atomix-storage",
-      "atomix-utils",
+      "//deps:atomix",
+      "//deps:atomix_cluster",
+      "//deps:atomix_primary_backup",
+      "//deps:atomix_primitive",
+      "//deps:atomix_raft",
+      "//deps:atomix_storage",
+      "//deps:atomix_utils",
       "typesafe-config",
       "classgraph"
     ]
   },
 
   "artifacts": {
+    // NOTE for onos-lib-gen users: the Docker build applies onos-sona-patch 999991/999992 with
+    // "git am -3". 999992 (tcnative/sigar, already in this tree) also rewrites the timestamp header
+    // of generate_workspace.bzl, so keep that header at "Wed, 4 Jan 2023 15:33:44 GMT" after
+    // regenerating; otherwise the patch conflicts instead of being detected as already applied.
     "aopalliance-repackaged": "mvn:org.glassfish.hk2.external:aopalliance-repackaged:2.5.0-b42",
     "amqp-client": "mvn:com.rabbitmq:amqp-client:jar:3.6.1",
     "asm": "mvn:org.ow2.asm:asm:5.2",
@@ -134,39 +139,43 @@
     "atomix-storage": "mvn:io.atomix:atomix-storage:3.1.12",
     "atomix-utils": "mvn:io.atomix:atomix-utils:3.1.12",
     "classgraph": "mvn:io.github.classgraph:classgraph:4.2.3",
-    "commons-codec": "mvn:commons-codec:commons-codec:1.10",
-    "commons-cli": "mvn:commons-cli:commons-cli:1.3",
+    // Apache Commons: newest releases built with bnd 6+ declare mandatory Import-Package java.*,
+    // which the Felix 5.6 framework in Karaf 4.2.14 cannot resolve (OSGi R7 feature). These are the
+    // latest releases whose manifests do not (checked: lang3 3.18+, text 1.14+, io 2.20+, codec 1.19+,
+    // net 3.12+, beanutils 1.11+, cli 1.10+ all do). Revisit after a Karaf upgrade.
+    "commons-codec": "mvn:commons-codec:commons-codec:1.18.0",
+    "commons-cli": "mvn:commons-cli:commons-cli:1.9.0",
     "commons-collections": "mvn:commons-collections:commons-collections:3.2.2",
     "commons-configuration": "mvn:commons-configuration:commons-configuration:1.10",
-    "commons-io": "mvn:commons-io:commons-io:2.6",
-    "commons-beanutils": "mvn:commons-beanutils:commons-beanutils:1.9.3",
+    "commons-io": "mvn:commons-io:commons-io:2.19.0",
+    "commons-beanutils": "mvn:commons-beanutils:commons-beanutils:1.10.1",
     "commons-jxpath": "mvn:commons-jxpath:commons-jxpath:1.3",
     "fast-classpath-scanner": "mvn:io.github.lukehutch:fast-classpath-scanner:2.21",
     "jdom": "mvn:jdom:jdom:1.0",
     "commons-lang": "mvn:commons-lang:commons-lang:2.6",
-    "commons-lang3": "mvn:org.apache.commons:commons-lang3:3.7",
+    "commons-lang3": "mvn:org.apache.commons:commons-lang3:3.17.0",
     "commons-logging": "mvn:commons-logging:commons-logging:1.2",
     "commons-math3": "mvn:org.apache.commons:commons-math3:3.6.1",
-    "commons-net": "mvn:commons-net:commons-net:jar:3.5",
+    "commons-net": "mvn:commons-net:commons-net:jar:3.11.1",
     "commons-pool": "mvn:commons-pool:commons-pool:1.6",
-    "commons-text": "mvn:org.apache.commons:commons-text:1.3",
+    "commons-text": "mvn:org.apache.commons:commons-text:1.13.1",
     "concurrent-trees": "mvn:com.googlecode.concurrent-trees:concurrent-trees:2.6.1",
     "easymock": "mvn:org.easymock:easymock:4.0.2",
     "antlr": "mvn:antlr:antlr:2.7.7",
     "ganymed-ssh2": "mvn:ch.ethz.ganymed:ganymed-ssh2:262",
     "gmetric4j": "mvn:info.ganglia.gmetric4j:gmetric4j:1.0.10",
-    "com_google_code_gson_gson": "mvn:com.google.code.gson:gson:2.7",
-    "com_google_guava_guava": "mvn:com.google.guava:guava:22.0",
-    "com_google_guava_guava_testlib": "mvn:com.google.guava:guava-testlib:22.0",
+    "com_google_code_gson_gson": "mvn:com.google.code.gson:gson:2.14.0",
+    "com_google_guava_guava": "mvn:com.google.guava:guava:33.7.1-jre",
+    "com_google_guava_guava_testlib": "mvn:com.google.guava:guava-testlib:33.7.1-jre",
     "hamcrest-all": "mvn:org.hamcrest:hamcrest-all:1.3",
     "hk2-api": "mvn:org.glassfish.hk2:hk2-api:2.5.0-b42",
     "hk2-locator": "mvn:org.glassfish.hk2:hk2-locator:2.5.0-b42",
     "hk2-osgi-resource-locator": "mvn:org.glassfish.hk2:osgi-resource-locator:1.0.1",
     "hk2-utils": "mvn:org.glassfish.hk2:hk2-utils:2.5.0-b42",
-    "httpclient-osgi": "mvn:org.apache.httpcomponents:httpclient-osgi:4.5.1",
-    "httpcore-osgi": "mvn:org.apache.httpcomponents:httpcore-osgi:4.4.4",
+    "httpclient-osgi": "mvn:org.apache.httpcomponents:httpclient-osgi:4.5.14",
+    "httpcore-osgi": "mvn:org.apache.httpcomponents:httpcore-osgi:4.4.16",
     "influxdb-java": "mvn:org.influxdb:influxdb-java:2.9",
-    "ipaddress": "mvn:com.github.seancfoley:ipaddress:5.3.3",
+    "ipaddress": "mvn:com.github.seancfoley:ipaddress:5.6.2",
     "simpleclient": "mvn:io.prometheus:simpleclient:0.5.0",
     "simpleclient_common": "mvn:io.prometheus:simpleclient_common:0.5.0",
     "simpleclient_hotspot": "mvn:io.prometheus:simpleclient_hotspot:0.5.0",
@@ -178,11 +187,11 @@
     "moshi": "mvn:com.squareup.moshi:moshi:1.4.0",
     "okio": "mvn:com.squareup.okio:okio:1.14.0",
     "jacoco-agent-runtime": "mvn:org.jacoco:org.jacoco.agent:jar:runtime:0.8.2",
-    "jackson-annotations": "mvn:com.fasterxml.jackson.core:jackson-annotations:2.11.4",
-    "jackson-core": "mvn:com.fasterxml.jackson.core:jackson-core:2.11.4",
-    "jackson-databind": "mvn:com.fasterxml.jackson.core:jackson-databind:2.11.4",
-    "jackson-datatype-jsr310": "mvn:com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.11.4",
-    "jackson-dataformat-yaml": "mvn:com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.11.4",
+    "jackson-annotations": "mvn:com.fasterxml.jackson.core:jackson-annotations:2.22",
+    "jackson-core": "mvn:com.fasterxml.jackson.core:jackson-core:2.22.2",
+    "jackson-databind": "mvn:com.fasterxml.jackson.core:jackson-databind:2.22.2",
+    "jackson-datatype-jsr310": "mvn:com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.22.2",
+    "jackson-dataformat-yaml": "mvn:com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.22.2",
 
     // Note: grpc imports "javax_annotation_api" has an http file, so we need to give a different name here
     // See WORKSPACE
@@ -206,6 +215,10 @@
     "jersey-hk2":"mvn:org.glassfish.jersey.inject:jersey-hk2:2.27",
     "jersey-test-framework-core": "mvn:org.glassfish.jersey.test-framework:jersey-test-framework-core:2.27",
     "jersey-test-framework-jetty": "mvn:org.glassfish.jersey.test-framework.providers:jersey-test-framework-provider-jetty:2.27",
+    // Jetty here is compile/test-time only: at runtime ONOS uses the Jetty shipped by Karaf (pax-web).
+    // Keep it at the release jersey-container-jetty-http 2.27 (TEST_REST) was built against: newer 9.4.x
+    // made QueuedThreadPool.newThread() public, which Jersey 2.27's protected override cannot load
+    // (IllegalAccessError in every REST resource test). Bump together with Jersey.
     "jetty-util": "mvn:org.eclipse.jetty:jetty-util:9.4.11.v20180605",
     "jetty-websocket-api": "mvn:org.eclipse.jetty.websocket:websocket-api:9.4.11.v20180605",
     "jetty-websocket": "mvn:org.eclipse.jetty.websocket:websocket-servlet:9.4.11.v20180605",
@@ -216,10 +229,10 @@
     "jetty-http": "mvn:org.eclipse.jetty:jetty-http:9.4.11.v20180605",
     "jetty-io": "mvn:org.eclipse.jetty:jetty-io:9.4.11.v20180605",
     "javax.servlet-api": "mvn:javax.servlet:javax.servlet-api:3.1.0",
-    "joda-time": "mvn:joda-time:joda-time:2.9.3",
-    "jsch": "mvn:com.jcraft:jsch:0.1.53",
+    "joda-time": "mvn:joda-time:joda-time:2.14.3",
+    "jsch": "mvn:com.jcraft:jsch:0.1.55",
     "com_google_code_findbugs_jsr305": "mvn:com.google.code.findbugs:jsr305:3.0.2",
-    "junit": "mvn:junit:junit:4.12",
+    "junit": "mvn:junit:junit:4.13.2",
     "junit-dep": "mvn:junit:junit:4.10",
     "kryo": "mvn:com.esotericsoftware:kryo:4.0.1",
     "mapdb": "mvn:org.mapdb:mapdb:1.0.9",
@@ -257,8 +270,8 @@
     "org.apache.karaf.features.core": "mvn:org.apache.karaf.features:org.apache.karaf.features.core:4.2.14",
     "org.apache.karaf.shell.console": "mvn:org.apache.karaf.shell:org.apache.karaf.shell.console:4.2.14",
     "org.apache.karaf.shell.core": "mvn:org.apache.karaf.shell:org.apache.karaf.shell.core:4.2.14",
-    "org.apache.httpcomponents.httpasyncclient-osgi": "mvn:org.apache.httpcomponents:httpasyncclient-osgi:4.1.2",
-    "org.apache.httpcomponents.httpcore-nio": "mvn:org.apache.httpcomponents:httpcore-nio:4.4.4",
+    "org.apache.httpcomponents.httpasyncclient-osgi": "mvn:org.apache.httpcomponents:httpasyncclient-osgi:4.1.5",
+    "org.apache.httpcomponents.httpcore-nio": "mvn:org.apache.httpcomponents:httpcore-nio:4.4.16",
     "org.apache.karaf.jaas": "mvn:org.apache.karaf.jaas:org.apache.karaf.jaas.modules:4.2.14",
     "org.apache.karaf.system.core": "mvn:org.apache.karaf.system:org.apache.karaf.system.core:4.2.14",
     "org.apache.servicemix.bundles.snmp4j": "mvn:org.apache.servicemix.bundles:org.apache.servicemix.bundles.snmp4j:2.3.4_1",
@@ -270,9 +283,9 @@
     "javassist": "mvn:org.javassist:javassist:3.22.0-GA", //transitive
     "mimepull": "mvn:org.jvnet.mimepull:mimepull:1.9.6", //transitive
     "servlet-api": "mvn:javax.servlet:servlet-api:2.5",
-    "slf4j-api": "mvn:org.slf4j:slf4j-api:1.7.25",
-    "slf4j-jdk14": "mvn:org.slf4j:slf4j-jdk14:1.7.25",
-    "slf4j-nop": "mvn:org.slf4j:slf4j-nop:1.7.25",
+    "slf4j-api": "mvn:org.slf4j:slf4j-api:1.7.36",
+    "slf4j-jdk14": "mvn:org.slf4j:slf4j-jdk14:1.7.36",
+    "slf4j-nop": "mvn:org.slf4j:slf4j-nop:1.7.36",
     "typesafe-config": "mvn:com.typesafe:config:1.3.2",
     "validation-api": "mvn:javax.validation:validation-api:2.0.1.Final",
     "checkstyle": "mvn:com.puppycrawl.tools:checkstyle:8.10",
@@ -288,7 +301,7 @@
     "io.socket-client": "mvn:io.socket:socket.io-client:jar:0.8.3",
     "engine.io-client": "mvn:io.socket:engine.io-client:jar:0.8.3",
     "org_codehaus_mojo_animal_sniffer_annotations": "mvn:org.codehaus.mojo:animal-sniffer-annotations:1.17",
-    "dns-java": "mvn:dnsjava:dnsjava:3.3.1",
+    "dns-java": "mvn:dnsjava:dnsjava:3.6.5",
 
 
     // grpc related jars
@@ -297,7 +310,7 @@
     "com_google_auth_google_auth_library_credentials": "mvn:com.google.auth:google-auth-library-credentials:0.13.0",
     "com_google_auth_google_auth_library_oauth2_http": "mvn:com.google.auth:google-auth-library-oauth2-http:0.13.0",
     "com_google_j2objc_j2objc_annotations": "mvn:com.google.j2objc:j2objc-annotations:1.1",
-    "com_google_guava_failureaccess": "mvn:com.google.guava:failureaccess:1.0.1",
+    "com_google_guava_failureaccess": "mvn:com.google.guava:failureaccess:1.0.3",
     "com_google_android_annotations": "mvn:com.google.android:annotations:4.1.1.4",
     "io_opencensus_opencensus_api": "mvn:io.opencensus:opencensus-api:0.21.0",
     "io_opencensus_opencensus_contrib_grpc_metrics": "mvn:io.opencensus:opencensus-contrib-grpc-metrics:0.21.0",
@@ -311,7 +324,7 @@
     "jackson-coreutils": "mvn:com.github.fge:jackson-coreutils:1.6",
     "btf": "mvn:com.github.fge:btf:1.2",
     "msg-simple": "mvn:com.github.fge:msg-simple:1.1",
-    "snakeyaml": "mvn:org.yaml:snakeyaml:1.26",
+    "snakeyaml": "mvn:org.yaml:snakeyaml:2.7",
 
     // Kubernetes related jars
     "k8s-client": "mvn:io.fabric8:kubernetes-client:5.4.2",
@@ -351,8 +364,13 @@
     "org.apache.servicemix.bundles.dom4j":"mvn:org.apache.servicemix.bundles:org.apache.servicemix.bundles.dom4j:1.6.1_5",
     "plexus-utils": "mvn:org.codehaus.plexus:plexus-utils:3.0.24",
     "sshd-core": "mvn:org.apache.sshd:sshd-core:1.7.0",
-    "bcpkix-jdk15on": "mvn:org.bouncycastle:bcpkix-jdk15on:1.66",
-    "bcprov-jdk15on": "mvn:org.bouncycastle:bcprov-jdk15on:1.66",
+    // Keys keep the historical *-jdk15on names so BUILD references stay unchanged;
+    // the artifacts are the jdk18on line (jdk15on ended at 1.70). bcpkix depends on bcutil since 1.70.
+    // 1.77 is the last release without Import-Package java.* (optional there, but Felix 5.6 in Karaf 4.2.14
+    // refuses to install any bundle importing java.*). 1.78+ needs a Karaf upgrade.
+    "bcpkix-jdk15on": "mvn:org.bouncycastle:bcpkix-jdk18on:1.77",
+    "bcutil-jdk18on": "mvn:org.bouncycastle:bcutil-jdk18on:1.77",
+    "bcprov-jdk15on": "mvn:org.bouncycastle:bcprov-jdk18on:1.77",
     "hamcrest-optional": "mvn:com.spotify:hamcrest-optional:1.1.0",
     "swagger-annotations": "mvn:io.swagger:swagger-annotations:1.5.16",
     "kafka-clients": "mvn:org.apache.servicemix.bundles:org.apache.servicemix.bundles.kafka-clients:1.1.1_1",

@@ -91,3 +91,25 @@ wrapped_osgi_jar(
     visibility = ["//visibility:public"],
     deps = [],
 )
+
+# Atomix 3.1.12 is the last release of its line and pins Guava to the major it
+# was built against (Import-Package com.google.common.*;version="[22.0,23)").
+# It is binary compatible with the Guava shipped in deps.json (every Guava
+# member it references still exists there), so only the manifest range has to
+# change for the bundles to resolve. deps.json's ATOMIX library points at these
+# copies; the jar contents and export versions are untouched.
+load("//tools/build/bazel:widened_import_jar.bzl", "widened_import_jar")
+
+[widened_import_jar(
+    name = "atomix" + suffix,
+    jar = "@atomix" + suffix + "//jar",
+    ranges = {"com.google.common": "[22.0,34)"},
+) for suffix in [
+    "",
+    "_cluster",
+    "_primary_backup",
+    "_primitive",
+    "_raft",
+    "_storage",
+    "_utils",
+]]

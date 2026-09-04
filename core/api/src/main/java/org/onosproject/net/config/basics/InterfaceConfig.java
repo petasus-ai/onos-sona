@@ -89,7 +89,9 @@ public class InterfaceConfig extends Config<ConnectPoint> {
                     "%s must be an array with at least one element", VLAN_TAGGED);
 
             for (JsonNode vlanNode : node.path(VLAN_TAGGED)) {
-                checkArgument(vlanNode.isInt() &&
+                // putVlans() adds the VLAN as a short; newer Jackson keeps that as a
+                // ShortNode, for which isInt() is false, so accept any integral node.
+                checkArgument(vlanNode.isIntegralNumber() &&
                         vlanNode.intValue() >= 0 &&  vlanNode.intValue() <= VlanId.MAX_VLAN,
                         "Invalid VLAN ID %s in %s", vlanNode.intValue(), VLAN_TAGGED);
             }

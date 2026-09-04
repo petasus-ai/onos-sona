@@ -26,12 +26,8 @@ import java.util.Stack;
 import org.onosproject.ovsdb.rfc.exception.UnsupportedException;
 import org.onosproject.ovsdb.rfc.jsonrpc.JsonReadContext;
 
-import com.fasterxml.jackson.core.JsonEncoding;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.io.IOContext;
-import com.fasterxml.jackson.core.json.ByteSourceJsonBootstrapper;
-import com.fasterxml.jackson.core.util.BufferRecycler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.MappingJsonFactory;
 
@@ -143,20 +139,48 @@ public final class JsonRpcReaderUtil {
      * @throws UnsupportedException this is an unsupported exception
      */
     private static void checkEncoding(ByteBuf in) throws IOException {
-        int inputStart = 0;
-        int inputLength = 4;
         fliterCharaters(in);
         byte[] buff = new byte[4];
         in.getBytes(in.readerIndex(), buff);
-        ByteSourceJsonBootstrapper strapper = new ByteSourceJsonBootstrapper(new IOContext(new BufferRecycler(),
-                                                                                           null,
-                                                                                           false),
-                                                                             buff, inputStart,
-                                                                             inputLength);
-        JsonEncoding jsonEncoding = strapper.detectEncoding();
-        if (!JsonEncoding.UTF8.equals(jsonEncoding)) {
+        if (!isUtf8(buff)) {
             throw new UnsupportedException("Only UTF-8 encoding is supported.");
         }
+    }
+
+    /**
+     * Tells whether the first four bytes of a JSON text indicate UTF-8.
+     * This mirrors the byte-order-mark and null-byte heuristics of Jackson's
+     * ByteSourceJsonBootstrapper.detectEncoding(); that class is internal
+     * API whose constructor contract changes between Jackson releases, so it
+     * is not used directly.
+     *
+     * @param head first four bytes of the input
+     * @return true if the input is UTF-8 (with or without a byte order mark)
+     */
+    static boolean isUtf8(byte[] head) {
+        int quad = (head[0] << 24) | ((head[1] & 0xFF) << 16) | ((head[2] & 0xFF) << 8) | (head[3] & 0xFF);
+
+        // byte order marks
+        if (quad == 0x0000FEFF || quad == 0xFFFE0000 || quad == 0x0000FFFE || quad == 0xFEFF0000) {
+            return false; // UTF-32 and the unusual UCS-4 byte orders
+        }
+        int msw = quad >>> 16;
+        if (msw == 0xFEFF || msw == 0xFFFE) {
+            return false; // UTF-16
+        }
+        if ((quad >>> 8) == 0xEFBBBF) {
+            return true; // UTF-8 BOM
+        }
+
+        // no BOM: the first character is ASCII in JSON, so null bytes reveal wider encodings
+        if ((quad >> 8) == 0 || (quad & 0x00FFFFFF) == 0
+                || (quad & ~0x00FF0000) == 0 || (quad & ~0x0000FF00) == 0) {
+            return false; // UTF-32 (and unusual UCS-4 orders)
+        }
+        if ((msw & 0xFF00) == 0 || (msw & 0x00FF) == 0) {
+            return false; // UTF-16
+        }
+        return true;
     }
 
 }

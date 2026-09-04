@@ -15,6 +15,7 @@ COMPILE = [
     "@commons_io//jar",
     "@commons_pool//jar",
     "@com_google_guava_guava//jar",
+    "@com_google_guava_failureaccess//jar",
     "@slf4j_api//jar",
     "@osgi_core//jar",
     "@org_osgi_util_promise//jar",
@@ -112,13 +113,13 @@ REST = [
     "//utils/rest:onlab-rest",
 ]
 ATOMIX = [
-    "@atomix//jar",
-    "@atomix_cluster//jar",
-    "@atomix_primary_backup//jar",
-    "@atomix_primitive//jar",
-    "@atomix_raft//jar",
-    "@atomix_storage//jar",
-    "@atomix_utils//jar",
+    "//deps:atomix",
+    "//deps:atomix_cluster",
+    "//deps:atomix_primary_backup",
+    "//deps:atomix_primitive",
+    "//deps:atomix_raft",
+    "//deps:atomix_storage",
+    "//deps:atomix_utils",
     "@typesafe_config//jar",
     "@classgraph//jar",
 ]
@@ -193,15 +194,15 @@ def generated_maven_jars():
     if "commons_codec" not in native.existing_rules():
         java_import_external(
             name = "commons_codec",
-            jar_sha256 = "4241dfa94e711d435f29a4604a3e2de5c4aa3c165e23bd066be6fc1fc4309569",
+            jar_sha256 = "ba005f304cef92a3dede24a38ad5ac9b8afccf0d8f75839d6c1338634cf7f6e4",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/commons-codec/commons-codec/1.10/commons-codec-1.10.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/commons-codec/commons-codec/1.18.0/commons-codec-1.18.0.jar"],        )
     if "commons_cli" not in native.existing_rules():
         java_import_external(
             name = "commons_cli",
-            jar_sha256 = "f8046bdc72b7ff88afb1dff5ff45451df95290c78a639ec7fa40c953ca89cb26",
+            jar_sha256 = "d3d530d0f28fd0fbbffe2b0b338f70e8cb96f1605579e2e3abd4db29cac24e69",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/commons-cli/commons-cli/1.3/commons-cli-1.3.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/commons-cli/commons-cli/1.9.0/commons-cli-1.9.0.jar"],        )
     if "commons_collections" not in native.existing_rules():
         java_import_external(
             name = "commons_collections",
@@ -217,15 +218,15 @@ def generated_maven_jars():
     if "commons_io" not in native.existing_rules():
         java_import_external(
             name = "commons_io",
-            jar_sha256 = "f877d304660ac2a142f3865badfc971dec7ed73c747c7f8d5d2f5139ca736513",
+            jar_sha256 = "824268919b4b62f9f40f08c54381de5993b078f58667e332d17348ae019d72b9",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/commons-io/commons-io/2.6/commons-io-2.6.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/commons-io/commons-io/2.19.0/commons-io-2.19.0.jar"],        )
     if "commons_beanutils" not in native.existing_rules():
         java_import_external(
             name = "commons_beanutils",
-            jar_sha256 = "c058e39c7c64203d3a448f3adb588cb03d6378ed808485618f26e137f29dae73",
+            jar_sha256 = "707a09e86ed1cf5516cdabdf1710d8fe201b6e26e7233870dce1d0ccf2a468d1",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/commons-beanutils/commons-beanutils/1.9.3/commons-beanutils-1.9.3.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/commons-beanutils/commons-beanutils/1.10.1/commons-beanutils-1.10.1.jar"],        )
     if "commons_jxpath" not in native.existing_rules():
         java_import_external(
             name = "commons_jxpath",
@@ -253,9 +254,9 @@ def generated_maven_jars():
     if "commons_lang3" not in native.existing_rules():
         java_import_external(
             name = "commons_lang3",
-            jar_sha256 = "6e8dc31e046508d9953c96534edf0c2e0bfe6f468966b5b842b3f87e43b6a847",
+            jar_sha256 = "6ee731df5c8e5a2976a1ca023b6bb320ea8d3539fbe64c8a1d5cb765127c33b4",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/3.7/commons-lang3-3.7.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/3.17.0/commons-lang3-3.17.0.jar"],        )
     if "commons_logging" not in native.existing_rules():
         java_import_external(
             name = "commons_logging",
@@ -271,9 +272,9 @@ def generated_maven_jars():
     if "commons_net" not in native.existing_rules():
         java_import_external(
             name = "commons_net",
-            jar_sha256 = "c25b0da668b3c5649f002d504def22d1b4cb30d206f05428d2fe168fa1a901c2",
+            jar_sha256 = "3bb861274992dba5487de328303745b7085de72694b63a3300be1e057144311e",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/commons-net/commons-net/3.5/commons-net-3.5.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/commons-net/commons-net/3.11.1/commons-net-3.11.1.jar"],        )
     if "commons_pool" not in native.existing_rules():
         java_import_external(
             name = "commons_pool",
@@ -283,9 +284,9 @@ def generated_maven_jars():
     if "commons_text" not in native.existing_rules():
         java_import_external(
             name = "commons_text",
-            jar_sha256 = "8185b3a5311092d83ed1f184c2d093b3105d726bbd76867c32b3511542bb99a8",
+            jar_sha256 = "76434bd2dd778ab140d84b3c6ffa40c40fe6219909f5ed1d8b8977c5ae8e50c8",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/apache/commons/commons-text/1.3/commons-text-1.3.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/apache/commons/commons-text/1.13.1/commons-text-1.13.1.jar"],        )
     if "concurrent_trees" not in native.existing_rules():
         java_import_external(
             name = "concurrent_trees",
@@ -319,21 +320,21 @@ def generated_maven_jars():
     if "com_google_code_gson_gson" not in native.existing_rules():
         java_import_external(
             name = "com_google_code_gson_gson",
-            jar_sha256 = "2d43eb5ea9e133d2ee2405cc14f5ee08951b8361302fdd93494a3a997b508d32",
+            jar_sha256 = "2cbd119bf1961c28788310963dc80ba65f58cdeec1dd139c8bdb1240faa2c36f",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/com/google/code/gson/gson/2.7/gson-2.7.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/com/google/code/gson/gson/2.14.0/gson-2.14.0.jar"],        )
     if "com_google_guava_guava" not in native.existing_rules():
         java_import_external(
             name = "com_google_guava_guava",
-            jar_sha256 = "1158e94c7de4da480873f0b4ab4a1da14c0d23d4b1902cc94a58a6f0f9ab579e",
+            jar_sha256 = "796d8e28ac64e83a47c4c5935a8fecc4682650a04bbdead738ef0f5a3a0e6c46",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/com/google/guava/guava/22.0/guava-22.0.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/com/google/guava/guava/33.7.1-jre/guava-33.7.1-jre.jar"],        )
     if "com_google_guava_guava_testlib" not in native.existing_rules():
         java_import_external(
             name = "com_google_guava_guava_testlib",
-            jar_sha256 = "5a7542ddd374a6a2e1c4f55609a72f926267047acad4213585557526c36628e0",
+            jar_sha256 = "eaee6892e3ae43eced37ef4401fd8989dc4b0f0b47f21b01c0913159a787bb4e",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/com/google/guava/guava-testlib/22.0/guava-testlib-22.0.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/com/google/guava/guava-testlib/33.7.1-jre/guava-testlib-33.7.1-jre.jar"],        )
     if "hamcrest_all" not in native.existing_rules():
         java_import_external(
             name = "hamcrest_all",
@@ -367,15 +368,15 @@ def generated_maven_jars():
     if "httpclient_osgi" not in native.existing_rules():
         java_import_external(
             name = "httpclient_osgi",
-            jar_sha256 = "e0cda85f788456b0a1664713794c70fd8ce634afbc5714df2dc6181174a6edd0",
+            jar_sha256 = "b240110bcd8e3434f98add9da609a4da43955a68a56ad5ac402265bee26ac10b",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/apache/httpcomponents/httpclient-osgi/4.5.1/httpclient-osgi-4.5.1.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/apache/httpcomponents/httpclient-osgi/4.5.14/httpclient-osgi-4.5.14.jar"],        )
     if "httpcore_osgi" not in native.existing_rules():
         java_import_external(
             name = "httpcore_osgi",
-            jar_sha256 = "a0bd904e00cb6788efd5cd8c180cb19569bba43e22a711e9b020ffa51b045a4c",
+            jar_sha256 = "8b22476c8dcd1a10dab8666dadfd45424e1cb2fc0edaef86fe745566abdba86e",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/apache/httpcomponents/httpcore-osgi/4.4.4/httpcore-osgi-4.4.4.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/apache/httpcomponents/httpcore-osgi/4.4.16/httpcore-osgi-4.4.16.jar"],        )
     if "influxdb_java" not in native.existing_rules():
         java_import_external(
             name = "influxdb_java",
@@ -385,9 +386,9 @@ def generated_maven_jars():
     if "ipaddress" not in native.existing_rules():
         java_import_external(
             name = "ipaddress",
-            jar_sha256 = "a8485113300d367306258a2663491fba8b1b746d00ca0df88d3943994cc0f7b9",
+            jar_sha256 = "b2258ec12ed1454d85dc199043d7df0ec464de1ab8f58c555d3cc63fe6237356",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/com/github/seancfoley/ipaddress/5.3.3/ipaddress-5.3.3.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/com/github/seancfoley/ipaddress/5.6.2/ipaddress-5.6.2.jar"],        )
     if "simpleclient" not in native.existing_rules():
         java_import_external(
             name = "simpleclient",
@@ -457,33 +458,33 @@ def generated_maven_jars():
     if "jackson_annotations" not in native.existing_rules():
         java_import_external(
             name = "jackson_annotations",
-            jar_sha256 = "2ab76f64048673675f26ddd1008a32889855d8a126273edae2aeee516785a1ec",
+            jar_sha256 = "21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.11.4/jackson-annotations-2.11.4.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.22/jackson-annotations-2.22.jar"],        )
     if "jackson_core" not in native.existing_rules():
         java_import_external(
             name = "jackson_core",
-            jar_sha256 = "e1dda269f16f3be00578f3a46c754f098245c7a480b86e07030b6ee7087ee1f1",
+            jar_sha256 = "ff167a6317be15895706c26668f45b898efe40ab8780970658210fe1393d52a6",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-core/2.11.4/jackson-core-2.11.4.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-core/2.22.2/jackson-core-2.22.2.jar"],        )
     if "jackson_databind" not in native.existing_rules():
         java_import_external(
             name = "jackson_databind",
-            jar_sha256 = "dc64fa3907bd299f29ad6116169e583333d04404b23a0f81ed679afa8e2a2ee8",
+            jar_sha256 = "d0da14c12b16b5d54719aa172d83b542ff4abeb8b0fb7db476fde8ceece760ca",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.11.4/jackson-databind-2.11.4.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.22.2/jackson-databind-2.22.2.jar"],        )
     if "jackson_datatype_jsr310" not in native.existing_rules():
         java_import_external(
             name = "jackson_datatype_jsr310",
-            jar_sha256 = "4f70ec64696f8de547773d7f8d5243ab7d11dc42a854df1764fa16837b6f53af",
+            jar_sha256 = "9df71cc7fb3781fd0bed6c05eebbfa8b39292a49f5619e76fdd0d889f64c8f33",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/com/fasterxml/jackson/datatype/jackson-datatype-jsr310/2.11.4/jackson-datatype-jsr310-2.11.4.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/com/fasterxml/jackson/datatype/jackson-datatype-jsr310/2.22.2/jackson-datatype-jsr310-2.22.2.jar"],        )
     if "jackson_dataformat_yaml" not in native.existing_rules():
         java_import_external(
             name = "jackson_dataformat_yaml",
-            jar_sha256 = "8a042017593286150e4cacda2a06e67f72e3ef1ca9e93d5ad8e1531b64ed66e7",
+            jar_sha256 = "f5e52c7d8914f23c5fcc00d0afbef77e20557228a6200e184bb61f69ab03fc44",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/com/fasterxml/jackson/dataformat/jackson-dataformat-yaml/2.11.4/jackson-dataformat-yaml-2.11.4.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/com/fasterxml/jackson/dataformat/jackson-dataformat-yaml/2.22.2/jackson-dataformat-yaml-2.22.2.jar"],        )
     if "javax_annotation_javax_annotation_api" not in native.existing_rules():
         java_import_external(
             name = "javax_annotation_javax_annotation_api",
@@ -661,15 +662,15 @@ def generated_maven_jars():
     if "joda_time" not in native.existing_rules():
         java_import_external(
             name = "joda_time",
-            jar_sha256 = "a05f5b8b021802a71919b18702aebdf286148188b3ee9d26e6ec40e8d0071487",
+            jar_sha256 = "43533e9df6431839d0865c897d7d43a9ca75378a52b7f60b3e08b037a5c94986",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/joda-time/joda-time/2.9.3/joda-time-2.9.3.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/joda-time/joda-time/2.14.3/joda-time-2.14.3.jar"],        )
     if "jsch" not in native.existing_rules():
         java_import_external(
             name = "jsch",
-            jar_sha256 = "f00d5cb29d70a98ef6bf2000edc89b415ae6f59d25e33caf5578b20d0d400932",
+            jar_sha256 = "d492b15a6d2ea3f1cc39c422c953c40c12289073dbe8360d98c0f6f9ec74fc44",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/com/jcraft/jsch/0.1.53/jsch-0.1.53.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/com/jcraft/jsch/0.1.55/jsch-0.1.55.jar"],        )
     if "com_google_code_findbugs_jsr305" not in native.existing_rules():
         java_import_external(
             name = "com_google_code_findbugs_jsr305",
@@ -679,9 +680,9 @@ def generated_maven_jars():
     if "junit" not in native.existing_rules():
         java_import_external(
             name = "junit",
-            jar_sha256 = "59721f0805e223d84b90677887d9ff567dc534d7c502ca903c0c2b17f05c116a",
+            jar_sha256 = "8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/junit/junit/4.12/junit-4.12.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar"],        )
     if "junit_dep" not in native.existing_rules():
         java_import_external(
             name = "junit_dep",
@@ -835,9 +836,9 @@ def generated_maven_jars():
     if "openflowj" not in native.existing_rules():
         java_import_external(
             name = "openflowj",
-            jar_sha256 = "4ee0569510cc8db3b7b9e100e67ff1d8543cf3b1031190260119cc50188b350b",
+            jar_sha256 = "b5bd490435fd6910ac9d2e0f1b2d71c68d9ff7261bfd0e70c4a0f8ea970c2785",
             licenses = ["notice"],
-            jar_urls = ["https://github.com/sonaproject/onos-sona-patch/raw/master/2.7/openflowj-3.2.3.onos.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/onosproject/openflowj/3.2.1.onos/openflowj-3.2.1.onos.jar"],        )
     if "org_osgi_util_function" not in native.existing_rules():
         java_import_external(
             name = "org_osgi_util_function",
@@ -907,15 +908,15 @@ def generated_maven_jars():
     if "org_apache_httpcomponents_httpasyncclient_osgi" not in native.existing_rules():
         java_import_external(
             name = "org_apache_httpcomponents_httpasyncclient_osgi",
-            jar_sha256 = "243ed2ef640565dbe6abdaec7ff8469d3a983424ae80170a3b0db246be40ddb3",
+            jar_sha256 = "9cda7ef582d1401dd8df93e18153fe6e87b20f70e8f92656407e71f05466f809",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/apache/httpcomponents/httpasyncclient-osgi/4.1.2/httpasyncclient-osgi-4.1.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/apache/httpcomponents/httpasyncclient-osgi/4.1.5/httpasyncclient-osgi-4.1.5.jar"],        )
     if "org_apache_httpcomponents_httpcore_nio" not in native.existing_rules():
         java_import_external(
             name = "org_apache_httpcomponents_httpcore_nio",
-            jar_sha256 = "f21be11ed00a7c655204c03d3ff38c2e8ac88db0913da3598ce5f9ffd686ae1f",
+            jar_sha256 = "4018736ede2d321034e8517ea90baefb31831a8608afccc446d8a699fb1d00d4",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/apache/httpcomponents/httpcore-nio/4.4.4/httpcore-nio-4.4.4.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/apache/httpcomponents/httpcore-nio/4.4.16/httpcore-nio-4.4.16.jar"],        )
     if "org_apache_karaf_jaas" not in native.existing_rules():
         java_import_external(
             name = "org_apache_karaf_jaas",
@@ -985,21 +986,21 @@ def generated_maven_jars():
     if "slf4j_api" not in native.existing_rules():
         java_import_external(
             name = "slf4j_api",
-            jar_sha256 = "18c4a0095d5c1da6b817592e767bb23d29dd2f560ad74df75ff3961dbde25b79",
+            jar_sha256 = "d3ef575e3e4979678dc01bf1dcce51021493b4d11fb7f1be8ad982877c16a1c0",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/slf4j/slf4j-api/1.7.25/slf4j-api-1.7.25.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/slf4j/slf4j-api/1.7.36/slf4j-api-1.7.36.jar"],        )
     if "slf4j_jdk14" not in native.existing_rules():
         java_import_external(
             name = "slf4j_jdk14",
-            jar_sha256 = "9b8b9b8279959b17e71432d40b8cf4175c761c3bc6ebc2c7ec0f2ae8ff223feb",
+            jar_sha256 = "5bf64690af4e59876b8902bb0db3dd39c686a40abfed97d3837eeeec7a2922ac",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/slf4j/slf4j-jdk14/1.7.25/slf4j-jdk14-1.7.25.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/slf4j/slf4j-jdk14/1.7.36/slf4j-jdk14-1.7.36.jar"],        )
     if "slf4j_nop" not in native.existing_rules():
         java_import_external(
             name = "slf4j_nop",
-            jar_sha256 = "6cb127138f41b5a869f9ecdd061ad17799a0e3fe7204600797154eb0432eeb12",
+            jar_sha256 = "c214958b07816cb4412b30c7bdbd4308ffdc6ba2a83767b8f3a9229cbd9274d6",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/slf4j/slf4j-nop/1.7.25/slf4j-nop-1.7.25.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/slf4j/slf4j-nop/1.7.36/slf4j-nop-1.7.36.jar"],        )
     if "typesafe_config" not in native.existing_rules():
         java_import_external(
             name = "typesafe_config",
@@ -1087,9 +1088,9 @@ def generated_maven_jars():
     if "dns_java" not in native.existing_rules():
         java_import_external(
             name = "dns_java",
-            jar_sha256 = "25b6fec5a5b4c9240accf86641c4f1694c6ca1b750097a8d175b1f7e930e34af",
+            jar_sha256 = "d1208e39e4ba17ec643ac5832b8b17dcaf5e3ae28f8c65904a755e23523cd94a",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/dnsjava/dnsjava/3.3.1/dnsjava-3.3.1.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/dnsjava/dnsjava/3.6.5/dnsjava-3.6.5.jar"],        )
     if "com_google_api_grpc_proto_google_common_protos" not in native.existing_rules():
         java_import_external(
             name = "com_google_api_grpc_proto_google_common_protos",
@@ -1123,9 +1124,9 @@ def generated_maven_jars():
     if "com_google_guava_failureaccess" not in native.existing_rules():
         java_import_external(
             name = "com_google_guava_failureaccess",
-            jar_sha256 = "a171ee4c734dd2da837e4b16be9df4661afab72a41adaf31eb84dfdaf936ca26",
+            jar_sha256 = "cbfc3906b19b8f55dd7cfd6dfe0aa4532e834250d7f080bd8d211a3e246b59cb",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/com/google/guava/failureaccess/1.0.1/failureaccess-1.0.1.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/com/google/guava/failureaccess/1.0.3/failureaccess-1.0.3.jar"],        )
     if "com_google_android_annotations" not in native.existing_rules():
         java_import_external(
             name = "com_google_android_annotations",
@@ -1195,9 +1196,9 @@ def generated_maven_jars():
     if "snakeyaml" not in native.existing_rules():
         java_import_external(
             name = "snakeyaml",
-            jar_sha256 = "d87d607e500885356c03c1cae61e8c2e05d697df8787d5aba13484c2eb76a844",
+            jar_sha256 = "2e194eba45a67dee19a4e272f4a04b18de8054e9f598b094382f6dae0b0e4b5e",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/yaml/snakeyaml/1.26/snakeyaml-1.26.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/yaml/snakeyaml/2.7/snakeyaml-2.7.jar"],        )
     if "k8s_client" not in native.existing_rules():
         java_import_external(
             name = "k8s_client",
@@ -1411,15 +1412,21 @@ def generated_maven_jars():
     if "bcpkix_jdk15on" not in native.existing_rules():
         java_import_external(
             name = "bcpkix_jdk15on",
-            jar_sha256 = "02d61268352fdb35dba996c9ca68a3f793d7b8bfa75754aac66d696517a421bd",
+            jar_sha256 = "1ac7fe8efd5b2f38cdc165be5a0675734fe44808dab92707201f03a535d6f1b8",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/bouncycastle/bcpkix-jdk15on/1.66/bcpkix-jdk15on-1.66.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/bouncycastle/bcpkix-jdk18on/1.77/bcpkix-jdk18on-1.77.jar"],        )
+    if "bcutil_jdk18on" not in native.existing_rules():
+        java_import_external(
+            name = "bcutil_jdk18on",
+            jar_sha256 = "947673bcbc5a8dde2d2fa688a5b7598d0ca6e2a74a7ea30cd93f04f6b3ad68f8",
+            licenses = ["notice"],
+            jar_urls = ["https://repo1.maven.org/maven2/org/bouncycastle/bcutil-jdk18on/1.77/bcutil-jdk18on-1.77.jar"],        )
     if "bcprov_jdk15on" not in native.existing_rules():
         java_import_external(
             name = "bcprov_jdk15on",
-            jar_sha256 = "1b861dba1c5445de9b38a1789c211ef28b9d07e26d1fa38bee717e5b51162ffe",
+            jar_sha256 = "dabb98c24d72c9b9f585633d1df9c5cd58d9ad373d0cd681367e6a603a495d58",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/bouncycastle/bcprov-jdk15on/1.66/bcprov-jdk15on-1.66.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/bouncycastle/bcprov-jdk18on/1.77/bcprov-jdk18on-1.77.jar"],        )
     if "hamcrest_optional" not in native.existing_rules():
         java_import_external(
             name = "hamcrest_optional",
@@ -1486,39 +1493,39 @@ artifact_map["@atomix_raft//:atomix_raft"] = "mvn:io.atomix:atomix-raft:jar:3.1.
 artifact_map["@atomix_storage//:atomix_storage"] = "mvn:io.atomix:atomix-storage:jar:3.1.12"
 artifact_map["@atomix_utils//:atomix_utils"] = "mvn:io.atomix:atomix-utils:jar:3.1.12"
 artifact_map["@classgraph//:classgraph"] = "mvn:io.github.classgraph:classgraph:jar:4.2.3"
-artifact_map["@commons_codec//:commons_codec"] = "mvn:commons-codec:commons-codec:jar:1.10"
-artifact_map["@commons_cli//:commons_cli"] = "mvn:commons-cli:commons-cli:jar:1.3"
+artifact_map["@commons_codec//:commons_codec"] = "mvn:commons-codec:commons-codec:jar:1.18.0"
+artifact_map["@commons_cli//:commons_cli"] = "mvn:commons-cli:commons-cli:jar:1.9.0"
 artifact_map["@commons_collections//:commons_collections"] = "mvn:commons-collections:commons-collections:jar:3.2.2"
 artifact_map["@commons_configuration//:commons_configuration"] = "mvn:commons-configuration:commons-configuration:jar:1.10"
-artifact_map["@commons_io//:commons_io"] = "mvn:commons-io:commons-io:jar:2.6"
-artifact_map["@commons_beanutils//:commons_beanutils"] = "mvn:commons-beanutils:commons-beanutils:jar:1.9.3"
+artifact_map["@commons_io//:commons_io"] = "mvn:commons-io:commons-io:jar:2.19.0"
+artifact_map["@commons_beanutils//:commons_beanutils"] = "mvn:commons-beanutils:commons-beanutils:jar:1.10.1"
 artifact_map["@commons_jxpath//:commons_jxpath"] = "mvn:commons-jxpath:commons-jxpath:jar:1.3"
 artifact_map["@fast_classpath_scanner//:fast_classpath_scanner"] = "mvn:io.github.lukehutch:fast-classpath-scanner:jar:2.21"
 artifact_map["@jdom//:jdom"] = "mvn:jdom:jdom:jar:NON-OSGI:1.0"
 artifact_map["@commons_lang//:commons_lang"] = "mvn:commons-lang:commons-lang:jar:2.6"
-artifact_map["@commons_lang3//:commons_lang3"] = "mvn:org.apache.commons:commons-lang3:jar:3.7"
+artifact_map["@commons_lang3//:commons_lang3"] = "mvn:org.apache.commons:commons-lang3:jar:3.17.0"
 artifact_map["@commons_logging//:commons_logging"] = "mvn:commons-logging:commons-logging:jar:1.2"
 artifact_map["@commons_math3//:commons_math3"] = "mvn:org.apache.commons:commons-math3:jar:3.6.1"
-artifact_map["@commons_net//:commons_net"] = "mvn:commons-net:commons-net:jar:3.5"
+artifact_map["@commons_net//:commons_net"] = "mvn:commons-net:commons-net:jar:3.11.1"
 artifact_map["@commons_pool//:commons_pool"] = "mvn:commons-pool:commons-pool:jar:1.6"
-artifact_map["@commons_text//:commons_text"] = "mvn:org.apache.commons:commons-text:jar:1.3"
+artifact_map["@commons_text//:commons_text"] = "mvn:org.apache.commons:commons-text:jar:1.13.1"
 artifact_map["@concurrent_trees//:concurrent_trees"] = "mvn:com.googlecode.concurrent-trees:concurrent-trees:jar:2.6.1"
 artifact_map["@easymock//:easymock"] = "mvn:org.easymock:easymock:jar:4.0.2"
 artifact_map["@antlr//:antlr"] = "mvn:antlr:antlr:jar:NON-OSGI:2.7.7"
 artifact_map["@ganymed_ssh2//:ganymed_ssh2"] = "mvn:ch.ethz.ganymed:ganymed-ssh2:jar:NON-OSGI:262"
 artifact_map["@gmetric4j//:gmetric4j"] = "mvn:info.ganglia.gmetric4j:gmetric4j:jar:1.0.10"
-artifact_map["@com_google_code_gson_gson//:com_google_code_gson_gson"] = "mvn:com.google.code.gson:gson:jar:2.7"
-artifact_map["@com_google_guava_guava//:com_google_guava_guava"] = "mvn:com.google.guava:guava:jar:22.0"
-artifact_map["@com_google_guava_guava_testlib//:com_google_guava_guava_testlib"] = "mvn:com.google.guava:guava-testlib:jar:NON-OSGI:22.0"
+artifact_map["@com_google_code_gson_gson//:com_google_code_gson_gson"] = "mvn:com.google.code.gson:gson:jar:2.14.0"
+artifact_map["@com_google_guava_guava//:com_google_guava_guava"] = "mvn:com.google.guava:guava:jar:33.7.1-jre"
+artifact_map["@com_google_guava_guava_testlib//:com_google_guava_guava_testlib"] = "mvn:com.google.guava:guava-testlib:jar:NON-OSGI:33.7.1-jre"
 artifact_map["@hamcrest_all//:hamcrest_all"] = "mvn:org.hamcrest:hamcrest-all:jar:NON-OSGI:1.3"
 artifact_map["@hk2_api//:hk2_api"] = "mvn:org.glassfish.hk2:hk2-api:jar:2.5.0-b42"
 artifact_map["@hk2_locator//:hk2_locator"] = "mvn:org.glassfish.hk2:hk2-locator:jar:2.5.0-b42"
 artifact_map["@hk2_osgi_resource_locator//:hk2_osgi_resource_locator"] = "mvn:org.glassfish.hk2:osgi-resource-locator:jar:1.0.1"
 artifact_map["@hk2_utils//:hk2_utils"] = "mvn:org.glassfish.hk2:hk2-utils:jar:2.5.0-b42"
-artifact_map["@httpclient_osgi//:httpclient_osgi"] = "mvn:org.apache.httpcomponents:httpclient-osgi:jar:4.5.1"
-artifact_map["@httpcore_osgi//:httpcore_osgi"] = "mvn:org.apache.httpcomponents:httpcore-osgi:jar:4.4.4"
+artifact_map["@httpclient_osgi//:httpclient_osgi"] = "mvn:org.apache.httpcomponents:httpclient-osgi:jar:4.5.14"
+artifact_map["@httpcore_osgi//:httpcore_osgi"] = "mvn:org.apache.httpcomponents:httpcore-osgi:jar:4.4.16"
 artifact_map["@influxdb_java//:influxdb_java"] = "mvn:org.influxdb:influxdb-java:jar:NON-OSGI:2.9"
-artifact_map["@ipaddress//:ipaddress"] = "mvn:com.github.seancfoley:ipaddress:jar:5.3.3"
+artifact_map["@ipaddress//:ipaddress"] = "mvn:com.github.seancfoley:ipaddress:jar:5.6.2"
 artifact_map["@simpleclient//:simpleclient"] = "mvn:io.prometheus:simpleclient:jar:0.5.0"
 artifact_map["@simpleclient_common//:simpleclient_common"] = "mvn:io.prometheus:simpleclient_common:jar:0.5.0"
 artifact_map["@simpleclient_hotspot//:simpleclient_hotspot"] = "mvn:io.prometheus:simpleclient_hotspot:jar:0.5.0"
@@ -1530,11 +1537,11 @@ artifact_map["@logging_interceptor//:logging_interceptor"] = "mvn:com.squareup.o
 artifact_map["@moshi//:moshi"] = "mvn:com.squareup.moshi:moshi:jar:NON-OSGI:1.4.0"
 artifact_map["@okio//:okio"] = "mvn:com.squareup.okio:okio:jar:NON-OSGI:1.14.0"
 artifact_map["@jacoco_agent_runtime//:jacoco_agent_runtime"] = "mvn:org.jacoco:org.jacoco.agent:jar:runtime:NON-OSGI:0.8.2"
-artifact_map["@jackson_annotations//:jackson_annotations"] = "mvn:com.fasterxml.jackson.core:jackson-annotations:jar:2.11.4"
-artifact_map["@jackson_core//:jackson_core"] = "mvn:com.fasterxml.jackson.core:jackson-core:jar:2.11.4"
-artifact_map["@jackson_databind//:jackson_databind"] = "mvn:com.fasterxml.jackson.core:jackson-databind:jar:2.11.4"
-artifact_map["@jackson_datatype_jsr310//:jackson_datatype_jsr310"] = "mvn:com.fasterxml.jackson.datatype:jackson-datatype-jsr310:jar:2.11.4"
-artifact_map["@jackson_dataformat_yaml//:jackson_dataformat_yaml"] = "mvn:com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:jar:2.11.4"
+artifact_map["@jackson_annotations//:jackson_annotations"] = "mvn:com.fasterxml.jackson.core:jackson-annotations:jar:2.22"
+artifact_map["@jackson_core//:jackson_core"] = "mvn:com.fasterxml.jackson.core:jackson-core:jar:2.22.2"
+artifact_map["@jackson_databind//:jackson_databind"] = "mvn:com.fasterxml.jackson.core:jackson-databind:jar:2.22.2"
+artifact_map["@jackson_datatype_jsr310//:jackson_datatype_jsr310"] = "mvn:com.fasterxml.jackson.datatype:jackson-datatype-jsr310:jar:2.22.2"
+artifact_map["@jackson_dataformat_yaml//:jackson_dataformat_yaml"] = "mvn:com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:jar:2.22.2"
 artifact_map["@javax_annotation_javax_annotation_api//:javax_annotation_javax_annotation_api"] = "mvn:javax.annotation:javax.annotation-api:jar:1.3"
 artifact_map["@javax_inject//:javax_inject"] = "mvn:org.glassfish.hk2.external:javax.inject:jar:2.5.0-b42"
 artifact_map["@javax_ws_rs_api//:javax_ws_rs_api"] = "mvn:javax.ws.rs:javax.ws.rs-api:jar:2.1"
@@ -1564,10 +1571,10 @@ artifact_map["@jetty_continuation//:jetty_continuation"] = "mvn:org.eclipse.jett
 artifact_map["@jetty_http//:jetty_http"] = "mvn:org.eclipse.jetty:jetty-http:jar:9.4.11.v20180605"
 artifact_map["@jetty_io//:jetty_io"] = "mvn:org.eclipse.jetty:jetty-io:jar:9.4.11.v20180605"
 artifact_map["@javax_servlet_api//:javax_servlet_api"] = "mvn:javax.servlet:javax.servlet-api:jar:3.1.0"
-artifact_map["@joda_time//:joda_time"] = "mvn:joda-time:joda-time:jar:2.9.3"
-artifact_map["@jsch//:jsch"] = "mvn:com.jcraft:jsch:jar:NON-OSGI:0.1.53"
+artifact_map["@joda_time//:joda_time"] = "mvn:joda-time:joda-time:jar:2.14.3"
+artifact_map["@jsch//:jsch"] = "mvn:com.jcraft:jsch:jar:NON-OSGI:0.1.55"
 artifact_map["@com_google_code_findbugs_jsr305//:com_google_code_findbugs_jsr305"] = "mvn:com.google.code.findbugs:jsr305:jar:3.0.2"
-artifact_map["@junit//:junit"] = "mvn:junit:junit:jar:NON-OSGI:4.12"
+artifact_map["@junit//:junit"] = "mvn:junit:junit:jar:NON-OSGI:4.13.2"
 artifact_map["@junit_dep//:junit_dep"] = "mvn:junit:junit:jar:NON-OSGI:4.10"
 artifact_map["@kryo//:kryo"] = "mvn:com.esotericsoftware:kryo:jar:4.0.1"
 artifact_map["@mapdb//:mapdb"] = "mvn:org.mapdb:mapdb:jar:1.0.9"
@@ -1605,8 +1612,8 @@ artifact_map["@org_apache_karaf_bundle_core//:org_apache_karaf_bundle_core"] = "
 artifact_map["@org_apache_karaf_features_core//:org_apache_karaf_features_core"] = "mvn:org.apache.karaf.features:org.apache.karaf.features.core:jar:4.2.14"
 artifact_map["@org_apache_karaf_shell_console//:org_apache_karaf_shell_console"] = "mvn:org.apache.karaf.shell:org.apache.karaf.shell.console:jar:4.2.14"
 artifact_map["@org_apache_karaf_shell_core//:org_apache_karaf_shell_core"] = "mvn:org.apache.karaf.shell:org.apache.karaf.shell.core:jar:4.2.14"
-artifact_map["@org_apache_httpcomponents_httpasyncclient_osgi//:org_apache_httpcomponents_httpasyncclient_osgi"] = "mvn:org.apache.httpcomponents:httpasyncclient-osgi:jar:4.1.2"
-artifact_map["@org_apache_httpcomponents_httpcore_nio//:org_apache_httpcomponents_httpcore_nio"] = "mvn:org.apache.httpcomponents:httpcore-nio:jar:NON-OSGI:4.4.4"
+artifact_map["@org_apache_httpcomponents_httpasyncclient_osgi//:org_apache_httpcomponents_httpasyncclient_osgi"] = "mvn:org.apache.httpcomponents:httpasyncclient-osgi:jar:4.1.5"
+artifact_map["@org_apache_httpcomponents_httpcore_nio//:org_apache_httpcomponents_httpcore_nio"] = "mvn:org.apache.httpcomponents:httpcore-nio:jar:NON-OSGI:4.4.16"
 artifact_map["@org_apache_karaf_jaas//:org_apache_karaf_jaas"] = "mvn:org.apache.karaf.jaas:org.apache.karaf.jaas.modules:jar:4.2.14"
 artifact_map["@org_apache_karaf_system_core//:org_apache_karaf_system_core"] = "mvn:org.apache.karaf.system:org.apache.karaf.system.core:jar:4.2.14"
 artifact_map["@org_apache_servicemix_bundles_snmp4j//:org_apache_servicemix_bundles_snmp4j"] = "mvn:org.apache.servicemix.bundles:org.apache.servicemix.bundles.snmp4j:jar:2.3.4_1"
@@ -1618,9 +1625,9 @@ artifact_map["@rrd4j//:rrd4j"] = "mvn:org.rrd4j:rrd4j:jar:NON-OSGI:3.1"
 artifact_map["@javassist//:javassist"] = "mvn:org.javassist:javassist:jar:3.22.0-GA"
 artifact_map["@mimepull//:mimepull"] = "mvn:org.jvnet.mimepull:mimepull:jar:1.9.6"
 artifact_map["@servlet_api//:servlet_api"] = "mvn:javax.servlet:servlet-api:jar:NON-OSGI:2.5"
-artifact_map["@slf4j_api//:slf4j_api"] = "mvn:org.slf4j:slf4j-api:jar:1.7.25"
-artifact_map["@slf4j_jdk14//:slf4j_jdk14"] = "mvn:org.slf4j:slf4j-jdk14:jar:1.7.25"
-artifact_map["@slf4j_nop//:slf4j_nop"] = "mvn:org.slf4j:slf4j-nop:jar:1.7.25"
+artifact_map["@slf4j_api//:slf4j_api"] = "mvn:org.slf4j:slf4j-api:jar:1.7.36"
+artifact_map["@slf4j_jdk14//:slf4j_jdk14"] = "mvn:org.slf4j:slf4j-jdk14:jar:1.7.36"
+artifact_map["@slf4j_nop//:slf4j_nop"] = "mvn:org.slf4j:slf4j-nop:jar:1.7.36"
 artifact_map["@typesafe_config//:typesafe_config"] = "mvn:com.typesafe:config:jar:1.3.2"
 artifact_map["@validation_api//:validation_api"] = "mvn:javax.validation:validation-api:jar:2.0.1.Final"
 artifact_map["@checkstyle//:checkstyle"] = "mvn:com.puppycrawl.tools:checkstyle:jar:NON-OSGI:8.10"
@@ -1635,13 +1642,13 @@ artifact_map["@mibs_rfc//:mibs_rfc"] = "mvn:org.onosproject:mibbler-mibs-rfc:jar
 artifact_map["@io_socket_client//:io_socket_client"] = "mvn:io.socket:socket.io-client:jar:NON-OSGI:0.8.3"
 artifact_map["@engine_io_client//:engine_io_client"] = "mvn:io.socket:engine.io-client:jar:NON-OSGI:0.8.3"
 artifact_map["@org_codehaus_mojo_animal_sniffer_annotations//:org_codehaus_mojo_animal_sniffer_annotations"] = "mvn:org.codehaus.mojo:animal-sniffer-annotations:jar:NON-OSGI:1.17"
-artifact_map["@dns_java//:dns_java"] = "mvn:dnsjava:dnsjava:jar:3.3.1"
+artifact_map["@dns_java//:dns_java"] = "mvn:dnsjava:dnsjava:jar:3.6.5"
 artifact_map["@com_google_api_grpc_proto_google_common_protos//:com_google_api_grpc_proto_google_common_protos"] = "mvn:com.google.api.grpc:proto-google-common-protos:jar:NON-OSGI:1.12.0"
 artifact_map["@com_google_errorprone_error_prone_annotations//:com_google_errorprone_error_prone_annotations"] = "mvn:com.google.errorprone:error_prone_annotations:jar:NON-OSGI:2.3.4"
 artifact_map["@com_google_auth_google_auth_library_credentials//:com_google_auth_google_auth_library_credentials"] = "mvn:com.google.auth:google-auth-library-credentials:jar:NON-OSGI:0.13.0"
 artifact_map["@com_google_auth_google_auth_library_oauth2_http//:com_google_auth_google_auth_library_oauth2_http"] = "mvn:com.google.auth:google-auth-library-oauth2-http:jar:NON-OSGI:0.13.0"
 artifact_map["@com_google_j2objc_j2objc_annotations//:com_google_j2objc_j2objc_annotations"] = "mvn:com.google.j2objc:j2objc-annotations:jar:NON-OSGI:1.1"
-artifact_map["@com_google_guava_failureaccess//:com_google_guava_failureaccess"] = "mvn:com.google.guava:failureaccess:jar:1.0.1"
+artifact_map["@com_google_guava_failureaccess//:com_google_guava_failureaccess"] = "mvn:com.google.guava:failureaccess:jar:1.0.3"
 artifact_map["@com_google_android_annotations//:com_google_android_annotations"] = "mvn:com.google.android:annotations:jar:NON-OSGI:4.1.1.4"
 artifact_map["@io_opencensus_opencensus_api//:io_opencensus_opencensus_api"] = "mvn:io.opencensus:opencensus-api:jar:NON-OSGI:0.21.0"
 artifact_map["@io_opencensus_opencensus_contrib_grpc_metrics//:io_opencensus_opencensus_contrib_grpc_metrics"] = "mvn:io.opencensus:opencensus-contrib-grpc-metrics:jar:NON-OSGI:0.21.0"
@@ -1653,7 +1660,7 @@ artifact_map["@json_patch//:json_patch"] = "mvn:com.github.fge:json-patch:jar:1.
 artifact_map["@jackson_coreutils//:jackson_coreutils"] = "mvn:com.github.fge:jackson-coreutils:jar:1.6"
 artifact_map["@btf//:btf"] = "mvn:com.github.fge:btf:jar:1.2"
 artifact_map["@msg_simple//:msg_simple"] = "mvn:com.github.fge:msg-simple:jar:1.1"
-artifact_map["@snakeyaml//:snakeyaml"] = "mvn:org.yaml:snakeyaml:jar:1.26"
+artifact_map["@snakeyaml//:snakeyaml"] = "mvn:org.yaml:snakeyaml:jar:2.7"
 artifact_map["@k8s_client//:k8s_client"] = "mvn:io.fabric8:kubernetes-client:jar:NON-OSGI:5.4.2"
 artifact_map["@k8s_model//:k8s_model"] = "mvn:io.fabric8:kubernetes-model:jar:NON-OSGI:5.4.2"
 artifact_map["@k8s_model_common//:k8s_model_common"] = "mvn:io.fabric8:kubernetes-model-common:jar:5.4.2"
@@ -1689,8 +1696,9 @@ artifact_map["@onos_yang_serializers_utils//:onos_yang_serializers_utils"] = "mv
 artifact_map["@org_apache_servicemix_bundles_dom4j//:org_apache_servicemix_bundles_dom4j"] = "mvn:org.apache.servicemix.bundles:org.apache.servicemix.bundles.dom4j:jar:1.6.1_5"
 artifact_map["@plexus_utils//:plexus_utils"] = "mvn:org.codehaus.plexus:plexus-utils:jar:NON-OSGI:3.0.24"
 artifact_map["@sshd_core//:sshd_core"] = "mvn:org.apache.sshd:sshd-core:jar:1.7.0"
-artifact_map["@bcpkix_jdk15on//:bcpkix_jdk15on"] = "mvn:org.bouncycastle:bcpkix-jdk15on:jar:1.66"
-artifact_map["@bcprov_jdk15on//:bcprov_jdk15on"] = "mvn:org.bouncycastle:bcprov-jdk15on:jar:1.66"
+artifact_map["@bcpkix_jdk15on//:bcpkix_jdk15on"] = "mvn:org.bouncycastle:bcpkix-jdk18on:jar:1.77"
+artifact_map["@bcutil_jdk18on//:bcutil_jdk18on"] = "mvn:org.bouncycastle:bcutil-jdk18on:jar:1.77"
+artifact_map["@bcprov_jdk15on//:bcprov_jdk15on"] = "mvn:org.bouncycastle:bcprov-jdk18on:jar:1.77"
 artifact_map["@hamcrest_optional//:hamcrest_optional"] = "mvn:com.spotify:hamcrest-optional:jar:NON-OSGI:1.1.0"
 artifact_map["@swagger_annotations//:swagger_annotations"] = "mvn:io.swagger:swagger-annotations:jar:1.5.16"
 artifact_map["@kafka_clients//:kafka_clients"] = "mvn:org.apache.servicemix.bundles:org.apache.servicemix.bundles.kafka-clients:jar:1.1.1_1"
