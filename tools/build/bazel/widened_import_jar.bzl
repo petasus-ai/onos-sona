@@ -14,7 +14,7 @@
  limitations under the License.
 """
 
-def widened_import_jar(name, jar, ranges, visibility = ["//visibility:public"]):
+def widened_import_jar(name, jar, ranges = {}, optional = [], visibility = ["//visibility:public"]):
     """Copies a third-party OSGi bundle, widening selected Import-Package version ranges.
 
     Args:
@@ -22,10 +22,14 @@ def widened_import_jar(name, jar, ranges, visibility = ["//visibility:public"]):
       jar: label of the original jar (e.g. "@atomix//jar").
       ranges: dict of package prefix -> new OSGi version range, e.g.
               {"com.google.common": "[22.0,34)"}.
+      optional: package prefixes whose imports become resolution:=optional
+              (their version range is left alone).
     """
     args = []
     for prefix, version_range in ranges.items():
         args += [prefix, "'%s'" % version_range]
+    for prefix in optional:
+        args += [prefix, "optional"]
     native.genrule(
         name = name + "-widen",
         srcs = [jar],

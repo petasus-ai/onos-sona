@@ -1,11 +1,11 @@
 COMPILE_DEPS = CORE_DEPS + METRICS + [
     "@gmetric4j//jar",
-    "@metrics_graphite//jar",
+    "//deps:metrics_graphite",
 ]
 
 INCLUDED_BUNDLES = [
     "@gmetric4j//jar",
-    "@metrics_graphite//jar",
+    "//deps:metrics_graphite",
     "@remotetea_oncrpc//jar",
 ]
 

@@ -113,3 +113,22 @@ load("//tools/build/bazel:widened_import_jar.bzl", "widened_import_jar")
     "_storage",
     "_utils",
 ]]
+
+# Dropwizard metrics 4.x never shipped a metrics-ganglia; 3.2.6 is the last one
+# and pins com.codahale.metrics to "[3.2,4)". Every metrics-core member it
+# references (ScheduledReporter constructors, Snapshot, Metered, ...) still
+# exists in 4.2, so only the range has to move.
+widened_import_jar(
+    name = "metrics_ganglia",
+    jar = "@metrics_ganglia//jar",
+    ranges = {"com.codahale.metrics": "[3.2,5)"},
+)
+
+# metrics-graphite 4.2.x imports com.rabbitmq.client without resolution:=optional
+# (it was optional in 3.2.x); the package is only used by GraphiteRabbitMQ, which
+# ONOS never instantiates, and amqp-client 5.x would drag Netty 4.2 into Karaf.
+widened_import_jar(
+    name = "metrics_graphite",
+    jar = "@metrics_graphite//jar",
+    optional = ["com.rabbitmq.client"],
+)

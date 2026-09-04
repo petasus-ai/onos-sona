@@ -7,6 +7,7 @@ COMPILE_DEPS = CORE_DEPS + METRICS + CLI + [
     "@logging_interceptor//jar",
     "@okio//jar",
     "@moshi//jar",
+    "@msgpack_core//jar",
     "@converter_moshi//jar",
     "@com_google_code_gson_gson//jar",
 ]
@@ -21,6 +22,7 @@ BUNDLES = [
     "@com_google_code_gson_gson//jar",
     "@okio//jar",
     "@moshi//jar",
+    "@msgpack_core//jar",
     "@converter_moshi//jar",
 ]
 
@@ -34,6 +36,7 @@ EXCLUDED_BUNDLES = [
     "@com_google_code_gson_gson//jar",
     "@okio//jar",
     "@moshi//jar",
+    "@msgpack_core//jar",
     "@converter_moshi//jar",
 ]
 

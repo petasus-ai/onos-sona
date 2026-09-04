@@ -9,6 +9,7 @@ BUNDLES = [
     "@logging_interceptor//jar",
     "@okio//jar",
     "@moshi//jar",
+    "@msgpack_core//jar",
     "@converter_moshi//jar",
     # prometheus deps
     "@simpleclient//jar",

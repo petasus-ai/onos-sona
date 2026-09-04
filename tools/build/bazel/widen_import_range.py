@@ -26,11 +26,17 @@
 # is what the rest of the build resolves against, so a targeted manifest edit
 # is safer.
 #
-# usage: widen_import_range.py <in.jar> <out.jar> <package-prefix> <range> [<package-prefix> <range> ...]
+# A rule value of "optional" marks the matching clauses resolution:=optional
+# instead of changing their range, for bundles that hard-import a package they
+# only touch on an unused code path (e.g. metrics-graphite's RabbitMQ sender).
+#
+# usage: widen_import_range.py <in.jar> <out.jar> <package-prefix> <range|optional> [<package-prefix> <range|optional> ...]
 
 import re
 import sys
 import zipfile
+
+OPTIONAL = "optional"
 
 
 def parse_manifest(raw):
@@ -83,7 +89,11 @@ def widen(value, rules):
         pkg = clause.split(";")[0].strip()
         for prefix, new_range in rules:
             if pkg == prefix or pkg.startswith(prefix + "."):
-                clause = re.sub(r'version="[^"]*"', 'version="%s"' % new_range, clause)
+                if new_range == OPTIONAL:
+                    if "resolution:=optional" not in clause:
+                        clause += ";resolution:=optional"
+                else:
+                    clause = re.sub(r'version="[^"]*"', 'version="%s"' % new_range, clause)
                 break
         clauses.append(clause)
     return ",".join(clauses)

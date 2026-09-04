@@ -251,9 +251,10 @@ public class DefaultInfluxDbMetricsReporter implements InfluxDbMetricsReporter {
      */
     private void configSender() {
         try {
+            // metrics-influxdb 1.3 takes a measurement prefix; ONOS keeps the bare metric names
             influxDbHttpSender = new InfluxDbHttpSender(DEFAULT_PROTOCOL, address,
                     port, database, username + SEPARATOR + password, REPORT_TIME_UNIT,
-                    DEFAULT_CONN_TIMEOUT, DEFAULT_READ_TIMEOUT);
+                    DEFAULT_CONN_TIMEOUT, DEFAULT_READ_TIMEOUT, "");
         } catch (Exception e) {
             log.error("Fail to connect to given influxDB server!");
         }

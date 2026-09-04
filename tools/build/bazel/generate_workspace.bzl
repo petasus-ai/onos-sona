@@ -56,6 +56,7 @@ TEST_REST = [] + TEST_ADAPTERS + [
     "@jersey_server//jar",
     "@jersey_common//jar",
     "@jersey_hk2//jar",
+    "@jersey_media_jaxb//jar",
     "@jersey_test_framework_core//jar",
     "@jersey_test_framework_jetty//jar",
     "@jersey_container_jetty_http//jar",
@@ -128,9 +129,9 @@ def generated_maven_jars():
     if "aopalliance_repackaged" not in native.existing_rules():
         java_import_external(
             name = "aopalliance_repackaged",
-            jar_sha256 = "669869a9d7e98fcea34580de250db54531550487d03571f26b9592e712897423",
+            jar_sha256 = "bad77f9278d753406360af9e4747bd9b3161554ea9cd3d62411a0ae1f2c141fd",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/hk2/external/aopalliance-repackaged/2.5.0-b42/aopalliance-repackaged-2.5.0-b42.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/hk2/external/aopalliance-repackaged/2.6.1/aopalliance-repackaged-2.6.1.jar"],        )
     if "amqp_client" not in native.existing_rules():
         java_import_external(
             name = "amqp_client",
@@ -344,27 +345,27 @@ def generated_maven_jars():
     if "hk2_api" not in native.existing_rules():
         java_import_external(
             name = "hk2_api",
-            jar_sha256 = "4d328e5b1cb5e8dcf3f97e1348d960f439e597009aa9d994dd5325bcef367908",
+            jar_sha256 = "c2cb80a01e58440ae57d5ee59af4d4d94e5180e04aff112b0cb611c07d61e773",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/hk2/hk2-api/2.5.0-b42/hk2-api-2.5.0-b42.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/hk2/hk2-api/2.6.1/hk2-api-2.6.1.jar"],        )
     if "hk2_locator" not in native.existing_rules():
         java_import_external(
             name = "hk2_locator",
-            jar_sha256 = "2a3766079d1cd21e715e4fd75e8189ebd58f9bf852885f1679253f0a27039b72",
+            jar_sha256 = "febc668deb9f2000c76bd4918d8086c0a4c74d07bd0c60486b72c6bd38b62874",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/hk2/hk2-locator/2.5.0-b42/hk2-locator-2.5.0-b42.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/hk2/hk2-locator/2.6.1/hk2-locator-2.6.1.jar"],        )
     if "hk2_osgi_resource_locator" not in native.existing_rules():
         java_import_external(
             name = "hk2_osgi_resource_locator",
-            jar_sha256 = "775003be577e8806f51b6e442be1033d83be2cb2207227b349be0bf16e6c0843",
+            jar_sha256 = "aab5d7849f7cfcda2cc7c541ba1bd365151d42276f151c825387245dfde3dd74",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/hk2/osgi-resource-locator/1.0.1/osgi-resource-locator-1.0.1.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/hk2/osgi-resource-locator/1.0.3/osgi-resource-locator-1.0.3.jar"],        )
     if "hk2_utils" not in native.existing_rules():
         java_import_external(
             name = "hk2_utils",
-            jar_sha256 = "5edb176086ad0be1d4abbc0a1d26d519d088a01ee24f9ee064c657895a86e3ee",
+            jar_sha256 = "30727f79086452fdefdab08451d982c2082aa239d9f75cdeb1ba271e3c887036",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/hk2/hk2-utils/2.5.0-b42/hk2-utils-2.5.0-b42.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/hk2/hk2-utils/2.6.1/hk2-utils-2.6.1.jar"],        )
     if "httpclient_osgi" not in native.existing_rules():
         java_import_external(
             name = "httpclient_osgi",
@@ -380,9 +381,9 @@ def generated_maven_jars():
     if "influxdb_java" not in native.existing_rules():
         java_import_external(
             name = "influxdb_java",
-            jar_sha256 = "c2c35eff56e5b101028a52f5fa2bc25e7b5e0f6c7b7fdf9f5c8ed503621547eb",
+            jar_sha256 = "174d2de00c4e9d6a2876d8a75a3eb4f38f256c0b2b0b7e366c22d5e401761c64",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/influxdb/influxdb-java/2.9/influxdb-java-2.9.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/influxdb/influxdb-java/2.15/influxdb-java-2.15.jar"],        )
     if "ipaddress" not in native.existing_rules():
         java_import_external(
             name = "ipaddress",
@@ -416,15 +417,15 @@ def generated_maven_jars():
     if "retrofit" not in native.existing_rules():
         java_import_external(
             name = "retrofit",
-            jar_sha256 = "c0295f38b3c1a48bb71a8ed2ea69ddeb2e49a830b11862385a403355c6a94643",
+            jar_sha256 = "b8a4c00d26d996fe023e80c6b33a4d2d52d2c7ba35eef27326cf1d97eda556c5",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/com/squareup/retrofit2/retrofit/2.3.0/retrofit-2.3.0.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/com/squareup/retrofit2/retrofit/2.5.0/retrofit-2.5.0.jar"],        )
     if "converter_moshi" not in native.existing_rules():
         java_import_external(
             name = "converter_moshi",
-            jar_sha256 = "9623b53c71e7305ab1eb8b9e68a4ea57152420de9e2646e3676fbe851fc0371a",
+            jar_sha256 = "6bade0b754a7b8b7551e2208cb8227e697c2db553b8f12df6f1aa70c6f058600",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/com/squareup/retrofit2/converter-moshi/2.3.0/converter-moshi-2.3.0.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/com/squareup/retrofit2/converter-moshi/2.5.0/converter-moshi-2.5.0.jar"],        )
     if "okhttp" not in native.existing_rules():
         java_import_external(
             name = "okhttp",
@@ -440,15 +441,21 @@ def generated_maven_jars():
     if "moshi" not in native.existing_rules():
         java_import_external(
             name = "moshi",
-            jar_sha256 = "d8ef4da48b59790d587904c4ef2245ee6f64dedec780f1250d00ab136160dcce",
+            jar_sha256 = "42fe746d2694ea11fe6a02becd9da2ca3dafe97c9efd50a0f9af5c4596e74a6a",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/com/squareup/moshi/moshi/1.4.0/moshi-1.4.0.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/com/squareup/moshi/moshi/1.8.0/moshi-1.8.0.jar"],        )
+    if "msgpack_core" not in native.existing_rules():
+        java_import_external(
+            name = "msgpack_core",
+            jar_sha256 = "5b5ff9e86d5b680aecd2d3355ddd468afec5e18586c0d479ac8b0961806b99eb",
+            licenses = ["notice"],
+            jar_urls = ["https://repo1.maven.org/maven2/org/msgpack/msgpack-core/0.8.16/msgpack-core-0.8.16.jar"],        )
     if "okio" not in native.existing_rules():
         java_import_external(
             name = "okio",
-            jar_sha256 = "4633c331f50642ebe795dc089d6a5928aff43071c9d17e7840a009eea2fe95a3",
+            jar_sha256 = "8e88b055523cc80613dfb844d598740e10ada62f4bd98304cdd140c5854cc3b6",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/com/squareup/okio/okio/1.14.0/okio-1.14.0.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/com/squareup/okio/okio/1.17.6/okio-1.17.6.jar"],        )
     if "jacoco_agent_runtime" not in native.existing_rules():
         java_import_external(
             name = "jacoco_agent_runtime",
@@ -494,9 +501,9 @@ def generated_maven_jars():
     if "javax_inject" not in native.existing_rules():
         java_import_external(
             name = "javax_inject",
-            jar_sha256 = "3bcf096beb918c9586be829190903090a21ac40513c1401e1b986e6030addc98",
+            jar_sha256 = "5e88c123b3e41bca788b2683118867d9b6dec714247ea91c588aed46a36ee24f",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/hk2/external/javax.inject/2.5.0-b42/javax.inject-2.5.0-b42.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/hk2/external/jakarta.inject/2.6.1/jakarta.inject-2.6.1.jar"],        )
     if "javax_ws_rs_api" not in native.existing_rules():
         java_import_external(
             name = "javax_ws_rs_api",
@@ -530,129 +537,135 @@ def generated_maven_jars():
     if "jersey_client" not in native.existing_rules():
         java_import_external(
             name = "jersey_client",
-            jar_sha256 = "aba407bda94df54f590041b4cde5f2fa31db45bd8b4cf7575af48c1f8f81bb04",
+            jar_sha256 = "d9062052eb6ac74280cea4f5b01a3fa68e74452c99672a0603ade4073812051a",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/core/jersey-client/2.27/jersey-client-2.27.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/core/jersey-client/2.48/jersey-client-2.48.jar"],        )
     if "jersey_security" not in native.existing_rules():
         java_import_external(
             name = "jersey_security",
-            jar_sha256 = "25052afa8c18f2e98e9160bc4f434179eff592c7c9cfb98bfc582d40280daa0b",
+            jar_sha256 = "1a611827791e5acffb8a8222a0c0868cbf8b1ff8bbc77fb764a6ab402bf77b12",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/security/oauth2-client/2.27/oauth2-client-2.27.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/security/oauth2-client/2.48/oauth2-client-2.48.jar"],        )
     if "jersey_common" not in native.existing_rules():
         java_import_external(
             name = "jersey_common",
-            jar_sha256 = "9a9578c6dac52b96195a614150f696d455db6b6d267a645c3120a4d0ee495789",
+            jar_sha256 = "0371d4517e031c489a5cca7f2153e2e8403a67b7412f0b3d0136e8267a1ce60a",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/core/jersey-common/2.27/jersey-common-2.27.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/core/jersey-common/2.48/jersey-common-2.48.jar"],        )
     if "jersey_container_jetty_http" not in native.existing_rules():
         java_import_external(
             name = "jersey_container_jetty_http",
-            jar_sha256 = "932390b9381d2bc9b9c1d386c30d7f2245ff0539e5c18b987727eea174256a09",
+            jar_sha256 = "e06a3f5b2c7236fa61f6508866775760395a64aa0e0b5e8c15fad1c159b8a1ea",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/containers/jersey-container-jetty-http/2.27/jersey-container-jetty-http-2.27.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/containers/jersey-container-jetty-http/2.48/jersey-container-jetty-http-2.48.jar"],        )
     if "jersey_container_servlet" not in native.existing_rules():
         java_import_external(
             name = "jersey_container_servlet",
-            jar_sha256 = "40349db8dabf6327a01ad59eaff172bd9a5f8927b2411bcdc59ceb05ce7731c1",
+            jar_sha256 = "9169ac8caadabf691d38c84acd251249355e1939cb3cd9a3cc23d6776f4733b6",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/containers/jersey-container-servlet/2.27/jersey-container-servlet-2.27.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/containers/jersey-container-servlet/2.48/jersey-container-servlet-2.48.jar"],        )
     if "jersey_container_servlet_core" not in native.existing_rules():
         java_import_external(
             name = "jersey_container_servlet_core",
-            jar_sha256 = "39e9fee46f5c6b5d4e49dc03f54741671bd4261090c5f7b5c72541a232873946",
+            jar_sha256 = "43be1e34914d6cb694163b6572baf5339cddc416980355e9ea4cb3ef605802df",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/containers/jersey-container-servlet-core/2.27/jersey-container-servlet-core-2.27.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/containers/jersey-container-servlet-core/2.48/jersey-container-servlet-core-2.48.jar"],        )
     if "jersey_media_multipart" not in native.existing_rules():
         java_import_external(
             name = "jersey_media_multipart",
-            jar_sha256 = "08b303988e99546364283c63da5aa2d79c7c823f7b0d1ca5deabe66fbbb6374e",
+            jar_sha256 = "cca527ab1054fe58fd51df82c39a7a40582aeaacb14e2a617d7145aa52b04400",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/media/jersey-media-multipart/2.27/jersey-media-multipart-2.27.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/media/jersey-media-multipart/2.48/jersey-media-multipart-2.48.jar"],        )
     if "jersey_media_sse" not in native.existing_rules():
         java_import_external(
             name = "jersey_media_sse",
-            jar_sha256 = "660f0a524761b85a8689cd80c45eff9d1dd8302a1c623710b1e05f95d6748686",
+            jar_sha256 = "f03bf245d8532d48c88d6a39cb36ae0f545119aa7203be8281ba050fbc8a6149",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/media/jersey-media-sse/2.27/jersey-media-sse-2.27.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/media/jersey-media-sse/2.48/jersey-media-sse-2.48.jar"],        )
     if "jersey_server" not in native.existing_rules():
         java_import_external(
             name = "jersey_server",
-            jar_sha256 = "45a2e1e87566cb9808953d1f5ce0b4d99ede51be4a0f22ed92a7ceda7ba9417e",
+            jar_sha256 = "92ebd773957a86e5f1e141d6264348f2e709f8079e2a789434f626dcd7a454a8",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/core/jersey-server/2.27/jersey-server-2.27.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/core/jersey-server/2.48/jersey-server-2.48.jar"],        )
     if "jersey_hk2" not in native.existing_rules():
         java_import_external(
             name = "jersey_hk2",
-            jar_sha256 = "634a2790f08c2f33feb78586b22a23005a2f8aa483c316ae2435729be0943968",
+            jar_sha256 = "184dd8af4392bf0f349640f9eab6228909354b5699a4aa54b85fc9bf09d2a970",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/inject/jersey-hk2/2.27/jersey-hk2-2.27.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/inject/jersey-hk2/2.48/jersey-hk2-2.48.jar"],        )
+    if "jersey_media_jaxb" not in native.existing_rules():
+        java_import_external(
+            name = "jersey_media_jaxb",
+            jar_sha256 = "6f3946b3d0a1967988b69a1100b5fbd96e91db0efa0a476cd08a1605005c4544",
+            licenses = ["notice"],
+            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/media/jersey-media-jaxb/2.48/jersey-media-jaxb-2.48.jar"],        )
     if "jersey_test_framework_core" not in native.existing_rules():
         java_import_external(
             name = "jersey_test_framework_core",
-            jar_sha256 = "f2d6a9b9163643864b488f390325ef29c733996ca90089b0dbfa010032421139",
+            jar_sha256 = "d3870ac3edd60f855d44b589d656183196bc78f729d3665906a269a03c25d15a",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/test-framework/jersey-test-framework-core/2.27/jersey-test-framework-core-2.27.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/test-framework/jersey-test-framework-core/2.48/jersey-test-framework-core-2.48.jar"],        )
     if "jersey_test_framework_jetty" not in native.existing_rules():
         java_import_external(
             name = "jersey_test_framework_jetty",
-            jar_sha256 = "4308de3001f867d589a4e95085c128d9d33b3022c6f8d5c68ff7ef2e1fb54451",
+            jar_sha256 = "aef2862894ee1ecbaefcaad0b9dc201a59b53401b4f2f7dadc4ee0186381b0f9",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/test-framework/providers/jersey-test-framework-provider-jetty/2.27/jersey-test-framework-provider-jetty-2.27.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/glassfish/jersey/test-framework/providers/jersey-test-framework-provider-jetty/2.48/jersey-test-framework-provider-jetty-2.48.jar"],        )
     if "jetty_util" not in native.existing_rules():
         java_import_external(
             name = "jetty_util",
-            jar_sha256 = "936e5ed74275c16164cc1eccaeae55900eb00edd9f1b1d3b83d70782dd25f505",
+            jar_sha256 = "62786c3f838354a35fa7b66c8e9e7be968185ade18ed6b81c17f0e2e1ea225a0",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-util/9.4.11.v20180605/jetty-util-9.4.11.v20180605.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-util/9.4.43.v20210629/jetty-util-9.4.43.v20210629.jar"],        )
     if "jetty_websocket_api" not in native.existing_rules():
         java_import_external(
             name = "jetty_websocket_api",
-            jar_sha256 = "924edcf7fb17f2ff2e541afce7fd692305235e51b5a16f7223d7e8b4de77559d",
+            jar_sha256 = "170b66e12d7afc3cca997ef9b0ac62f732a21e2afcb10e9d1be9d0e9a3e6e76b",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/eclipse/jetty/websocket/websocket-api/9.4.11.v20180605/websocket-api-9.4.11.v20180605.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/eclipse/jetty/websocket/websocket-api/9.4.43.v20210629/websocket-api-9.4.43.v20210629.jar"],        )
     if "jetty_websocket" not in native.existing_rules():
         java_import_external(
             name = "jetty_websocket",
-            jar_sha256 = "76f52b482ad174944e07f552cbfaaa2ccf498063e0a3837bb930eee8a06373aa",
+            jar_sha256 = "daa7eb33fcca4fd3d8eb78a990d439814146e22e49d7de4673a0bfcec987a0fb",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/eclipse/jetty/websocket/websocket-servlet/9.4.11.v20180605/websocket-servlet-9.4.11.v20180605.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/eclipse/jetty/websocket/websocket-servlet/9.4.43.v20210629/websocket-servlet-9.4.43.v20210629.jar"],        )
     if "jetty_server" not in native.existing_rules():
         java_import_external(
             name = "jetty_server",
-            jar_sha256 = "b74af5ac482b05c242ed231e00b7c08a0b6649f76f2e039a0885de0cf1376ef8",
+            jar_sha256 = "7b64a7e1cbd249c0e510d6cda545dbf9393d41d9a904f9243fdaf64f98cc60e8",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-server/9.4.11.v20180605/jetty-server-9.4.11.v20180605.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-server/9.4.43.v20210629/jetty-server-9.4.43.v20210629.jar"],        )
     if "jetty_servlet" not in native.existing_rules():
         java_import_external(
             name = "jetty_servlet",
-            jar_sha256 = "e24f145a6d95c7653ad2fe0c34cf8ce7311effb7eb8ed9399fae63d8af63eaf4",
+            jar_sha256 = "a457542a40ccebeae080a3e42093882419a11d4bc311d25a232f6b54d046e170",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-servlet/9.4.11.v20180605/jetty-servlet-9.4.11.v20180605.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-servlet/9.4.43.v20210629/jetty-servlet-9.4.43.v20210629.jar"],        )
     if "jetty_security" not in native.existing_rules():
         java_import_external(
             name = "jetty_security",
-            jar_sha256 = "5a12b1c69264466004baff33b14fc1555007c86fb2fece2a420c480aa7f8ef56",
+            jar_sha256 = "44149deceb680ab4b772634e5cf65b070bf0fbf139672295cedc9be1509d15ed",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-security/9.4.11.v20180605/jetty-security-9.4.11.v20180605.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-security/9.4.43.v20210629/jetty-security-9.4.43.v20210629.jar"],        )
     if "jetty_continuation" not in native.existing_rules():
         java_import_external(
             name = "jetty_continuation",
-            jar_sha256 = "0af8353dbe4ab06fb0020a380be60b2c2a63cd9430f5f199509ecd51dc3dd7cd",
+            jar_sha256 = "bc73fb7cd88fdc2d455ba9d781d47ccab1ee1df7cf2f144c7e1ad25fc9ab24e7",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-continuation/9.4.11.v20180605/jetty-continuation-9.4.11.v20180605.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-continuation/9.4.43.v20210629/jetty-continuation-9.4.43.v20210629.jar"],        )
     if "jetty_http" not in native.existing_rules():
         java_import_external(
             name = "jetty_http",
-            jar_sha256 = "963b75730aa92b0dfbe65fe8a2e413edc88aeb53e8686ba6b1617d7caeb14067",
+            jar_sha256 = "bcbf228fed3984962be41910193fb8d6fe3fbaa8a39b8cc6bc7c20e1e82e0937",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-http/9.4.11.v20180605/jetty-http-9.4.11.v20180605.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-http/9.4.43.v20210629/jetty-http-9.4.43.v20210629.jar"],        )
     if "jetty_io" not in native.existing_rules():
         java_import_external(
             name = "jetty_io",
-            jar_sha256 = "75c82d6e542a3518e2517c4084c83d8216ec2d2458f8747b8b5c944355ebd732",
+            jar_sha256 = "0f37f12273dbd0ae216549e425203f51f63cbf4bfef3f994d832d24730f03f0b",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-io/9.4.11.v20180605/jetty-io-9.4.11.v20180605.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-io/9.4.43.v20210629/jetty-io-9.4.43.v20210629.jar"],        )
     if "javax_servlet_api" not in native.existing_rules():
         java_import_external(
             name = "javax_servlet_api",
@@ -704,33 +717,33 @@ def generated_maven_jars():
     if "metrics_core" not in native.existing_rules():
         java_import_external(
             name = "metrics_core",
-            jar_sha256 = "5c6f685e41664d10c70c65837cba9e58d39ff3896811e3b5707a934b11c85ad0",
+            jar_sha256 = "401a3e1bbd64d7a652344b293a8d83b7e31f51df4dd2328190024fcbdf65583d",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/dropwizard/metrics/metrics-core/3.2.2/metrics-core-3.2.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/dropwizard/metrics/metrics-core/4.2.40/metrics-core-4.2.40.jar"],        )
     if "metrics_ganglia" not in native.existing_rules():
         java_import_external(
             name = "metrics_ganglia",
-            jar_sha256 = "fdae87ba15898e1754c885afab1594962b0bb24e2049ad35b853521b458f7351",
+            jar_sha256 = "bd64ca16506df7500fd0f11ae7133c8a05e8711518b0dd88607d82e08da0593f",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/dropwizard/metrics/metrics-ganglia/3.2.2/metrics-ganglia-3.2.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/dropwizard/metrics/metrics-ganglia/3.2.6/metrics-ganglia-3.2.6.jar"],        )
     if "metrics_graphite" not in native.existing_rules():
         java_import_external(
             name = "metrics_graphite",
-            jar_sha256 = "cb967ecf5d6d88fe08322b8fe64b885ef2ce0e74ed8fc9bfea286e7aad2e6d47",
+            jar_sha256 = "0b5ca279a68cba9daa0e37231e76b7a344a8b5dc6b62f6410f90094a720bf5df",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/dropwizard/metrics/metrics-graphite/3.2.2/metrics-graphite-3.2.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/dropwizard/metrics/metrics-graphite/4.2.40/metrics-graphite-4.2.40.jar"],        )
     if "metrics_influxdb" not in native.existing_rules():
         java_import_external(
             name = "metrics_influxdb",
-            jar_sha256 = "ad5b498597f66b245ecff13396fecfc7b8a2b2616c2e3f7773050596c09fd77f",
+            jar_sha256 = "fae7df4ef29743a320a2fb0b20d191e75cb98a57b88ee6adfe258c5cf7ce3461",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/com/izettle/metrics-influxdb/1.1.1/metrics-influxdb-1.1.1.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/com/izettle/metrics-influxdb/1.3.4/metrics-influxdb-1.3.4.jar"],        )
     if "metrics_json" not in native.existing_rules():
         java_import_external(
             name = "metrics_json",
-            jar_sha256 = "38f50ac1f211518279031919bbcc0e02f6d6659d02dcd6f4e47e90b16851c821",
+            jar_sha256 = "88f0aea19b4012cf2ffa6dc45ad9f4c48f08f064e37b01c4efc540ac17e0aec9",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/io/dropwizard/metrics/metrics-json/3.2.2/metrics-json-3.2.2.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/io/dropwizard/metrics/metrics-json/4.2.40/metrics-json-4.2.40.jar"],        )
     if "minimal_json" not in native.existing_rules():
         java_import_external(
             name = "minimal_json",
@@ -968,15 +981,15 @@ def generated_maven_jars():
     if "javassist" not in native.existing_rules():
         java_import_external(
             name = "javassist",
-            jar_sha256 = "59531c00f3e3aa1ff48b3a8cf4ead47d203ab0e2fd9e0ad401f764e05947e252",
+            jar_sha256 = "eba37290994b5e4868f3af98ff113f6244a6b099385d9ad46881307d3cb01aaf",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/javassist/javassist/3.22.0-GA/javassist-3.22.0-GA.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/javassist/javassist/3.30.2-GA/javassist-3.30.2-GA.jar"],        )
     if "mimepull" not in native.existing_rules():
         java_import_external(
             name = "mimepull",
-            jar_sha256 = "2d1ee56aa89837ba9ea55431542e7939fa9d425552c2e6c8ddfb3b77877721b7",
+            jar_sha256 = "b9f586bf8844b14a33e75fe7a4b94896dc80d80b732d128777e287af14c836fa",
             licenses = ["notice"],
-            jar_urls = ["https://repo1.maven.org/maven2/org/jvnet/mimepull/mimepull/1.9.6/mimepull-1.9.6.jar"],        )
+            jar_urls = ["https://repo1.maven.org/maven2/org/jvnet/mimepull/mimepull/1.9.15/mimepull-1.9.15.jar"],        )
     if "servlet_api" not in native.existing_rules():
         java_import_external(
             name = "servlet_api",
@@ -1482,7 +1495,7 @@ def generated_maven_jars():
             licenses = ["notice"],
             jar_urls = ["https://repo1.maven.org/maven2/io/kamon/sigar-loader/1.6.6-rev002/sigar-loader-1.6.6-rev002.jar"],        )
 artifact_map = {}
-artifact_map["@aopalliance_repackaged//:aopalliance_repackaged"] = "mvn:org.glassfish.hk2.external:aopalliance-repackaged:jar:2.5.0-b42"
+artifact_map["@aopalliance_repackaged//:aopalliance_repackaged"] = "mvn:org.glassfish.hk2.external:aopalliance-repackaged:jar:2.6.1"
 artifact_map["@amqp_client//:amqp_client"] = "mvn:com.rabbitmq:amqp-client:jar:3.6.1"
 artifact_map["@asm//:asm"] = "mvn:org.ow2.asm:asm:jar:5.2"
 artifact_map["@atomix//:atomix"] = "mvn:io.atomix:atomix:jar:3.1.12"
@@ -1518,24 +1531,25 @@ artifact_map["@com_google_code_gson_gson//:com_google_code_gson_gson"] = "mvn:co
 artifact_map["@com_google_guava_guava//:com_google_guava_guava"] = "mvn:com.google.guava:guava:jar:33.7.1-jre"
 artifact_map["@com_google_guava_guava_testlib//:com_google_guava_guava_testlib"] = "mvn:com.google.guava:guava-testlib:jar:NON-OSGI:33.7.1-jre"
 artifact_map["@hamcrest_all//:hamcrest_all"] = "mvn:org.hamcrest:hamcrest-all:jar:NON-OSGI:1.3"
-artifact_map["@hk2_api//:hk2_api"] = "mvn:org.glassfish.hk2:hk2-api:jar:2.5.0-b42"
-artifact_map["@hk2_locator//:hk2_locator"] = "mvn:org.glassfish.hk2:hk2-locator:jar:2.5.0-b42"
-artifact_map["@hk2_osgi_resource_locator//:hk2_osgi_resource_locator"] = "mvn:org.glassfish.hk2:osgi-resource-locator:jar:1.0.1"
-artifact_map["@hk2_utils//:hk2_utils"] = "mvn:org.glassfish.hk2:hk2-utils:jar:2.5.0-b42"
+artifact_map["@hk2_api//:hk2_api"] = "mvn:org.glassfish.hk2:hk2-api:jar:2.6.1"
+artifact_map["@hk2_locator//:hk2_locator"] = "mvn:org.glassfish.hk2:hk2-locator:jar:2.6.1"
+artifact_map["@hk2_osgi_resource_locator//:hk2_osgi_resource_locator"] = "mvn:org.glassfish.hk2:osgi-resource-locator:jar:1.0.3"
+artifact_map["@hk2_utils//:hk2_utils"] = "mvn:org.glassfish.hk2:hk2-utils:jar:2.6.1"
 artifact_map["@httpclient_osgi//:httpclient_osgi"] = "mvn:org.apache.httpcomponents:httpclient-osgi:jar:4.5.14"
 artifact_map["@httpcore_osgi//:httpcore_osgi"] = "mvn:org.apache.httpcomponents:httpcore-osgi:jar:4.4.16"
-artifact_map["@influxdb_java//:influxdb_java"] = "mvn:org.influxdb:influxdb-java:jar:NON-OSGI:2.9"
+artifact_map["@influxdb_java//:influxdb_java"] = "mvn:org.influxdb:influxdb-java:jar:NON-OSGI:2.15"
 artifact_map["@ipaddress//:ipaddress"] = "mvn:com.github.seancfoley:ipaddress:jar:5.6.2"
 artifact_map["@simpleclient//:simpleclient"] = "mvn:io.prometheus:simpleclient:jar:0.5.0"
 artifact_map["@simpleclient_common//:simpleclient_common"] = "mvn:io.prometheus:simpleclient_common:jar:0.5.0"
 artifact_map["@simpleclient_hotspot//:simpleclient_hotspot"] = "mvn:io.prometheus:simpleclient_hotspot:jar:0.5.0"
 artifact_map["@simpleclient_servlet//:simpleclient_servlet"] = "mvn:io.prometheus:simpleclient_servlet:jar:0.5.0"
-artifact_map["@retrofit//:retrofit"] = "mvn:com.squareup.retrofit2:retrofit:jar:NON-OSGI:2.3.0"
-artifact_map["@converter_moshi//:converter_moshi"] = "mvn:com.squareup.retrofit2:converter-moshi:jar:NON-OSGI:2.3.0"
+artifact_map["@retrofit//:retrofit"] = "mvn:com.squareup.retrofit2:retrofit:jar:NON-OSGI:2.5.0"
+artifact_map["@converter_moshi//:converter_moshi"] = "mvn:com.squareup.retrofit2:converter-moshi:jar:NON-OSGI:2.5.0"
 artifact_map["@okhttp//:okhttp"] = "mvn:com.squareup.okhttp3:okhttp:jar:NON-OSGI:3.12.12"
 artifact_map["@logging_interceptor//:logging_interceptor"] = "mvn:com.squareup.okhttp3:logging-interceptor:jar:NON-OSGI:3.12.12"
-artifact_map["@moshi//:moshi"] = "mvn:com.squareup.moshi:moshi:jar:NON-OSGI:1.4.0"
-artifact_map["@okio//:okio"] = "mvn:com.squareup.okio:okio:jar:NON-OSGI:1.14.0"
+artifact_map["@moshi//:moshi"] = "mvn:com.squareup.moshi:moshi:jar:NON-OSGI:1.8.0"
+artifact_map["@msgpack_core//:msgpack_core"] = "mvn:org.msgpack:msgpack-core:jar:NON-OSGI:0.8.16"
+artifact_map["@okio//:okio"] = "mvn:com.squareup.okio:okio:jar:NON-OSGI:1.17.6"
 artifact_map["@jacoco_agent_runtime//:jacoco_agent_runtime"] = "mvn:org.jacoco:org.jacoco.agent:jar:runtime:NON-OSGI:0.8.2"
 artifact_map["@jackson_annotations//:jackson_annotations"] = "mvn:com.fasterxml.jackson.core:jackson-annotations:jar:2.22"
 artifact_map["@jackson_core//:jackson_core"] = "mvn:com.fasterxml.jackson.core:jackson-core:jar:2.22.2"
@@ -1543,33 +1557,34 @@ artifact_map["@jackson_databind//:jackson_databind"] = "mvn:com.fasterxml.jackso
 artifact_map["@jackson_datatype_jsr310//:jackson_datatype_jsr310"] = "mvn:com.fasterxml.jackson.datatype:jackson-datatype-jsr310:jar:2.22.2"
 artifact_map["@jackson_dataformat_yaml//:jackson_dataformat_yaml"] = "mvn:com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:jar:2.22.2"
 artifact_map["@javax_annotation_javax_annotation_api//:javax_annotation_javax_annotation_api"] = "mvn:javax.annotation:javax.annotation-api:jar:1.3"
-artifact_map["@javax_inject//:javax_inject"] = "mvn:org.glassfish.hk2.external:javax.inject:jar:2.5.0-b42"
+artifact_map["@javax_inject//:javax_inject"] = "mvn:org.glassfish.hk2.external:jakarta.inject:jar:2.6.1"
 artifact_map["@javax_ws_rs_api//:javax_ws_rs_api"] = "mvn:javax.ws.rs:javax.ws.rs-api:jar:2.1"
 artifact_map["@javax_activation//:javax_activation"] = "mvn:javax.activation:activation:jar:NON-OSGI:1.1.1"
 artifact_map["@jaxb_api//:jaxb_api"] = "mvn:javax.xml.bind:jaxb-api:jar:2.3.1"
 artifact_map["@jaxb_core//:jaxb_core"] = "mvn:com.sun.xml.bind:jaxb-core:jar:2.3.0.1"
 artifact_map["@jaxb_impl//:jaxb_impl"] = "mvn:com.sun.xml.bind:jaxb-impl:jar:2.3.0.1"
-artifact_map["@jersey_client//:jersey_client"] = "mvn:org.glassfish.jersey.core:jersey-client:jar:2.27"
-artifact_map["@jersey_security//:jersey_security"] = "mvn:org.glassfish.jersey.security:oauth2-client:jar:NON-OSGI:2.27"
-artifact_map["@jersey_common//:jersey_common"] = "mvn:org.glassfish.jersey.core:jersey-common:jar:2.27"
-artifact_map["@jersey_container_jetty_http//:jersey_container_jetty_http"] = "mvn:org.glassfish.jersey.containers:jersey-container-jetty-http:jar:2.27"
-artifact_map["@jersey_container_servlet//:jersey_container_servlet"] = "mvn:org.glassfish.jersey.containers:jersey-container-servlet:jar:2.27"
-artifact_map["@jersey_container_servlet_core//:jersey_container_servlet_core"] = "mvn:org.glassfish.jersey.containers:jersey-container-servlet-core:jar:2.27"
-artifact_map["@jersey_media_multipart//:jersey_media_multipart"] = "mvn:org.glassfish.jersey.media:jersey-media-multipart:jar:2.27"
-artifact_map["@jersey_media_sse//:jersey_media_sse"] = "mvn:org.glassfish.jersey.media:jersey-media-sse:jar:2.27"
-artifact_map["@jersey_server//:jersey_server"] = "mvn:org.glassfish.jersey.core:jersey-server:jar:2.27"
-artifact_map["@jersey_hk2//:jersey_hk2"] = "mvn:org.glassfish.jersey.inject:jersey-hk2:jar:2.27"
-artifact_map["@jersey_test_framework_core//:jersey_test_framework_core"] = "mvn:org.glassfish.jersey.test-framework:jersey-test-framework-core:jar:NON-OSGI:2.27"
-artifact_map["@jersey_test_framework_jetty//:jersey_test_framework_jetty"] = "mvn:org.glassfish.jersey.test-framework.providers:jersey-test-framework-provider-jetty:jar:NON-OSGI:2.27"
-artifact_map["@jetty_util//:jetty_util"] = "mvn:org.eclipse.jetty:jetty-util:jar:9.4.11.v20180605"
-artifact_map["@jetty_websocket_api//:jetty_websocket_api"] = "mvn:org.eclipse.jetty.websocket:websocket-api:jar:9.4.11.v20180605"
-artifact_map["@jetty_websocket//:jetty_websocket"] = "mvn:org.eclipse.jetty.websocket:websocket-servlet:jar:9.4.11.v20180605"
-artifact_map["@jetty_server//:jetty_server"] = "mvn:org.eclipse.jetty:jetty-server:jar:9.4.11.v20180605"
-artifact_map["@jetty_servlet//:jetty_servlet"] = "mvn:org.eclipse.jetty:jetty-servlet:jar:9.4.11.v20180605"
-artifact_map["@jetty_security//:jetty_security"] = "mvn:org.eclipse.jetty:jetty-security:jar:9.4.11.v20180605"
-artifact_map["@jetty_continuation//:jetty_continuation"] = "mvn:org.eclipse.jetty:jetty-continuation:jar:9.4.11.v20180605"
-artifact_map["@jetty_http//:jetty_http"] = "mvn:org.eclipse.jetty:jetty-http:jar:9.4.11.v20180605"
-artifact_map["@jetty_io//:jetty_io"] = "mvn:org.eclipse.jetty:jetty-io:jar:9.4.11.v20180605"
+artifact_map["@jersey_client//:jersey_client"] = "mvn:org.glassfish.jersey.core:jersey-client:jar:2.48"
+artifact_map["@jersey_security//:jersey_security"] = "mvn:org.glassfish.jersey.security:oauth2-client:jar:NON-OSGI:2.48"
+artifact_map["@jersey_common//:jersey_common"] = "mvn:org.glassfish.jersey.core:jersey-common:jar:2.48"
+artifact_map["@jersey_container_jetty_http//:jersey_container_jetty_http"] = "mvn:org.glassfish.jersey.containers:jersey-container-jetty-http:jar:2.48"
+artifact_map["@jersey_container_servlet//:jersey_container_servlet"] = "mvn:org.glassfish.jersey.containers:jersey-container-servlet:jar:2.48"
+artifact_map["@jersey_container_servlet_core//:jersey_container_servlet_core"] = "mvn:org.glassfish.jersey.containers:jersey-container-servlet-core:jar:2.48"
+artifact_map["@jersey_media_multipart//:jersey_media_multipart"] = "mvn:org.glassfish.jersey.media:jersey-media-multipart:jar:2.48"
+artifact_map["@jersey_media_sse//:jersey_media_sse"] = "mvn:org.glassfish.jersey.media:jersey-media-sse:jar:2.48"
+artifact_map["@jersey_server//:jersey_server"] = "mvn:org.glassfish.jersey.core:jersey-server:jar:2.48"
+artifact_map["@jersey_hk2//:jersey_hk2"] = "mvn:org.glassfish.jersey.inject:jersey-hk2:jar:2.48"
+artifact_map["@jersey_media_jaxb//:jersey_media_jaxb"] = "mvn:org.glassfish.jersey.media:jersey-media-jaxb:jar:2.48"
+artifact_map["@jersey_test_framework_core//:jersey_test_framework_core"] = "mvn:org.glassfish.jersey.test-framework:jersey-test-framework-core:jar:NON-OSGI:2.48"
+artifact_map["@jersey_test_framework_jetty//:jersey_test_framework_jetty"] = "mvn:org.glassfish.jersey.test-framework.providers:jersey-test-framework-provider-jetty:jar:NON-OSGI:2.48"
+artifact_map["@jetty_util//:jetty_util"] = "mvn:org.eclipse.jetty:jetty-util:jar:9.4.43.v20210629"
+artifact_map["@jetty_websocket_api//:jetty_websocket_api"] = "mvn:org.eclipse.jetty.websocket:websocket-api:jar:9.4.43.v20210629"
+artifact_map["@jetty_websocket//:jetty_websocket"] = "mvn:org.eclipse.jetty.websocket:websocket-servlet:jar:9.4.43.v20210629"
+artifact_map["@jetty_server//:jetty_server"] = "mvn:org.eclipse.jetty:jetty-server:jar:9.4.43.v20210629"
+artifact_map["@jetty_servlet//:jetty_servlet"] = "mvn:org.eclipse.jetty:jetty-servlet:jar:9.4.43.v20210629"
+artifact_map["@jetty_security//:jetty_security"] = "mvn:org.eclipse.jetty:jetty-security:jar:9.4.43.v20210629"
+artifact_map["@jetty_continuation//:jetty_continuation"] = "mvn:org.eclipse.jetty:jetty-continuation:jar:9.4.43.v20210629"
+artifact_map["@jetty_http//:jetty_http"] = "mvn:org.eclipse.jetty:jetty-http:jar:9.4.43.v20210629"
+artifact_map["@jetty_io//:jetty_io"] = "mvn:org.eclipse.jetty:jetty-io:jar:9.4.43.v20210629"
 artifact_map["@javax_servlet_api//:javax_servlet_api"] = "mvn:javax.servlet:javax.servlet-api:jar:3.1.0"
 artifact_map["@joda_time//:joda_time"] = "mvn:joda-time:joda-time:jar:2.14.3"
 artifact_map["@jsch//:jsch"] = "mvn:com.jcraft:jsch:jar:NON-OSGI:0.1.55"
@@ -1578,11 +1593,11 @@ artifact_map["@junit//:junit"] = "mvn:junit:junit:jar:NON-OSGI:4.13.2"
 artifact_map["@junit_dep//:junit_dep"] = "mvn:junit:junit:jar:NON-OSGI:4.10"
 artifact_map["@kryo//:kryo"] = "mvn:com.esotericsoftware:kryo:jar:4.0.1"
 artifact_map["@mapdb//:mapdb"] = "mvn:org.mapdb:mapdb:jar:1.0.9"
-artifact_map["@metrics_core//:metrics_core"] = "mvn:io.dropwizard.metrics:metrics-core:jar:3.2.2"
-artifact_map["@metrics_ganglia//:metrics_ganglia"] = "mvn:io.dropwizard.metrics:metrics-ganglia:jar:3.2.2"
-artifact_map["@metrics_graphite//:metrics_graphite"] = "mvn:io.dropwizard.metrics:metrics-graphite:jar:3.2.2"
-artifact_map["@metrics_influxdb//:metrics_influxdb"] = "mvn:com.izettle:metrics-influxdb:jar:NON-OSGI:1.1.1"
-artifact_map["@metrics_json//:metrics_json"] = "mvn:io.dropwizard.metrics:metrics-json:jar:3.2.2"
+artifact_map["@metrics_core//:metrics_core"] = "mvn:io.dropwizard.metrics:metrics-core:jar:4.2.40"
+artifact_map["@metrics_ganglia//:metrics_ganglia"] = "mvn:io.dropwizard.metrics:metrics-ganglia:jar:3.2.6"
+artifact_map["@metrics_graphite//:metrics_graphite"] = "mvn:io.dropwizard.metrics:metrics-graphite:jar:4.2.40"
+artifact_map["@metrics_influxdb//:metrics_influxdb"] = "mvn:com.izettle:metrics-influxdb:jar:NON-OSGI:1.3.4"
+artifact_map["@metrics_json//:metrics_json"] = "mvn:io.dropwizard.metrics:metrics-json:jar:4.2.40"
 artifact_map["@minimal_json//:minimal_json"] = "mvn:com.eclipsesource.minimal-json:minimal-json:jar:0.9.4"
 artifact_map["@minlog//:minlog"] = "mvn:com.esotericsoftware:minlog:jar:1.3.0"
 artifact_map["@io_netty_netty//:io_netty_netty"] = "mvn:io.netty:netty:jar:3.10.5.Final"
@@ -1622,8 +1637,8 @@ artifact_map["@osgi_core//:osgi_core"] = "mvn:org.osgi:org.osgi.core:jar:6.0.0"
 artifact_map["@reflectasm//:reflectasm"] = "mvn:com.esotericsoftware:reflectasm:jar:1.11.7"
 artifact_map["@remotetea_oncrpc//:remotetea_oncrpc"] = "mvn:org.acplt.remotetea:remotetea-oncrpc:jar:1.1.3"
 artifact_map["@rrd4j//:rrd4j"] = "mvn:org.rrd4j:rrd4j:jar:NON-OSGI:3.1"
-artifact_map["@javassist//:javassist"] = "mvn:org.javassist:javassist:jar:3.22.0-GA"
-artifact_map["@mimepull//:mimepull"] = "mvn:org.jvnet.mimepull:mimepull:jar:1.9.6"
+artifact_map["@javassist//:javassist"] = "mvn:org.javassist:javassist:jar:3.30.2-GA"
+artifact_map["@mimepull//:mimepull"] = "mvn:org.jvnet.mimepull:mimepull:jar:1.9.15"
 artifact_map["@servlet_api//:servlet_api"] = "mvn:javax.servlet:servlet-api:jar:NON-OSGI:2.5"
 artifact_map["@slf4j_api//:slf4j_api"] = "mvn:org.slf4j:slf4j-api:jar:1.7.36"
 artifact_map["@slf4j_jdk14//:slf4j_jdk14"] = "mvn:org.slf4j:slf4j-jdk14:jar:1.7.36"
