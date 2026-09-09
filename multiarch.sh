@@ -17,7 +17,7 @@ set -euo pipefail
 # - Remote deletion is best-effort and may not work for all registries; use cautiously.
 
 VERSION="${1:-kubevirt}"
-IMAGE_PREFIX="${2:-registry.gitlab.com/sonaproject}"   # e.g. "registry.example.com/project" or leave empty for local images
+IMAGE_PREFIX="${2:-quay.io/edgestack}"   # e.g. "registry.example.com/project" or leave empty for local images
 
 # normalize prefix (append trailing slash if non-empty and missing)
 if [[ -n "${IMAGE_PREFIX}" && "${IMAGE_PREFIX: -1}" != "/" ]]; then

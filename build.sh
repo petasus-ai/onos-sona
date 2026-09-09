@@ -4,7 +4,7 @@ set -ex
 set -o pipefail
 
 TAG=${TAG:-kubevirt}
-REPO=${REPO:-registry.gitlab.com/sonaproject}
+REPO=${REPO:-quay.io/edgestack}
 PUSH=${PUSH:-}
 
 # support other container tools. e.g. podman

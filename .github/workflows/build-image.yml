@@ -1,8 +1,8 @@
 name: Build onos-sona image
 
 # Builds the onos-sona (SONA / KubeVirt networking) container image with the
-# repo Dockerfile and pushes a MULTI-ARCH (amd64 + arm64) manifest to the
-# GitLab registry, matching the existing :kubevirt manifest. Each arch builds
+# repo Dockerfile and pushes a MULTI-ARCH (amd64 + arm64) manifest to
+# quay.io/edgestack, matching the existing :kubevirt manifest. Each arch builds
 # on a NATIVE runner (no QEMU) and pushes by digest; a final job stitches the
 # per-arch digests into one tag. The Dockerfile runs `git log -10`, so the
 # checkout must include full history (fetch-depth: 0).
@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Image tag -> registry.gitlab.com/sonaproject/onos-sona-nightly-docker:<tag>"
+        description: "Image tag -> quay.io/edgestack/onos-sona-nightly-docker:<tag>"
         required: true
         default: "kubevirt"
       bazel_jobs:
@@ -22,8 +22,8 @@ on:
         default: "4"
 
 env:
-  REGISTRY: registry.gitlab.com
-  IMAGE: registry.gitlab.com/sonaproject/onos-sona-nightly-docker
+  REGISTRY: quay.io
+  IMAGE: quay.io/edgestack/onos-sona-nightly-docker
 
 concurrency:
   group: build-image-${{ github.event.inputs.tag || 'kubevirt' }}
@@ -53,12 +53,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Log in to GitLab registry
+      - name: Log in to quay.io
         uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
-          username: sonaproject
-          password: ${{ secrets.GITLAB_PROD_SECRET }}
+          username: edgestack
+          password: ${{ secrets.QUAY_CI_BOT_SECRET }}
 
       - name: Build and push by digest (${{ matrix.arch }})
         id: build
@@ -104,12 +104,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Log in to GitLab registry
+      - name: Log in to quay.io
         uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
-          username: sonaproject
-          password: ${{ secrets.GITLAB_PROD_SECRET }}
+          username: edgestack
+          password: ${{ secrets.QUAY_CI_BOT_SECRET }}
 
       - name: Create and push multi-arch manifest
         working-directory: /tmp/digests

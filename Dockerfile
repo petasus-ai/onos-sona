@@ -2,7 +2,7 @@ ARG JOBS=6
 ARG PROFILE=sona
 ARG TAG=11.0.17-11.60.19
 # First stage is the build environment
-FROM registry.gitlab.com/sonaproject/zulu-openjdk:${TAG} as builder
+FROM quay.io/edgestack/zulu-openjdk:${TAG} as builder
 MAINTAINER Jian Li <gunine@sk.com>
 
 # Set the environment variables
@@ -94,7 +94,7 @@ RUN mkdir /output
 RUN tar -xf bazel-bin/onos.tar.gz -C /output --strip-components=1
 
 # Second stage is the runtime environment
-FROM registry.gitlab.com/sonaproject/zulu-openjdk:${TAG}-jre
+FROM quay.io/edgestack/zulu-openjdk:${TAG}-jre
 
 LABEL org.label-schema.name="ONOS" \
       org.label-schema.description="SDN Controller" \
