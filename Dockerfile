@@ -49,7 +49,7 @@ COPY BUILD-sona /src/onos/BUILD
 RUN sed -i 's/modules.bzl/sona.bzl/g' /src/onos/BUILD
 
 # Download and patch ONOS core changes which affect ONOS
-RUN git clone https://github.com/sonaproject/onos-sona-patch.git patch && \
+RUN git clone https://github.com/petasus-ai/onos-sona-patch.git patch && \
     cp patch/${ONOS_VERSION}/*.patch /src/onos/ && \
     cp patch/patch.sh /src/onos/
 
