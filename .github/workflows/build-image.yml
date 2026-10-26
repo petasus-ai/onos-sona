@@ -6,10 +6,16 @@ name: Build onos-sona image
 # on a NATIVE runner (no QEMU) and pushes by digest; a final job stitches the
 # per-arch digests into one tag. The Dockerfile runs `git log -10`, so the
 # checkout must include full history (fetch-depth: 0).
+#
+# main publishes :dev. A tag vX.Y.Z on release-X.Y, checked by the shared release tag
+# guard, publishes :vX.Y.Z once - a published release is never built again - and latest
+# when it is the newest final release. A manual run publishes the tag it is given.
+# :kubevirt, which main moved until the first release, stays frozen as that build.
 
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:
@@ -26,12 +32,49 @@ env:
   IMAGE: quay.io/edgestack/onos-sona-nightly-docker
 
 concurrency:
-  group: build-image-${{ github.event.inputs.tag || 'kubevirt' }}
-  cancel-in-progress: true
+  group: build-image-${{ github.event.inputs.tag || github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
 
 jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    outputs:
+      tags: ${{ steps.plan.outputs.tags }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Guard the release tag
+        if: github.ref_type == 'tag'
+        uses: petasus-ai/.github/actions/guard-release-tag@987c4fc41f565d88e8879d2e204ff0d2ef369605
+      - name: Decide the tags
+        id: plan
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          set -euo pipefail
+          tags=""
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            tags=$INPUT_TAG
+          elif [ "$GITHUB_REF_TYPE" = tag ]; then
+            if docker buildx imagetools inspect "$IMAGE:$GITHUB_REF_NAME" >/dev/null 2>&1; then
+              echo "::notice::$IMAGE:$GITHUB_REF_NAME is already published; a release is never rebuilt."
+            else
+              tags=$GITHUB_REF_NAME
+              newest=$(git tag -l 'v*' | { grep -Ex 'v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)' || true; } | sort -V | tail -n 1)
+              [ "$newest" = "$GITHUB_REF_NAME" ] && tags="$tags latest"
+            fi
+          else
+            tags=dev
+          fi
+          echo "tags=$tags"
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+
   build:
     name: build (${{ matrix.arch }})
+    needs: plan
+    if: needs.plan.outputs.tags != ''
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 150
     strategy:
@@ -70,6 +113,10 @@ jobs:
           provenance: false
           build-args: |
             JOBS=${{ github.event.inputs.bazel_jobs || '4' }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ github.ref_name }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha,scope=${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
@@ -90,7 +137,7 @@ jobs:
 
   merge:
     name: merge manifest
-    needs: build
+    needs: [plan, build]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -113,16 +160,20 @@ jobs:
 
       - name: Create and push multi-arch manifest
         working-directory: /tmp/digests
+        env:
+          TAGS: ${{ needs.plan.outputs.tags }}
         run: |
-          tag="${{ github.event.inputs.tag || 'kubevirt' }}"
-          docker buildx imagetools create -t "${IMAGE}:${tag}" \
+          args=()
+          for tag in $TAGS; do args+=(-t "${IMAGE}:${tag}"); done
+          # shellcheck disable=SC2046 # one argument per digest file
+          docker buildx imagetools create "${args[@]}" \
             $(printf "${IMAGE}@sha256:%s " *)
 
       - name: Inspect
+        env:
+          TAGS: ${{ needs.plan.outputs.tags }}
         run: |
-          tag="${{ github.event.inputs.tag || 'kubevirt' }}"
-          docker buildx imagetools inspect "${IMAGE}:${tag}"
-          {
-            echo "### Built multi-arch image"
-            echo "- \`${IMAGE}:${tag}\` (linux/amd64 + linux/arm64)"
-          } >> "$GITHUB_STEP_SUMMARY"
+          for tag in $TAGS; do
+            docker buildx imagetools inspect "${IMAGE}:${tag}"
+            echo "- \`${IMAGE}:${tag}\` (linux/amd64 + linux/arm64)" >> "$GITHUB_STEP_SUMMARY"
+          done
