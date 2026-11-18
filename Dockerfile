@@ -16,7 +16,7 @@ ENV ONOS_BRANCH onos-2.7
 ENV BUILD_DEPS \
     ca-certificates \
     zip \
-    python \
+    python-is-python3 \
     python3 \
     git \
     bzip2 \
