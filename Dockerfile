@@ -1,6 +1,6 @@
 ARG JOBS=6
 ARG PROFILE=sona
-ARG TAG=11.0.17-11.60.19
+ARG TAG=11.0.33-11.92.113
 # First stage is the build environment
 FROM quay.io/edgestack/zulu-openjdk:${TAG} as builder
 MAINTAINER Jian Li <gunine@sk.com>
